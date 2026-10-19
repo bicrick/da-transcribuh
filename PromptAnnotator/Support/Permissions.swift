@@ -62,6 +62,16 @@ enum Permissions {
         }
     }
 
+    static func revealSettings(for status: Status) {
+        // One request puts this build on the Screen Recording list. Later calls do not stack a dialog.
+        if !status.screen {
+            _ = requestScreenRecording()
+        }
+        if let url = settingsURL(for: status) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     static func settingsURL(for status: Status) -> URL? {
         if !status.accessibility {
             return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")

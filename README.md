@@ -42,7 +42,7 @@ Prompt Annotator asks for:
 
 It does not request Speech Recognition. Transcription is on-device WhisperKit.
 
-Grant the toggles in System Settings, then quit and reopen. Starting a session does not show the system Accessibility dialog again; that dialog stays up even when the switch is already on, because the running app was launched before the grant. A rebuild is ad-hoc signed, so macOS may treat it as a new app and the switch has to be turned off and on once.
+Turn the switches on in System Settings, then quit and reopen. If a switch is already on and the app still asks, turn that switch off and on once. This Mac signs the debug app with a stable local certificate, so that grant keeps working after later rebuilds.
 
 ## WhisperKit model
 
@@ -58,4 +58,4 @@ Open `PromptAnnotator.xcodeproj` on macOS 14 or later, or:
 xcodebuild -project PromptAnnotator.xcodeproj -scheme PromptAnnotator -destination 'platform=macOS' test
 ```
 
-The first build fetches the WhisperKit package. Unit tests cover word alignment, the contact-sheet layout, markdown, and the shape composite. They do not download the model and they do not click through a live session.
+The first build fetches the WhisperKit package. Debug and Release are signed with the keychain certificate "Prompt Annotator Local". If that certificate is not installed, set the app target's signing identity to Sign to Run Locally. Unit tests cover word alignment, the contact-sheet layout, markdown, and the shape composite. They do not download the model and they do not click through a live session.

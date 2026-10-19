@@ -96,20 +96,28 @@ struct HomePage: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Permissions")
                     .font(.system(size: 13, weight: .semibold))
-                Text(permissions.status.summary ?? "Screen Recording, Microphone, and Accessibility are on.")
+                Text(permissionDetail)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
             if !permissions.status.isReady {
-                Button("Settings") {
-                    if let url = Permissions.settingsURL(for: permissions.status) {
-                        NSWorkspace.shared.open(url)
-                    }
+                Button("Turn On") {
+                    Permissions.revealSettings(for: permissions.status)
+                }
+                Button("Reopen") {
+                    Permissions.relaunch()
                 }
             }
         }
         .padding(12)
+    }
+
+    private var permissionDetail: String {
+        if let missing = permissions.status.summary {
+            return "Turn on \(missing). If a switch is already on, turn it off and on, then reopen."
+        }
+        return "Screen Recording, Microphone, and Accessibility are on."
     }
 
     private var drawRow: some View {
