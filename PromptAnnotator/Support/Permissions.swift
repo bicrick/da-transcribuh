@@ -29,20 +29,6 @@ enum Permissions {
         )
     }
 
-    static func prepare() async -> Status {
-        let accessibility = promptAccessibility()
-        let microphone = await requestMicrophone()
-        let screen = requestScreenRecording()
-        return Status(accessibility: accessibility, microphone: microphone, screen: screen)
-    }
-
-    static func promptAccessibility() -> Bool {
-        if AXIsProcessTrusted() { return true }
-        let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        let options = [key: true] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
-    }
-
     static func requestMicrophone() async -> Bool {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
@@ -61,6 +47,19 @@ enum Permissions {
     static func requestScreenRecording() -> Bool {
         if CGPreflightScreenCaptureAccess() { return true }
         return CGRequestScreenCaptureAccess()
+    }
+
+    static func relaunch() {
+        guard !Runtime.isUnitTest else { return }
+        let url = Bundle.main.bundleURL
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, error in
+            guard error == nil else { return }
+            DispatchQueue.main.async {
+                NSApp.terminate(nil)
+            }
+        }
     }
 
     static func settingsURL(for status: Status) -> URL? {

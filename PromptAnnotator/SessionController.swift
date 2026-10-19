@@ -67,6 +67,7 @@ final class SessionController: ObservableObject {
     private var isStarting = false
     private var chromeScreenID: CGDirectDisplayID?
     private var lastToggle = Date.distantPast
+    private var explainedPermissions = false
 
     var isBusy: Bool {
         switch phase {
@@ -335,15 +336,26 @@ final class SessionController: ObservableObject {
         isStarting = true
         defer { isStarting = false }
 
-        let access = await Permissions.prepare()
+        var access = Permissions.current()
+        if !access.microphone {
+            access.microphone = await Permissions.requestMicrophone()
+        }
+        if !access.screen {
+            access.screen = Permissions.requestScreenRecording()
+        }
         guard access.isReady else {
             lastError = access.summary.map { "Needs \($0)" }
-            presentMissingPermissions(access)
+            presentPermissionRelaunch(access)
             return
         }
         guard monitor.install() else {
-            lastError = "Accessibility is required to watch Shift."
-            presentMissingPermissions(Permissions.Status(accessibility: false, microphone: true, screen: true))
+            if !AXIsProcessTrusted() {
+                lastError = "Needs Accessibility"
+                presentPermissionRelaunch(Permissions.Status(accessibility: false, microphone: true, screen: true))
+            } else {
+                lastError = "Couldn't watch Shift."
+                presentError("Couldn't watch the keyboard", "Accessibility is on, but the event tap did not install. Quit and reopen Prompt Annotator.")
+            }
             return
         }
 
@@ -705,17 +717,27 @@ final class SessionController: ObservableObject {
         chrome.relayout()
     }
 
-    private func presentMissingPermissions(_ status: Permissions.Status) {
+    private func presentPermissionRelaunch(_ status: Permissions.Status) {
+        guard !explainedPermissions else { return }
+        explainedPermissions = true
         let missing = status.summary ?? "permission"
         let alert = NSAlert()
-        alert.messageText = "Prompt Annotator needs permission"
-        alert.informativeText = "Turn on \(missing) for Prompt Annotator in System Settings, then start the session again. Screen Recording often applies only after you quit and reopen the app. The app does not use Speech Recognition."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
+        alert.messageText = "Quit and reopen to use \(missing)"
+        alert.informativeText = "Those switches can already be on. macOS applies them to the next launch, so this copy still does not see them. Quit and reopen, then start the session again. If a switch is off, turn it on. If Prompt Annotator is missing from the list, click + and choose the app. The app does not use Speech Recognition."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Quit and Reopen")
         alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "Not Now")
         NSApp.activate(ignoringOtherApps: true)
-        if alert.runModal() == .alertSecondButtonReturn, let url = Permissions.settingsURL(for: status) {
-            NSWorkspace.shared.open(url)
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            Permissions.relaunch()
+        case .alertSecondButtonReturn:
+            if let url = Permissions.settingsURL(for: status) {
+                NSWorkspace.shared.open(url)
+            }
+        default:
+            break
         }
     }
 

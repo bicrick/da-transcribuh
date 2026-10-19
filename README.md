@@ -42,7 +42,7 @@ Prompt Annotator asks for:
 
 It does not request Speech Recognition. Transcription is on-device WhisperKit.
 
-Grant the toggles in System Settings. Screen Recording often applies only after you quit and reopen the app. An ad-hoc signature changes when the binary changes, so a rebuild can ask again.
+Grant the toggles in System Settings, then quit and reopen. Starting a session does not show the system Accessibility dialog again; that dialog stays up even when the switch is already on, because the running app was launched before the grant. A rebuild is ad-hoc signed, so macOS may treat it as a new app and the switch has to be turned off and on once.
 
 ## WhisperKit model
 

@@ -102,8 +102,10 @@ struct HomePage: View {
             }
             Spacer(minLength: 8)
             if !permissions.status.isReady {
-                Button("Allow") {
-                    Task { await permissions.request() }
+                Button("Settings") {
+                    if let url = Permissions.settingsURL(for: permissions.status) {
+                        NSWorkspace.shared.open(url)
+                    }
                 }
             }
         }
@@ -158,10 +160,5 @@ final class PermissionModel: ObservableObject {
 
     func refresh() {
         status = Permissions.current()
-    }
-
-    func request() async {
-        _ = await Permissions.prepare()
-        refresh()
     }
 }
