@@ -2,7 +2,9 @@
 
 A macOS 14 menu bar app for marking up the screen while you talk. It has no Dock icon and it is not sandboxed.
 
-Tap **Control-Option-Space** to start a session, and tap it again to stop. Clicks keep working. Hold **Shift** to draw. Release Shift and that group of marks becomes one tile. Option-Space, Command-Space, and Option-Command-Space are unchanged.
+The menu bar item opens the Prompt Annotator window: Home, Sessions, Recording, Sound, and Model. The default shortcut is **Control-Option-Space**. Change it on the Recording page. A tap starts a session, and a second tap stops it. Clicks keep working. Hold **Shift** to draw. Release Shift and that group of marks becomes one tile. Option-Space, Command-Space, and Option-Command-Space are left alone, and the shortcut cannot include Shift because Shift draws.
+
+The recording island can be Classic, Mini, or Hidden. Sound effects for start, tile, and stop are on by default and can be turned off.
 
 ## Hold Shift
 

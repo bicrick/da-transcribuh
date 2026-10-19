@@ -14,23 +14,30 @@ struct PromptAnnotatorApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            SessionMenu(session: session)
+            SessionMenu(session: session, settings: AppSettings.shared)
         } label: {
-            Image(systemName: session.menuIcon)
+            AppMenuMark(recording: session.phase == .recording)
         }
     }
 }
 
 private struct SessionMenu: View {
     @ObservedObject var session: SessionController
+    @ObservedObject var settings: AppSettings
 
     var body: some View {
+        Button("Open Prompt Annotator") {
+            SettingsPresenter.shared.show()
+        }
+
+        Divider()
+
         Button(session.toggleTitle) {
             session.toggle()
         }
         .disabled(session.isBusy)
 
-        Text("Shortcut: Control-Option-Space")
+        Text("Shortcut: \(settings.chord.display)")
 
         if session.isBusy {
             Text(session.statusText)
@@ -60,7 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotkeyCenter.shared.handler = {
             SessionController.shared.toggle()
         }
-        HotkeyCenter.shared.install()
+        HotkeyCenter.shared.install(AppSettings.shared.chord)
+        SettingsPresenter.shared.showOnFirstLaunch()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

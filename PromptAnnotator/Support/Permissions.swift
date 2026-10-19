@@ -21,6 +21,14 @@ enum Permissions {
         }
     }
 
+    static func current() -> Status {
+        Status(
+            accessibility: AXIsProcessTrusted(),
+            microphone: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+            screen: CGPreflightScreenCaptureAccess()
+        )
+    }
+
     static func prepare() async -> Status {
         let accessibility = promptAccessibility()
         let microphone = await requestMicrophone()

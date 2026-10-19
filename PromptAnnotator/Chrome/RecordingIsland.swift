@@ -2,42 +2,79 @@ import SwiftUI
 
 struct RecordingIslandView: View {
     @ObservedObject var session: SessionController
+    @ObservedObject private var settings = AppSettings.shared
     @State private var pulse = false
 
+    private var showsChrome: Bool {
+        !(session.phase == .recording && settings.islandStyle == .hidden)
+    }
+
     var body: some View {
-        HStack(spacing: 10) {
+        Group {
             if session.phase == .recording {
-                recordDot
-                Text("Recording")
-                    .font(.system(size: 13, weight: .semibold))
-                Text(TimeFormat.clock(session.elapsed))
-                    .font(.system(size: 13, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 44, alignment: .trailing)
-                WaveformBars(levels: session.levels)
-                if session.showsPenState {
-                    hairline
-                    Image(systemName: session.tool.symbolName)
-                        .font(.system(size: 12, weight: .semibold))
-                    Text(session.tool.title)
-                        .font(.system(size: 12, weight: .medium))
+                switch settings.islandStyle {
+                case .classic:
+                    HStack(spacing: 10) {
+                        recordDot
+                        Text("Recording")
+                            .font(.system(size: 13, weight: .semibold))
+                        timer
+                        WaveformBars(levels: session.levels)
+                        penState(includeTitle: true)
+                    }
+                case .mini:
+                    HStack(spacing: 8) {
+                        recordDot
+                        timer
+                        WaveformBars(levels: session.levels)
+                        penState(includeTitle: false)
+                    }
+                case .hidden:
+                    EmptyView()
                 }
             } else {
-                ProgressView()
-                    .controlSize(.small)
-                Text(session.statusText)
-                    .font(.system(size: 13, weight: .semibold))
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(session.statusText)
+                        .font(.system(size: 13, weight: .semibold))
+                }
             }
         }
         .foregroundStyle(.primary)
-        .padding(.horizontal, 14)
-        .frame(height: 36)
-        .fixedSize(horizontal: true, vertical: false)
-        .background(.regularMaterial, in: Capsule(style: .continuous))
-        .overlay(
-            Capsule(style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
-        )
+        .padding(.horizontal, showsChrome ? 14 : 0)
+        .frame(height: showsChrome ? 36 : 0)
+        .fixedSize(horizontal: showsChrome, vertical: false)
+        .background {
+            if showsChrome {
+                Capsule(style: .continuous)
+                    .fill(.regularMaterial)
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+                    )
+            }
+        }
+    }
+
+    private var timer: some View {
+        Text(TimeFormat.clock(session.elapsed))
+            .font(.system(size: 13, weight: .medium, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .frame(minWidth: 44, alignment: .trailing)
+    }
+
+    @ViewBuilder
+    private func penState(includeTitle: Bool) -> some View {
+        if session.showsPenState {
+            hairline
+            Image(systemName: session.tool.symbolName)
+                .font(.system(size: 12, weight: .semibold))
+            if includeTitle {
+                Text(session.tool.title)
+                    .font(.system(size: 12, weight: .medium))
+            }
+        }
     }
 
     private var recordDot: some View {

@@ -107,6 +107,12 @@ final class SessionController: ObservableObject {
         self.transcriber = transcriber
         monitor.session = self
         chrome.attach(self)
+        let settings = AppSettings.shared
+        tool = settings.defaultTool
+        color = settings.defaultColor
+        settings.onChromeChange = { [weak self] in
+            self?.refreshChrome()
+        }
     }
 
     nonisolated func toggle() {
@@ -117,6 +123,7 @@ final class SessionController: ObservableObject {
 
     func select(tool: AnnotationTool) {
         self.tool = tool
+        AppSettings.shared.setDefaultTool(tool)
         if showsPenState {
             ToolCursors.cursor(for: tool).set()
         }
@@ -124,9 +131,21 @@ final class SessionController: ObservableObject {
 
     func select(color: InkColor) {
         self.color = color
+        AppSettings.shared.setDefaultColor(color)
         if textEdit != nil {
             textEdit?.color = color
             syncOverlay()
+        }
+    }
+
+    func refreshChrome() {
+        switch phase {
+        case .recording:
+            chrome.showSession()
+        case .finishing, .downloading, .preparingModel, .transcribing:
+            chrome.showStatus()
+        case .idle, .done:
+            break
         }
     }
 
@@ -346,8 +365,11 @@ final class SessionController: ObservableObject {
             lastError = nil
             elapsed = 0
             showsPenState = false
+            tool = AppSettings.shared.defaultTool
+            color = AppSettings.shared.defaultColor
             setPhase(.recording)
             startTimer()
+            AppSounds.sessionStarted()
             log.info("Session started at \(folder.path, privacy: .public)")
         } catch {
             monitor.stop()
@@ -364,6 +386,7 @@ final class SessionController: ObservableObject {
 
     private func finish() async {
         guard phase == .recording else { return }
+        AppSounds.sessionStopped()
         setPhase(.finishing)
         monitor.stop()
         showsPenState = false
@@ -499,6 +522,7 @@ final class SessionController: ObservableObject {
         syncOverlay()
         refreshControls()
         guard !committed.isEmpty else { return }
+        AppSounds.tileCommitted()
         enqueueCapture(shapes: committed, displayID: displayID, committedAt: at, allowEmpty: false)
     }
 

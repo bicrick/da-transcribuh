@@ -18,7 +18,11 @@ final class ChromeHost {
     func showSession() {
         guard let session else { return }
         ensureHosts(session)
-        islandPanel?.orderFrontRegardless()
+        if AppSettings.shared.islandStyle == .hidden {
+            islandPanel?.orderOut(nil)
+        } else {
+            islandPanel?.orderFrontRegardless()
+        }
         toolbarPanel?.orderFrontRegardless()
         donePanel?.orderOut(nil)
         relayout()

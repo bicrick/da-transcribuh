@@ -10,12 +10,33 @@ final class HotkeyCenter {
 
     private var hotKey: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
+    private var chord = HotkeyChord.default
     private let signature: OSType = 0x5041_6E6E // 'PAnn'
     private let hotKeyID: UInt32 = 1
 
-    func install() {
-        guard hotKey == nil else { return }
+    @discardableResult
+    func install(_ chord: HotkeyChord) -> Bool {
+        installHandlerIfNeeded()
+        return register(chord)
+    }
 
+    @discardableResult
+    func apply(_ chord: HotkeyChord) -> Bool {
+        guard eventHandler != nil else {
+            self.chord = chord
+            return true
+        }
+        let previous = self.chord
+        guard register(chord) else {
+            _ = register(previous)
+            return false
+        }
+        self.chord = chord
+        return true
+    }
+
+    private func installHandlerIfNeeded() {
+        guard eventHandler == nil else { return }
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
@@ -49,17 +70,29 @@ final class HotkeyCenter {
             Unmanaged.passUnretained(self).toOpaque(),
             &eventHandler
         )
-        guard status == noErr else { return }
+        _ = status
+    }
 
+    @discardableResult
+    private func register(_ chord: HotkeyChord) -> Bool {
+        guard chord.canRegister else { return false }
+        if let hotKey {
+            UnregisterEventHotKey(hotKey)
+            self.hotKey = nil
+        }
         let id = EventHotKeyID(signature: signature, id: hotKeyID)
-        RegisterEventHotKey(
-            UInt32(kVK_Space),
-            UInt32(controlKey | optionKey),
+        let status = RegisterEventHotKey(
+            chord.keyCode,
+            chord.normalizedModifiers,
             id,
             GetApplicationEventTarget(),
             0,
             &hotKey
         )
+        if status == noErr {
+            self.chord = chord
+        }
+        return status == noErr
     }
 
     func remove() {

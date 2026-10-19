@@ -63,9 +63,31 @@ actor WhisperKitTranscriber: Transcribing {
         return Transcript(words: words, model: resolved.variant)
     }
 
-    private static func modelsDirectory() throws -> URL {
+    nonisolated static func modelsFolder() -> URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let directory = support.appendingPathComponent("PromptAnnotator/Models", isDirectory: true)
+        return support.appendingPathComponent("PromptAnnotator/Models", isDirectory: true)
+    }
+
+    nonisolated static func modelIsInstalled() -> Bool {
+        let root = modelsFolder()
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return false
+        }
+        for case let url as URL in enumerator {
+            let name = url.lastPathComponent
+            if name.contains("small.en") {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func modelsDirectory() throws -> URL {
+        let directory = modelsFolder()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
