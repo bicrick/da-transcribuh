@@ -16,7 +16,12 @@ struct PromptAnnotatorApp: App {
         MenuBarExtra {
             SessionMenu(session: session, settings: AppSettings.shared)
         } label: {
-            AppMenuMark(recording: session.phase == .recording)
+            // A system image plus a short title. A custom drawing in this label
+            // does not show up in the menu bar, so the app looks like it is not running.
+            Label(
+                session.phase == .recording ? "Rec" : "PA",
+                systemImage: session.phase == .recording ? "record.circle.fill" : "pencil.tip.crop.circle"
+            )
         }
     }
 }
@@ -68,7 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SessionController.shared.toggle()
         }
         HotkeyCenter.shared.install(AppSettings.shared.chord)
-        SettingsPresenter.shared.showOnFirstLaunch()
+        SettingsPresenter.shared.show()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
