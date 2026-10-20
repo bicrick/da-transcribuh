@@ -13,20 +13,14 @@ enum DisplayCapture {
             throw ExportError("The display being marked is no longer available.")
         }
 
+        // Capture the display as it is stacked: the front window, sheets, popovers,
+        // and the menu bar. Excluding this app punched those windows out and left
+        // whatever sat behind them. Only the recording chrome is left out.
         let excludedIDs = Set(excludedWindowIDs)
         let excludedWindows = content.windows.filter { excludedIDs.contains($0.windowID) }
-        let bundleID = Bundle.main.bundleIdentifier
-        let ourApps = content.applications.filter { $0.bundleIdentifier == bundleID }
-
-        let filter: SCContentFilter
-        if !ourApps.isEmpty {
-            filter = SCContentFilter(
-                display: display,
-                excludingApplications: ourApps,
-                exceptingWindows: []
-            )
-        } else {
-            filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
+        let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
+        if #available(macOS 14.2, *) {
+            filter.includeMenuBar = true
         }
 
         let configuration = SCStreamConfiguration()
@@ -35,6 +29,9 @@ enum DisplayCapture {
         configuration.showsCursor = false
         configuration.capturesAudio = false
         configuration.scalesToFit = false
+        if #available(macOS 14.2, *) {
+            configuration.includeChildWindows = true
+        }
 
         let screenshot = try await SCScreenshotManager.captureImage(
             contentFilter: filter,

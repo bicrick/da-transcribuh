@@ -16,33 +16,33 @@ The menu bar item opens the Prompt Annotator window: Home, Sessions, Recording, 
 
 ## How a session works
 
-A tap of the shortcut starts a session in capture mode. Drag to grab a rectangular snippet of the screen. A click that does not turn into a drag still reaches the page, and scrolling is left alone. Pick a draw tool to annotate, then hold **Shift** to draw and release Shift to save that group of marks as one tile. A second tap stops the session.
+A tap of the shortcut starts a session. You can just talk. Drag when you want a rectangular snippet of the screen, including the window or modal in front. A click that does not turn into a drag still reaches the page, and scrolling is left alone. Hold **Shift** to annotate: the tool bar appears, and release Shift to save that group of marks as one tile. A second tap stops the session.
 
-While capture is selected, the pointer stays normal until you drag. The drag draws a selection rectangle and, on release, screenshots that region. The recording island and the markup bar stay clickable. A drag that is only a few points across does not create a tile. Escape cancels a selection in progress.
+The capture is the stacked screen. Sheets, popovers, and the front window stay in the picture. The recording island, the tool bar, and the draw overlay stay out of it. A drag that is only a few points across does not create a tile. Escape cancels a selection in progress.
 
-Switch to pen (the default draw tool), highlighter, arrow, rectangle, or text when you want to mark. Hold Shift and the cursor becomes that tool. The draw surface captures the pointer only while Shift is held, so the app underneath does not receive the shift-click. Releasing Shift screenshots that display with ScreenCaptureKit, leaves the overlay, island, and markup bar out of the capture, and bakes the shapes into the bitmap. The canvas clears and the normal cursor comes back. A Shift tap that does not leave a mark does not create a tile. A tiny click is not a shape.
+While Shift is held, the cursor becomes the selected tool: pen (the default), highlighter, crosshair (arrow and rectangle), or I-beam (text). The draw surface captures the pointer only while Shift is held, so the app underneath does not receive the shift-click. Releasing Shift screenshots that display, bakes the shapes into the bitmap, and hides the tool bar. A Shift tap that does not leave a mark does not create a tile. A tiny click is not a shape.
 
 Escape cancels the shape in progress. Undo and redo apply to the marks in the current hold. After a group is saved, Undo on the bar drops that last tile.
 
 Text is the latch. Shift-click places a single-line label. Releasing Shift leaves the field open so you can type. Return finishes the label and commits the group. Escape cancels the label.
 
-Stop captures any marks still on screen, then ends the session. If you only talked, Stop still saves one clean screenshot and the transcript. Stop puts the tile sheet and the transcript on the clipboard, and the recording windows close.
+Stop saves any marks still on screen, then ends the session. If you never captured, Stop copies the transcript and does not take a screenshot. Each capture is paired with what you said up to that moment. Several captures become one numbered tile sheet, and the pasted words use those same numbers. The recording windows close.
 
 ## Shortcuts
 
 | Action | How |
 | --- | --- |
 | Start and stop a session | Control-Option-Space |
-| Capture a snippet | Drag while capture is selected |
-| Draw | Choose a tool, then hold Shift |
+| Capture a snippet | Drag |
+| Draw | Hold Shift |
 | Save one marked tile | Release Shift |
-| Put the tile sheet and transcript on the clipboard | Stop |
+| Copy the transcript, or the tile sheet and the numbered words | Stop |
 | Paste the picture; the words follow | Command-V |
 | Paste the picture and the words | Control-Option-V |
 
 The default shortcut is **Control-Option-Space**. Change it on the Recording page. Option-Space, Command-Space, and Option-Command-Space are left alone, and the shortcut cannot include Shift because Shift draws.
 
-Press Paste (Command-V). The picture goes in, and the words follow in a second paste. Each block is numbered to match the tile: `1.` is the first picture, `2.` is the second, and a silent tile still keeps its number. If the words do not appear, press Paste once more. Control-Option-V pastes the picture and then the words in one step. The menu can show the last session in Finder.
+If the session has captures, press Paste (Command-V). The tile sheet goes in, and the words follow in a second paste. Each block is numbered to match the tile: `1.` is the first picture, `2.` is the second, and a silent tile still keeps its number. If the words do not appear, press Paste once more. Control-Option-V pastes the picture and then the words in one step. A session with no capture puts the transcript on the clipboard by itself. The menu can show the last session in Finder.
 
 ## Requirements
 

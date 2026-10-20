@@ -21,7 +21,22 @@ final class ChromeHost {
         } else {
             islandPanel?.orderFrontRegardless()
         }
-        toolbarPanel?.orderFrontRegardless()
+        if session.showsToolbar {
+            toolbarPanel?.orderFrontRegardless()
+        } else {
+            toolbarPanel?.orderOut(nil)
+        }
+        relayout()
+    }
+
+    func setToolbarVisible(_ visible: Bool) {
+        guard let session else { return }
+        ensureHosts(session)
+        if visible {
+            toolbarPanel?.orderFrontRegardless()
+        } else {
+            toolbarPanel?.orderOut(nil)
+        }
         relayout()
     }
 

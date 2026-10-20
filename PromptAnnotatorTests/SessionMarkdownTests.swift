@@ -106,6 +106,18 @@ final class SessionMarkdownTests: XCTestCase {
         XCTAssertEqual(text, "1. hello there\n\n2. next done")
     }
 
+    func testPasteTextWithoutCapturesIsPlainSpeech() {
+        let text = SessionMarkdown.pasteText(
+            sections: [],
+            transcript: [
+                TimedWord(text: "hello", start: 1, end: 1.2),
+                TimedWord(text: "there", start: 1.3, end: 1.6),
+            ],
+            transcriptionError: nil
+        )
+        XCTAssertEqual(text, "hello there")
+    }
+
     func testPasteTextKeepsNumbersWhenATileIsSilent() {
         let text = SessionMarkdown.pasteText(
             sections: [

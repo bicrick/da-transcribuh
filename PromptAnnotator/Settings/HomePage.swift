@@ -38,7 +38,7 @@ struct HomePage: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Prompt Annotator")
                     .font(.system(size: 22, weight: .semibold))
-                Text("Mark the screen while you talk. Each Shift-hold becomes a tile.")
+                Text("Talk, and capture the screen when you want the picture with the words.")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
@@ -124,9 +124,9 @@ struct HomePage: View {
         HStack(spacing: 12) {
             rowIcon("viewfinder")
             VStack(alignment: .leading, spacing: 2) {
-                Text("Drag to capture a snippet")
+                Text("Drag to capture, or just talk")
                     .font(.system(size: 13, weight: .semibold))
-                Text("A click or scroll still reaches the page. Pick a draw tool, then hold Shift to mark.")
+                Text("A capture includes the front window. Hold Shift to annotate. No capture copies the transcript only.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }

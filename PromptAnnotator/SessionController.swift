@@ -28,6 +28,7 @@ final class SessionController: ObservableObject {
 
     @Published private(set) var phase: SessionPhase = .idle
     @Published private(set) var markupMode: MarkupMode = .capture
+    @Published private(set) var showsToolbar = false
     @Published private(set) var tool: AnnotationTool = .pen
     @Published private(set) var color: InkColor = .red
     @Published private(set) var elapsed: TimeInterval = 0
@@ -131,6 +132,7 @@ final class SessionController: ObservableObject {
         let hadMarks = textEdit != nil || draft != nil || shapes.contains(where: { $0.isSignificant() })
         markupMode = .capture
         showsPenState = false
+        setToolbarVisible(false)
         monitor.cancelHold()
         selectionRect = nil
         NSCursor.arrow.set()
@@ -146,22 +148,16 @@ final class SessionController: ObservableObject {
     }
 
     func select(tool: AnnotationTool) {
-        let switching = markupMode != .annotate
-        markupMode = .annotate
-        selectionRect = nil
-        if switching {
-            monitor.cancelHold()
-        }
         self.tool = tool
         AppSettings.shared.setDefaultTool(tool)
         if phase == .recording, monitor.shiftIsDown, textEdit == nil {
+            markupMode = .annotate
             showsPenState = true
-            chrome.relayout()
+            setToolbarVisible(true)
             ToolCursors.cursor(for: tool).set()
         } else if showsPenState {
             ToolCursors.cursor(for: tool).set()
         }
-        syncOverlay()
     }
 
     func select(color: InkColor) {
@@ -182,6 +178,11 @@ final class SessionController: ObservableObject {
         case .idle:
             break
         }
+    }
+
+    private func setToolbarVisible(_ visible: Bool) {
+        showsToolbar = visible
+        chrome.setToolbarVisible(visible)
     }
 
     func undo() {
@@ -269,13 +270,22 @@ final class SessionController: ObservableObject {
     }
 
     func penShift(down: Bool) {
-        guard phase == .recording, markupMode == .annotate, textEdit == nil else { return }
-        showsPenState = down
+        guard phase == .recording else { return }
         if down {
-            chrome.relayout()
+            markupMode = .annotate
+            if textEdit == nil {
+                showsPenState = true
+            }
+            setToolbarVisible(true)
             chromeScreenID = ScreenGeometry.screenUnderMouse().flatMap(ScreenGeometry.displayID)
-        } else if !monitor.isSwallowingMouse {
-            commitCanvas()
+        } else {
+            showsPenState = false
+            setToolbarVisible(false)
+            guard textEdit == nil else { return }
+            if !monitor.isSwallowingMouse {
+                commitCanvas()
+                markupMode = .capture
+            }
         }
         DispatchQueue.main.async { self.chrome.relayout() }
         refreshControls()
@@ -327,6 +337,8 @@ final class SessionController: ObservableObject {
         refreshControls()
         if !showsPenState, textEdit == nil {
             commitCanvas()
+            markupMode = .capture
+            setToolbarVisible(false)
         }
     }
 
@@ -452,6 +464,7 @@ final class SessionController: ObservableObject {
             elapsed = 0
             showsPenState = false
             markupMode = .capture
+            showsToolbar = false
             selectionRect = nil
             tool = AppSettings.shared.defaultTool
             color = AppSettings.shared.defaultColor
@@ -521,16 +534,6 @@ final class SessionController: ObservableObject {
                 )
             }
         }
-        if groups.isEmpty {
-            await performCapture(
-                shapes: [],
-                displayID: ScreenGeometry.screenUnderMouse().flatMap(ScreenGeometry.displayID),
-                committedAt: Date().timeIntervalSince(startedAt),
-                allowEmpty: true,
-                fallbackFrame: true
-            )
-        }
-
         keepTranscribing = false
         await speechTask?.value
         speechTask = nil
@@ -538,11 +541,6 @@ final class SessionController: ObservableObject {
         let spokenSamples = audio.copySamples()
         overlay.hide()
         let ended = Date()
-        let sessionEnd = ended.timeIntervalSince(startedAt)
-        if groups.count == 1, groups[0].isFallbackFrame {
-            groups[0].committedAt = sessionEnd
-        }
-
         guard let directory else {
             lastError = "The session folder is missing."
             setPhase(.idle)
