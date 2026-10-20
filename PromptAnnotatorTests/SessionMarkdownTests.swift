@@ -103,6 +103,30 @@ final class SessionMarkdownTests: XCTestCase {
             transcript: [],
             transcriptionError: nil
         )
-        XCTAssertEqual(text, "hello there\n\nnext done")
+        XCTAssertEqual(text, "1. hello there\n\n2. next done")
+    }
+
+    func testPasteTextKeepsNumbersWhenATileIsSilent() {
+        let text = SessionMarkdown.pasteText(
+            sections: [
+                SessionMarkdown.Section(
+                    index: 1,
+                    commitOffset: 4,
+                    imagePath: "frames/01.png",
+                    words: [],
+                    closingNote: []
+                ),
+                SessionMarkdown.Section(
+                    index: 2,
+                    commitOffset: 18,
+                    imagePath: "frames/02.png",
+                    words: [TimedWord(text: "second", start: 10, end: 10.4)],
+                    closingNote: []
+                ),
+            ],
+            transcript: [],
+            transcriptionError: nil
+        )
+        XCTAssertEqual(text, "1.\n\n2. second")
     }
 }

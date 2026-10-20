@@ -41,7 +41,7 @@ Stop captures any marks still on screen, then ends the session. If you only talk
 
 The default shortcut is **Control-Option-Space**. Change it on the Recording page. Option-Space, Command-Space, and Option-Command-Space are left alone, and the shortcut cannot include Shift because Shift draws.
 
-Press Paste (Command-V). The picture goes in, and the words follow in a second paste. If the words do not appear, press Paste once more. Control-Option-V pastes the picture and then the words in one step. The menu can show the last session in Finder.
+Press Paste (Command-V). The picture goes in, and the words follow in a second paste. Each block is numbered to match the tile: `1.` is the first picture, `2.` is the second, and a silent tile still keeps its number. If the words do not appear, press Paste once more. Control-Option-V pastes the picture and then the words in one step. The menu can show the last session in Finder.
 
 ## Requirements
 

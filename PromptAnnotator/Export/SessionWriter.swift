@@ -84,18 +84,19 @@ struct SessionMarkdown {
         transcriptionError: String?
     ) -> String {
         var paragraphs: [String] = []
-        for section in sections {
-            let spoken = [Aligner.spokenText(section.words), Aligner.spokenText(section.closingNote)]
-                .filter { !$0.isEmpty }
-                .joined(separator: " ")
-            if !spoken.isEmpty {
-                paragraphs.append(spoken)
-            }
-        }
-        if paragraphs.isEmpty {
+        if sections.isEmpty {
             let all = Aligner.spokenText(transcript)
             if !all.isEmpty {
                 paragraphs.append(all)
+            }
+        } else {
+            // The sheet badges are 1, 2, 3. The pasted words use those same numbers,
+            // including a tile that had no speech, so the list stays lined up.
+            for section in sections {
+                let spoken = [Aligner.spokenText(section.words), Aligner.spokenText(section.closingNote)]
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
+                paragraphs.append(spoken.isEmpty ? "\(section.index)." : "\(section.index). \(spoken)")
             }
         }
         if let transcriptionError, !transcriptionError.isEmpty {
