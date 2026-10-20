@@ -83,7 +83,9 @@ struct RecordingPage: View {
 
     @ViewBuilder
     private func styleGlyph(_ style: IslandStyle) -> some View {
-        let preview = [CGFloat(0.25), 0.7, 0.4, 0.9, 0.35, 0.6, 0.3]
+        let preview = (0..<40).map { index in
+            CGFloat(0.05 + abs(sin(Double(index) * 0.55)) * 0.85)
+        }
         switch style {
         case .classic:
             HStack(spacing: 5) {

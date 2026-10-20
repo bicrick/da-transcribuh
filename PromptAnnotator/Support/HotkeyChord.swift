@@ -59,6 +59,18 @@ struct HotkeyChord: Equatable, Codable {
         return symbols + keyTitle
     }
 
+    /// Separate keycaps, modifiers first, then the key. Control-Option-Space is ⌃, ⌥, Space.
+    var keycaps: [String] {
+        var caps: [String] = []
+        let mods = normalizedModifiers
+        if mods & UInt32(controlKey) != 0 { caps.append("⌃") }
+        if mods & UInt32(optionKey) != 0 { caps.append("⌥") }
+        if mods & UInt32(shiftKey) != 0 { caps.append("⇧") }
+        if mods & UInt32(cmdKey) != 0 { caps.append("⌘") }
+        caps.append(keyTitle)
+        return caps
+    }
+
     var keyTitle: String {
         switch keyCode {
         case UInt32(kVK_Space): return "Space"

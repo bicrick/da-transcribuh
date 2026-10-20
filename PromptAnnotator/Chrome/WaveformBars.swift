@@ -1,39 +1,48 @@
 import SwiftUI
 
 enum WaveformSamples {
-    static let count = 19
+    static var count: Int { WaveformTrace.columns }
 }
 
-/// Frequency bars. Each one stays in its slot and changes height with the sound.
+/// Thin centered lines. Silence is a dotted baseline. Speech fills the height.
 struct WaveformBars: View {
     var levels: [CGFloat]
-    var slotWidth: CGFloat = 188
-    var slotHeight: CGFloat = 26
+    var slotWidth: CGFloat = 440
+    var slotHeight: CGFloat = 78
+    var ink: Color = .primary
 
     var body: some View {
-        let bars = levels.isEmpty ? [CGFloat(0.12)] : levels
-        HStack(alignment: .center, spacing: spacing(for: bars.count)) {
-            ForEach(Array(bars.enumerated()), id: \.offset) { _, level in
-                Capsule(style: .continuous)
-                    .fill(Color.primary.opacity(0.82))
-                    .frame(width: Self.barWidth, height: barHeight(level))
+        Canvas { context, size in
+            let bars = columns(for: size.width)
+            guard !bars.isEmpty else { return }
+            let gap: CGFloat = 1.15
+            let barWidth = max(1, (size.width - gap * CGFloat(bars.count - 1)) / CGFloat(bars.count))
+            for (index, level) in bars.enumerated() {
+                let clamped = min(1, max(0, level))
+                let height = max(2, clamped * size.height)
+                let x = CGFloat(index) * (barWidth + gap)
+                let rect = CGRect(
+                    x: x,
+                    y: (size.height - height) / 2,
+                    width: barWidth,
+                    height: height
+                )
+                let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
+                context.fill(path, with: .color(ink.opacity(0.9)))
             }
         }
         .frame(width: slotWidth, height: slotHeight)
-        .animation(.easeOut(duration: 0.1), value: levels)
+        .accessibilityLabel("Live waveform")
     }
 
-    private func barHeight(_ level: CGFloat) -> CGFloat {
-        let clamped = min(1, max(0, level))
-        return max(3, 3 + clamped * (slotHeight - 3))
+    private func columns(for width: CGFloat) -> [CGFloat] {
+        let source = levels.isEmpty ? [WaveformTrace.floor] : levels
+        let target = max(12, Int((width / 2.45).rounded()))
+        if source.count == target { return source }
+        return (0..<target).map { index in
+            let start = index * source.count / target
+            let end = min(source.count, max(start + 1, (index + 1) * source.count / target))
+            return source[start..<end].max() ?? WaveformTrace.floor
+        }
     }
-
-    private func spacing(for count: Int) -> CGFloat {
-        guard count > 1 else { return 0 }
-        let used = CGFloat(count) * Self.barWidth
-        let raw = (slotWidth - used) / CGFloat(count - 1)
-        return min(6, max(2, raw))
-    }
-
-    private static let barWidth: CGFloat = 3.5
 }

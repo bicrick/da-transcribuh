@@ -32,7 +32,7 @@ final class SessionController: ObservableObject {
     @Published private(set) var tool: AnnotationTool = .pen
     @Published private(set) var color: InkColor = .red
     @Published private(set) var elapsed: TimeInterval = 0
-    @Published private(set) var levels: [CGFloat] = Array(repeating: 0.12, count: WaveformSamples.count)
+    @Published private(set) var levels: [CGFloat] = WaveformTrace.resting()
     @Published private(set) var captureCount = 0
     @Published private(set) var showsPenState = false
     @Published private(set) var canUndo = false

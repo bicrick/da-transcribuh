@@ -75,7 +75,7 @@ final class ChromeHost {
 
     private func ensureHosts(_ session: SessionController) {
         if islandPanel == nil {
-            let panel = ChromePanel(radius: 18)
+            let panel = ChromePanel(radius: 22)
             let host = NSHostingView(rootView: RecordingIslandView(session: session))
             host.sizingOptions = [.intrinsicContentSize]
             host.autoresizingMask = [.width, .height]

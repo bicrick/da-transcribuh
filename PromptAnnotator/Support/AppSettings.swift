@@ -55,7 +55,7 @@ enum IslandStyle: String, CaseIterable, Identifiable, Codable {
 
     var detail: String {
         switch self {
-        case .classic: return "Waveform in the middle"
+        case .classic: return "Dense waveform, stop, and cancel"
         case .compact: return "Dot, waveform, and time"
         case .minimal: return "Waveform only"
         case .hidden: return "No bar while you record"
@@ -134,7 +134,7 @@ final class AppSettings: ObservableObject {
         silenceStopSeconds = defaults.object(forKey: Keys.silence) as? Double ?? 0
         maxSessionMinutes = defaults.object(forKey: Keys.maxMinutes) as? Double ?? 0
         normalizeSpeech = defaults.bool(forKey: Keys.normalize)
-        pasteOnStop = defaults.bool(forKey: Keys.pasteOnStop)
+        pasteOnStop = defaults.object(forKey: Keys.pasteOnStop) as? Bool ?? true
         returnOnShift = defaults.bool(forKey: Keys.returnOnShift)
         capitalizeTranscript = defaults.bool(forKey: Keys.capitalize)
         loginItemNote = nil

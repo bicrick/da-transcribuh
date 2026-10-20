@@ -23,6 +23,18 @@ final class SettingsBehaviorTests: XCTestCase {
         XCTAssertEqual(TranscriptText.leadingCapital("already"), "Already")
     }
 
+    @MainActor
+    func testPasteOnStopStartsOnAndCanBeTurnedOff() {
+        let name = "PromptAnnotatorTests.pasteDefaults"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertTrue(settings.pasteOnStop)
+        settings.setPasteOnStop(false)
+        XCTAssertFalse(AppSettings(defaults: defaults).pasteOnStop)
+        defaults.removePersistentDomain(forName: name)
+    }
+
     func testSilenceStopWaitsForSpeechThenQuiet() {
         var watch = SilenceWatch()
         XCTAssertFalse(watch.tick(level: 0.05, heardSpeech: false, limit: 1, delta: 0.5))

@@ -245,7 +245,7 @@ struct ConfigurationPage: View {
                     get: { settings.pasteOnStop },
                     set: { settings.setPasteOnStop($0) }
                 )) {
-                    settingCopy("Paste when the session ends", "Pastes into the app that is in front. It waits if this window is focused.")
+                    settingCopy("Paste when the session ends", "On by default. Pastes into the front app, the way a dictation stop does. It waits while this window is focused.")
                 }
                 .toggleStyle(.switch)
                 Toggle(isOn: Binding(

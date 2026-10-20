@@ -12,7 +12,7 @@
 
 A macOS menu bar app that records your voice and on-screen marks, then puts a tile sheet and transcript on the clipboard. It appears in the Dock and it is not sandboxed. This repository is in beta. The app shows its version and build number.
 
-The menu bar item opens the Prompt Annotator window: Home, History, Recording, Configuration, Sound, Model, and Performance. History searches past transcripts. Configuration rebinds the shortcuts and holds the advanced session settings. Performance shows the app's memory, the model size on disk, and how much of the Mac that is. The recording bar can be Default, Compact, Minimal, or Hidden. Tones for start, capture, and stop are on by default and can be turned off. Sound offers Classic, Soft, Click, and Deep. A spoken stop and a silent stop use different tones. The first launch walks through permissions, the shortcut, and how a session works.
+The menu bar item opens the Prompt Annotator window: Home, History, Recording, Configuration, Sound, Model, and Performance. History searches past transcripts. Configuration rebinds the shortcuts and holds the advanced session settings. Performance shows the app's memory, the model size on disk, and how much of the Mac that is. The recording bar can be Default, Compact, Minimal, or Hidden. Default is a wide voice trace with Stop and Cancel under it. Tones for start, capture, and stop are on by default and can be turned off. Sound offers Classic, Soft, Click, and Deep. A spoken stop and a silent stop use different tones. The first launch walks through permissions, the shortcut, and how a session works.
 
 ## How a session works
 
@@ -26,7 +26,7 @@ Escape cancels the shape in progress. Undo and redo apply to the marks in the cu
 
 Text is the latch. Shift-click places a single-line label. Releasing Shift leaves the field open so you can type. Return finishes the label and commits the group. Escape cancels the label.
 
-Stop saves any marks still on screen, then ends the session. If you never captured, Stop copies the transcript and does not take a screenshot. Each capture is paired with what you said up to that moment. A capture you take without speaking stays a picture, and nothing is pasted after it. Several captures become one numbered tile sheet, and the pasted words use those same numbers when you did speak. While those words are prepared, the recording bar keeps the waveform moving, then closes.
+Stop saves any marks still on screen, then ends the session. Paste into the front app is on by default, and Configuration can turn it off. If you never captured, Stop copies the transcript and does not take a screenshot. Each capture is paired with what you said up to that moment. A capture you take without speaking stays a picture, and nothing is pasted after it. Several captures become one numbered tile sheet, and the pasted words use those same numbers when you did speak. While those words are prepared, the recording bar keeps the waveform moving, then closes.
 
 ## Shortcuts
 
@@ -42,7 +42,7 @@ Stop saves any marks still on screen, then ends the session. If you never captur
 
 The default shortcut is **Control-Option-Space**. Change it on the Recording page. Option-Space, Command-Space, and Option-Command-Space are left alone, and the shortcut cannot include Shift because Shift draws.
 
-If the session has captures, press Paste (Command-V). The tile sheet goes in, and the words follow in a second paste when you spoke. Each block is numbered to match the tile you commented on. A picture with no words is left out of the text, and a session where nothing was said pastes the picture alone. If the words do not appear, press Paste once more. Control-Option-V pastes the picture and then the words in one step. A session with no capture puts the transcript on the clipboard by itself. The menu can show the last session in Finder.
+When a session ends, the picture and the words paste into the front app. Turn that off under Configuration, Paste when the session ends. Command-V still pastes the picture, and the words follow in a second paste when you spoke. Each block is numbered to match the tile you commented on. A picture with no words is left out of the text, and a session where nothing was said pastes the picture alone. If the words do not appear, press Paste once more. Control-Option-V pastes the picture and then the words in one step. A session with no capture puts the transcript on the clipboard by itself. The menu can show the last session in Finder.
 
 ## Requirements
 

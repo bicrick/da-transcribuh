@@ -9,6 +9,7 @@ final class HotkeyChordTests: XCTestCase {
         XCTAssertTrue(chord.canRegister)
         XCTAssertFalse(chord.takesOverSystemShortcut)
         XCTAssertEqual(chord.display, "⌃⌥Space")
+        XCTAssertEqual(chord.keycaps, ["⌃", "⌥", "Space"])
     }
 
     func testSystemSpaceChordsStayReserved() {
