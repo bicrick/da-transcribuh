@@ -12,7 +12,7 @@
 
 A macOS menu bar app that records your voice and on-screen marks, then puts a tile sheet and transcript on the clipboard. It appears in the Dock and it is not sandboxed. This repository is in beta. The app shows its version and build number.
 
-The menu bar item opens the Prompt Annotator window: Home, History, Recording, Configuration, Sound, Model, and Performance. History searches past transcripts. Configuration rebinds the shortcuts and holds the advanced session settings. Performance shows the app's memory, the model size on disk, and how much of the Mac that is. The recording bar can be Default, Compact, Minimal, or Hidden. Default is a wide voice trace with Stop and Cancel under it. Tones for start, capture, and stop are on by default and can be turned off. Sound offers Classic, Soft, Click, and Deep. A spoken stop and a silent stop use different tones. The first launch walks through permissions, the shortcut, how a session works, and which speech model to download.
+The menu bar item opens the Prompt Annotator window: Home, History, Recording, Configuration, Sound, Model, and Performance. History searches past transcripts. Configuration rebinds the shortcuts and holds the advanced session settings. Performance shows the app's memory, the model size on disk, and how much of the Mac that is. The recording bar can be Default, Compact, Minimal, or Hidden. Tones for start, capture, and stop are on by default and can be turned off. Sound offers Classic, Soft, Click, and Deep. A spoken stop and a silent stop use different tones. The first launch walks through permissions, the shortcut, how a session works, and which speech model to download.
 
 ## How a session works
 

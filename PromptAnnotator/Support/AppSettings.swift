@@ -55,7 +55,7 @@ enum IslandStyle: String, CaseIterable, Identifiable, Codable {
 
     var detail: String {
         switch self {
-        case .classic: return "Dense waveform, stop, and cancel"
+        case .classic: return "Waveform in the middle"
         case .compact: return "Dot, waveform, and time"
         case .minimal: return "Waveform only"
         case .hidden: return "No bar while you record"

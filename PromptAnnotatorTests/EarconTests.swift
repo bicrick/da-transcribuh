@@ -98,6 +98,14 @@ final class FrequencyBandTests: XCTestCase {
         XCTAssertTrue(quiet.allSatisfy { $0 < 0.2 })
     }
 
+    func testSmoothingKeepsEachPitchInItsSlot() {
+        let rest = FrequencyBands.resting(8)
+        let eased = FrequencyBands.smooth(rest, toward: [1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
+        XCTAssertEqual(eased.count, 8)
+        XCTAssertGreaterThan(eased[0], eased[7])
+        XCTAssertLessThan(eased[0], 1)
+    }
+
     private func tone(band: Int, count: Int) -> [Float] {
         let hz = FrequencyBands.frequency(band: band, count: count)
         return (0..<FrequencyBands.window).map { index in

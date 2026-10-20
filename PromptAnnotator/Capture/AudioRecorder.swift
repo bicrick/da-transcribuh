@@ -11,8 +11,8 @@ final class AudioRecorder {
     private var speechConverter: AVAudioConverter?
     private var speechFormat: AVAudioFormat?
     private var speechSamples: [Float] = []
-    private var traceWindow: [Float] = []
-    private var bands: [CGFloat] = WaveformTrace.resting()
+    private var bandWindow: [Float] = []
+    private var bands: [CGFloat] = FrequencyBands.resting(WaveformSamples.count)
     private var currentLevel: CGFloat = 0.12
     private var voicedBuffers = 0
     private var speechHeard = false
@@ -22,11 +22,11 @@ final class AudioRecorder {
     func start(url: URL) throws {
         sampleLock.lock()
         speechSamples = []
-        traceWindow = []
+        bandWindow = []
         currentLevel = 0.12
         voicedBuffers = 0
         speechHeard = false
-        bands = WaveformTrace.resting()
+        bands = FrequencyBands.resting(WaveformSamples.count)
         sampleLock.unlock()
 
         try startRecorder(url: url)
@@ -80,11 +80,10 @@ final class AudioRecorder {
             currentLevel = level
             sampleLock.lock()
             SpeechGate.note(level: level, voicedBuffers: &voicedBuffers, heard: &speechHeard)
-            if bands.count != WaveformTrace.columns {
-                bands = WaveformTrace.resting()
+            if bands.count != WaveformSamples.count {
+                bands = FrequencyBands.resting(WaveformSamples.count)
             }
-            bands.removeFirst()
-            bands.append(WaveformTrace.fromMeter(level))
+            bands = FrequencyBands.smooth(bands, toward: FrequencyBands.shaped(level: level, count: bands.count))
             let snapshot = bands
             sampleLock.unlock()
             return snapshot
@@ -167,14 +166,20 @@ final class AudioRecorder {
         let level = Self.unitLevel(floats)
         sampleLock.lock()
         speechSamples.append(contentsOf: floats)
-        traceWindow.append(contentsOf: floats)
-        let cap = WaveformTrace.windowSamples
-        if traceWindow.count > cap + cap / 4 {
-            traceWindow.removeFirst(traceWindow.count - cap)
+        bandWindow.append(contentsOf: floats)
+        if bandWindow.count > FrequencyBands.window + 2_048 {
+            bandWindow.removeFirst(bandWindow.count - FrequencyBands.window)
         }
-        bands = WaveformTrace.levels(samples: traceWindow)
+        let window = bandWindow
+        let previous = bands
         currentLevel = level
         SpeechGate.note(level: level, voicedBuffers: &voicedBuffers, heard: &speechHeard)
+        sampleLock.unlock()
+
+        let next = FrequencyBands.levels(samples: window, count: WaveformSamples.count)
+        let eased = FrequencyBands.smooth(previous, toward: next)
+        sampleLock.lock()
+        bands = eased
         sampleLock.unlock()
     }
 
