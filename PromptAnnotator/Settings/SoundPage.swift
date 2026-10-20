@@ -76,7 +76,7 @@ struct SoundPage: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    Text("Start rises. A spoken stop resolves downward. A silent stop is one soft tone. Soft plays the same tones quieter.")
+                    Text("Low blips. Start rises, a spoken stop falls, and a silent stop is a single softer tone. Soft plays the same tones quieter.")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

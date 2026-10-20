@@ -11,6 +11,58 @@ final class EarconTests: XCTestCase {
         XCTAssertNotEqual(spoken, silent)
         XCTAssertGreaterThan(silent.count, 44)
     }
+
+    func testBlipsStayLowAndShort() {
+        let start = Earcon.samples(.start)
+        let spoken = Earcon.samples(.stopSpoken)
+        let silent = Earcon.samples(.stopSilent)
+        let tile = Earcon.samples(.tile)
+
+        XCTAssertLessThan(dominantFrequency(start), 280)
+        XCTAssertGreaterThan(dominantFrequency(start), 70)
+        XCTAssertLessThan(dominantFrequency(spoken), 280)
+        XCTAssertLessThan(dominantFrequency(silent), 160)
+        XCTAssertLessThan(dominantFrequency(tile), 280)
+        XCTAssertLessThan(seconds(tile), 0.08)
+        XCTAssertLessThan(seconds(start), 0.35)
+        XCTAssertLessThan(seconds(silent), seconds(spoken))
+        for samples in [start, spoken, silent, tile] {
+            XCTAssertLessThan(samples.map { abs($0) }.max() ?? 0, 0.9)
+        }
+    }
+
+    private func seconds(_ samples: [Float]) -> Double {
+        Double(samples.count) / 44_100
+    }
+
+    private func dominantFrequency(_ samples: [Float]) -> Double {
+        guard let peakIndex = samples.indices.max(by: { abs(samples[$0]) < abs(samples[$1]) }) else {
+            return 0
+        }
+        let radius = 1400
+        let start = max(0, peakIndex - radius)
+        let end = min(samples.count, peakIndex + radius)
+        let window = Array(samples[start..<end])
+        let minLag = Int(44_100 / 400)
+        let maxLag = min(Int(44_100 / 50), window.count - 1)
+        var bestLag = minLag
+        var best = -Float.greatestFiniteMagnitude
+        guard maxLag > minLag else { return 0 }
+        for lag in minLag...maxLag {
+            var corr: Float = 0
+            let limit = window.count - lag
+            var index = 0
+            while index < limit {
+                corr += window[index] * window[index + lag]
+                index += 1
+            }
+            if corr > best {
+                best = corr
+                bestLag = lag
+            }
+        }
+        return 44_100 / Double(bestLag)
+    }
 }
 
 final class SpeechGateTests: XCTestCase {

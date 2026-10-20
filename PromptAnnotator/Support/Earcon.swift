@@ -1,6 +1,6 @@
 import Foundation
 
-/// Short tones for session start, a spoken stop, a silent stop, and a capture.
+/// Low electronic blips for session start, a spoken stop, a silent stop, and a capture.
 enum Earcon {
     enum Kind: Equatable {
         case start
@@ -16,33 +16,48 @@ enum Earcon {
     static func samples(_ kind: Kind) -> [Float] {
         switch kind {
         case .start:
-            return blip(frequency: 698, seconds: 0.055, amplitude: 0.34)
-                + gap(0.02)
-                + blip(frequency: 1174, seconds: 0.1, amplitude: 0.42)
+            return blip(frequency: 112, seconds: 0.072, amplitude: 0.62, brightness: 0.55)
+                + gap(0.028)
+                + blip(frequency: 168, seconds: 0.096, amplitude: 0.7, brightness: 0.34)
         case .stopSpoken:
-            return blip(frequency: 988, seconds: 0.06, amplitude: 0.36)
-                + gap(0.018)
-                + blip(frequency: 659, seconds: 0.14, amplitude: 0.4)
+            return blip(frequency: 154, seconds: 0.06, amplitude: 0.58, brightness: 0.32)
+                + gap(0.024)
+                + blip(frequency: 92, seconds: 0.13, amplitude: 0.72, brightness: 0.62)
         case .stopSilent:
-            return blip(frequency: 415, seconds: 0.11, amplitude: 0.24)
+            return blip(frequency: 78, seconds: 0.11, amplitude: 0.48, brightness: 0.16)
         case .tile:
-            return blip(frequency: 1568, seconds: 0.028, amplitude: 0.18)
+            return blip(frequency: 136, seconds: 0.04, amplitude: 0.34, brightness: 0.22)
         }
     }
 
     private static let sampleRate = 44_100.0
 
-    private static func blip(frequency: Double, seconds: Double, amplitude: Double) -> [Float] {
+    /// A short bass blip. The pitch sags a little, and a quiet octave keeps it audible on small speakers.
+    private static func blip(frequency: Double, seconds: Double, amplitude: Double, brightness: Double) -> [Float] {
         let count = max(1, Int(sampleRate * seconds))
-        return (0..<count).map { index in
-            let progress = Double(index) / Double(max(count - 1, 1))
+        let attack = min(0.004, seconds * 0.16)
+        let droop = 0.08
+        var phase = 0.0
+        var raw = [Float]()
+        raw.reserveCapacity(count)
+        for index in 0..<count {
             let t = Double(index) / sampleRate
-            let frequencyNow = frequency * (1 - 0.18 * progress)
-            let window = sin(.pi * progress)
-            let fundamental = sin(2 * .pi * frequencyNow * t)
-            let overtone = 0.16 * sin(4 * .pi * frequencyNow * t)
-            return Float((fundamental + overtone) * window * window * amplitude)
+            let progress = Double(index) / Double(max(count - 1, 1))
+            let freq = frequency * (1 - droop * progress)
+            phase += 2 * .pi * freq / sampleRate
+            let env: Double
+            if t < attack {
+                env = t / max(attack, 0.0001)
+            } else {
+                let tau = max(seconds - attack, 0.01) / 2.8
+                env = exp(-(t - attack) / tau)
+            }
+            let tone = sin(phase) + brightness * sin(2 * phase) + brightness * 0.2 * sin(3 * phase)
+            raw.append(Float(tanh(tone * 1.15) * env))
         }
+        let peak = raw.map { abs($0) }.max() ?? 1
+        let scale = Float(amplitude) / max(peak, 0.0001)
+        return raw.map { $0 * scale }
     }
 
     private static func gap(_ seconds: Double) -> [Float] {
