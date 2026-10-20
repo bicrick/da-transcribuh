@@ -140,7 +140,7 @@ struct HomePage: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Sessions folder")
                     .font(.system(size: 13, weight: .semibold))
-                Text("Documents / PromptAnnotator / Sessions")
+                Text(SessionStore.displayPath())
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }

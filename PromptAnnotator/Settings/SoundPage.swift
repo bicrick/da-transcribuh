@@ -1,21 +1,48 @@
-import AVFoundation
 import SwiftUI
 
 struct SoundPage: View {
     @ObservedObject var settings: AppSettings
+    @State private var devices: [AudioInputDevice] = []
 
     var body: some View {
         SettingsPageStack(title: "Sound") {
             Text("Microphone")
                 .font(.system(size: 13, weight: .semibold))
             SettingsCard {
-                HStack {
-                    Text("Input")
-                        .font(.system(size: 13, weight: .medium))
-                    Spacer()
-                    Text(inputName)
-                        .font(.system(size: 13))
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("Input")
+                            .font(.system(size: 13, weight: .medium))
+                        Spacer()
+                        Picker("Input", selection: Binding(
+                            get: { settings.inputDeviceUID },
+                            set: { settings.setInputDeviceUID($0) }
+                        )) {
+                            Text("System default").tag("")
+                            ForEach(devices) { device in
+                                Text(device.name).tag(device.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(maxWidth: 240)
+                    }
+                    Text("A chosen microphone is used for the session, then the previous system input is restored.")
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Toggle(isOn: Binding(
+                        get: { settings.raiseInputVolume },
+                        set: { settings.setRaiseInputVolume($0) }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Raise the input level")
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("Turns a quiet microphone up when the device allows it.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
                 }
                 .padding(12)
             }
@@ -40,7 +67,16 @@ struct SoundPage: View {
                         Image(systemName: "speaker.wave.2")
                             .foregroundStyle(.secondary)
                     }
-                    Text("Start rises. A spoken stop resolves downward. A silent stop, including screenshots with no speech, is one soft tone.")
+                    Picker("Theme", selection: Binding(
+                        get: { settings.soundTheme },
+                        set: { settings.setSoundTheme($0) }
+                    )) {
+                        ForEach(SoundTheme.allCases) { theme in
+                            Text(theme.title).tag(theme)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    Text("Start rises. A spoken stop resolves downward. A silent stop is one soft tone. Soft plays the same tones quieter.")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -55,9 +91,6 @@ struct SoundPage: View {
                 .padding(12)
             }
         }
-    }
-
-    private var inputName: String {
-        AVCaptureDevice.default(for: .audio)?.localizedName ?? "System default"
+        .onAppear { devices = AudioInputs.devices() }
     }
 }

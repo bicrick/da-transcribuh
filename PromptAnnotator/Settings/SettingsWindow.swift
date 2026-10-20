@@ -3,6 +3,7 @@ import SwiftUI
 
 extension Notification.Name {
     static let promptAnnotatorSettingsShown = Notification.Name("promptAnnotatorSettingsShown")
+    static let promptAnnotatorSessionsChanged = Notification.Name("promptAnnotatorSessionsChanged")
 }
 
 struct SettingsRoot: View {
@@ -29,14 +30,18 @@ struct SettingsRoot: View {
             switch page ?? .home {
             case .home:
                 HomePage(session: session, settings: settings, permissions: permissions, sessions: sessions)
-            case .sessions:
-                SessionsPage(sessions: sessions, reload: reload)
+            case .history:
+                HistoryPage(sessions: sessions, reload: reload)
             case .recording:
                 RecordingPage(settings: settings, session: session)
+            case .configuration:
+                ConfigurationPage(settings: settings)
             case .sound:
                 SoundPage(settings: settings)
             case .model:
                 ModelPage()
+            case .performance:
+                PerformancePage()
             }
         }
         .navigationSplitViewStyle(.balanced)
@@ -44,6 +49,9 @@ struct SettingsRoot: View {
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSettingsShown)) { _ in
             reload()
             permissions.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSessionsChanged)) { _ in
+            reload()
         }
     }
 
@@ -112,6 +120,25 @@ final class SettingsPresenter {
         window.minSize = NSSize(width: 760, height: 520)
         window.center()
         self.window = window
+        applyChrome()
         return window
+    }
+
+    var isKey: Bool {
+        window?.isKeyWindow == true
+    }
+
+    func applyChrome() {
+        window?.level = AppSettings.shared.keepWindowOnTop ? .floating : .normal
+    }
+}
+
+enum ReturnKey {
+    static func post() {
+        guard let source = CGEventSource(stateID: .hidSystemState) else { return }
+        let down = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: true)
+        let up = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: false)
+        down?.post(tap: .cghidEventTap)
+        up?.post(tap: .cghidEventTap)
     }
 }

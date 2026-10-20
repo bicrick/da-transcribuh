@@ -4,49 +4,15 @@ import SwiftUI
 struct RecordingPage: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var session: SessionController
-    @State private var capturing = false
-    @State private var message: String?
 
     var body: some View {
         SettingsPageStack(title: "Recording") {
             Text("Recording window")
                 .font(.system(size: 13, weight: .semibold))
             styleRow
-
-            Text("Keyboard shortcut")
-                .font(.system(size: 13, weight: .semibold))
-            SettingsCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Toggle session")
-                                .font(.system(size: 13, weight: .semibold))
-                            Text("Starts and stops a recording. A tap, not a hold.")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 8)
-                        Button(capturing ? "Press shortcut" : settings.chord.display) {
-                            capturing = true
-                            message = nil
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    if let message {
-                        Text(message)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.red)
-                    } else {
-                        Text("Option-Space, Command-Space, and Option-Command-Space are left alone. Shift stays free for drawing.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(12)
-            }
-            .background(ShortcutCapture(active: $capturing) { event in
-                apply(event)
-            })
+            Text("Shortcuts, push to talk, and where sessions are saved are in Configuration.")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
 
             Text("Defaults")
                 .font(.system(size: 13, weight: .semibold))
@@ -176,69 +142,5 @@ struct RecordingPage: View {
         .buttonStyle(.plain)
         .help(color.name)
     }
-
-    private func apply(_ event: NSEvent) {
-        capturing = false
-        if event.keyCode == 53, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty {
-            message = nil
-            return
-        }
-        let chord = HotkeyChord(event: event)
-        if let rejection = chord.rejection {
-            message = rejection
-            return
-        }
-        if settings.setChord(chord) {
-            message = nil
-        } else {
-            message = "macOS would not register that shortcut."
-        }
-    }
 }
 
-private struct ShortcutCapture: NSViewRepresentable {
-    @Binding var active: Bool
-    var onKey: (NSEvent) -> Void
-
-    func makeNSView(context: Context) -> CaptureView {
-        let view = CaptureView()
-        view.onKey = onKey
-        return view
-    }
-
-    func updateNSView(_ nsView: CaptureView, context: Context) {
-        nsView.onKey = onKey
-        nsView.setCapture(active)
-    }
-
-    final class CaptureView: NSView {
-        var onKey: ((NSEvent) -> Void)?
-        private var capture = false
-        private var monitor: Any?
-
-        func setCapture(_ active: Bool) {
-            capture = active
-            sync()
-        }
-
-        private func sync() {
-            if capture, monitor == nil {
-                window?.makeFirstResponder(self)
-                monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                    guard let self, self.capture else { return event }
-                    self.onKey?(event)
-                    return nil
-                }
-            } else if !capture, let monitor {
-                NSEvent.removeMonitor(monitor)
-                self.monitor = nil
-            }
-        }
-
-        deinit {
-            if let monitor {
-                NSEvent.removeMonitor(monitor)
-            }
-        }
-    }
-}

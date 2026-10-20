@@ -2,30 +2,36 @@ import SwiftUI
 
 enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
     case home
-    case sessions
+    case history
     case recording
+    case configuration
     case sound
     case model
+    case performance
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .home: return "Home"
-        case .sessions: return "Sessions"
+        case .history: return "History"
         case .recording: return "Recording"
+        case .configuration: return "Configuration"
         case .sound: return "Sound"
         case .model: return "Model"
+        case .performance: return "Performance"
         }
     }
 
     var symbol: String {
         switch self {
         case .home: return "house"
-        case .sessions: return "clock"
+        case .history: return "clock"
         case .recording: return "record.circle"
+        case .configuration: return "gearshape"
         case .sound: return "speaker.wave.2"
         case .model: return "waveform"
+        case .performance: return "memorychip"
         }
     }
 }

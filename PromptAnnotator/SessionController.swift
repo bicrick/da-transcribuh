@@ -76,6 +76,8 @@ final class SessionController: ObservableObject {
     private var keepTranscribing = false
     private var speechTask: Task<Void, Never>?
     private var lastSpeechCount = 0
+    private var silenceWatch = SilenceWatch()
+    private var stopQueued = false
 
     var isBusy: Bool {
         switch phase {
@@ -130,6 +132,51 @@ final class SessionController: ObservableObject {
         Task { @MainActor in
             await self.performToggle()
         }
+    }
+
+    func handleHotkey() {
+        if AppSettings.shared.pushToTalk {
+            if phase == .recording {
+                PushToTalk.shared.disarm()
+                Task { await finish() }
+            } else if !isBusy {
+                PushToTalk.shared.arm(keyCode: UInt16(AppSettings.shared.chord.keyCode))
+                Task { await begin() }
+            }
+        } else {
+            Task { await performToggle() }
+        }
+    }
+
+    func releasePushToTalk() {
+        guard AppSettings.shared.pushToTalk, phase == .recording else { return }
+        Task { await finish() }
+    }
+
+    func cancel() {
+        guard phase == .recording else { return }
+        PushToTalk.shared.disarm()
+        keepTranscribing = false
+        speechTask?.cancel()
+        speechTask = nil
+        monitor.stop()
+        audio.stop()
+        AudioInputs.endSession()
+        stopTimer()
+        stopProcessingMotion()
+        AppSounds.sessionStopped(heardSpeech: false)
+        if let directory {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        directory = nil
+        audioURL = nil
+        groups = []
+        captureCount = 0
+        shapes = []
+        draft = nil
+        textEdit = nil
+        stopQueued = false
+        setPhase(.idle)
     }
 
     func selectCapture() {
@@ -229,8 +276,26 @@ final class SessionController: ObservableObject {
 
     private func copyToClipboard() {
         let image = sheetURL.flatMap { NSImage(contentsOf: $0) }
-        let text = pasteText.isEmpty ? notes : pasteText
+        var text = pasteText.isEmpty ? notes : pasteText
+        if AppSettings.shared.capitalizeTranscript {
+            text = TranscriptText.leadingCapital(text)
+        }
+        pasteText = text
         SessionClipboard.copy(image: image, transcript: text)
+    }
+
+    private func deliverIfRequested() {
+        let settings = AppSettings.shared
+        guard settings.pasteOnStop else { return }
+        guard !SettingsPresenter.shared.isKey else { return }
+        let sendReturn = settings.returnOnShift && NSEvent.modifierFlags.contains(.shift)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            PasteFollowUp.shared.pasteBoth()
+            guard sendReturn else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+                ReturnKey.post()
+            }
+        }
     }
 
     private func startSpeechFollow() {
@@ -254,6 +319,7 @@ final class SessionController: ObservableObject {
         speechTask?.cancel()
         monitor.stop()
         audio.stop()
+        AudioInputs.endSession()
         timer?.invalidate()
         timer = nil
         stopProcessingMotion()
@@ -455,6 +521,8 @@ final class SessionController: ObservableObject {
             let folder = try SessionPaths.makeSessionDirectory(at: Date())
             let audioFile = folder.appendingPathComponent("audio.m4a")
             startedAt = Date()
+            let preferences = AppSettings.shared
+            AudioInputs.beginSession(uid: preferences.inputDeviceUID, raiseVolume: preferences.raiseInputVolume)
             try audio.start(url: audioFile)
             directory = folder
             audioURL = audioFile
@@ -468,6 +536,8 @@ final class SessionController: ObservableObject {
             transcriptionError = nil
             lastError = nil
             lastSpeechCount = 0
+            silenceWatch = SilenceWatch()
+            stopQueued = false
             elapsed = 0
             showsPenState = false
             markupMode = .capture
@@ -485,6 +555,7 @@ final class SessionController: ObservableObject {
         } catch {
             monitor.stop()
             audio.stop()
+            AudioInputs.endSession()
             if let directory {
                 try? FileManager.default.removeItem(at: directory)
             }
@@ -501,7 +572,10 @@ final class SessionController: ObservableObject {
         AppSounds.sessionStopped(heardSpeech: heardSpeech)
         setPhase(.finishing)
         startProcessingMotion()
-        defer { stopProcessingMotion() }
+        defer {
+            stopProcessingMotion()
+            stopQueued = false
+        }
         monitor.stop()
         showsPenState = false
         selectionRect = nil
@@ -548,7 +622,11 @@ final class SessionController: ObservableObject {
         await speechTask?.value
         speechTask = nil
         audio.stop()
-        let spokenSamples = audio.copySamples()
+        AudioInputs.endSession()
+        let spokenSamples = SampleNormalize.apply(
+            audio.copySamples(),
+            enabled: AppSettings.shared.normalizeSpeech
+        )
         overlay.hide()
         let ended = Date()
         guard let directory else {
@@ -587,6 +665,7 @@ final class SessionController: ObservableObject {
                 model = transcript.model
             } catch {
                 transcriptionError = error.localizedDescription
+                ErrorLog.record("Transcription failed: \(error.localizedDescription)")
                 log.error("Transcription failed: \(error.localizedDescription, privacy: .public)")
             }
         }
@@ -614,9 +693,12 @@ final class SessionController: ObservableObject {
             sheetURL = saved.sheetURL
             lastSessionURL = directory
             copyToClipboard()
+            deliverIfRequested()
+            NotificationCenter.default.post(name: .promptAnnotatorSessionsChanged, object: nil)
             setPhase(.idle)
         } catch {
             lastError = error.localizedDescription
+            ErrorLog.record("Couldn't write the session: \(error.localizedDescription)")
             presentError("Couldn't write the session", error.localizedDescription)
             lastSessionURL = directory
             setPhase(.idle)
@@ -858,6 +940,17 @@ final class SessionController: ObservableObject {
         guard phase == .recording else { return }
         elapsed = Date().timeIntervalSince(startedAt)
         levels = audio.sampleLevels()
+        let settings = AppSettings.shared
+        let quietLongEnough = silenceWatch.tick(
+            level: audio.latestLevel(),
+            heardSpeech: audio.heardSpeech(),
+            limit: settings.silenceStopSeconds,
+            delta: 0.1
+        )
+        if !stopQueued, quietLongEnough || SessionLimits.reachedMax(elapsed: elapsed, minutes: settings.maxSessionMinutes) {
+            stopQueued = true
+            Task { await self.finish() }
+        }
         if textEdit != nil {
             caretTick += 1
             if caretTick.isMultiple(of: 5) {
@@ -890,5 +983,6 @@ final class SessionController: ObservableObject {
         alert.addButton(withTitle: "OK")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
+        ErrorLog.record("\(title): \(message)")
     }
 }

@@ -7,12 +7,15 @@ final class HotkeyCenter {
     static let shared = HotkeyCenter()
 
     var handler: (() -> Void)?
+    var cancelHandler: (() -> Void)?
 
     private var hotKey: EventHotKeyRef?
+    private var cancelKey: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     private var chord = HotkeyChord.default
     private let signature: OSType = 0x5041_6E6E // 'PAnn'
     private let hotKeyID: UInt32 = 1
+    private let cancelID: UInt32 = 3
 
     @discardableResult
     func install(_ chord: HotkeyChord) -> Bool {
@@ -32,6 +35,30 @@ final class HotkeyCenter {
             return false
         }
         self.chord = chord
+        return true
+    }
+
+    @discardableResult
+    func applyCancel(_ chord: HotkeyChord?) -> Bool {
+        installHandlerIfNeeded()
+        if let cancelKey {
+            UnregisterEventHotKey(cancelKey)
+            self.cancelKey = nil
+        }
+        guard let chord else { return true }
+        guard chord.canRegister else { return false }
+        var registered: EventHotKeyRef?
+        let id = EventHotKeyID(signature: signature, id: cancelID)
+        let status = RegisterEventHotKey(
+            chord.keyCode,
+            chord.normalizedModifiers,
+            id,
+            GetApplicationEventTarget(),
+            0,
+            &registered
+        )
+        guard status == noErr else { return false }
+        cancelKey = registered
         return true
     }
 
@@ -59,12 +86,22 @@ final class HotkeyCenter {
                 )
                 guard parameter == noErr else { return parameter }
                 let center = Unmanaged<HotkeyCenter>.fromOpaque(userData).takeUnretainedValue()
-                guard pressed.signature == center.signature, pressed.id == center.hotKeyID else {
+                guard pressed.signature == center.signature else {
                     return OSStatus(eventNotHandledErr)
                 }
-                DispatchQueue.main.async {
-                    center.handler?()
+                if pressed.id == center.hotKeyID {
+                    DispatchQueue.main.async {
+                        center.handler?()
+                    }
+                    return noErr
                 }
+                if pressed.id == center.cancelID {
+                    DispatchQueue.main.async {
+                        center.cancelHandler?()
+                    }
+                    return noErr
+                }
+                return OSStatus(eventNotHandledErr)
                 return noErr
             },
             1,
@@ -101,6 +138,10 @@ final class HotkeyCenter {
         if let hotKey {
             UnregisterEventHotKey(hotKey)
             self.hotKey = nil
+        }
+        if let cancelKey {
+            UnregisterEventHotKey(cancelKey)
+            self.cancelKey = nil
         }
         if let eventHandler {
             RemoveEventHandler(eventHandler)

@@ -43,6 +43,9 @@ private struct SessionMenu: View {
         .disabled(session.isBusy)
 
         Text("Shortcut: \(settings.chord.display)")
+        if let cancel = settings.cancelChord {
+            Text("Cancel: \(cancel.display)")
+        }
 
         if session.isBusy {
             Text(session.statusText)
@@ -72,14 +75,22 @@ private struct SessionMenu: View {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Runtime.isUnitTest else { return }
-        // MenuBarExtra would otherwise keep this as an agent, which hides the Dock icon.
-        DispatchQueue.main.async {
-            NSApp.setActivationPolicy(.regular)
-        }
         HotkeyCenter.shared.handler = {
-            SessionController.shared.toggle()
+            SessionController.shared.handleHotkey()
         }
-        HotkeyCenter.shared.install(AppSettings.shared.chord)
+        HotkeyCenter.shared.cancelHandler = {
+            SessionController.shared.cancel()
+        }
+        let settings = AppSettings.shared
+        HotkeyCenter.shared.install(settings.chord)
+        HotkeyCenter.shared.applyCancel(settings.cancelChord)
+        settings.onAppChange = {
+            SettingsPresenter.shared.applyChrome()
+            DockPresence.apply(show: AppSettings.shared.showInDock)
+        }
+        DispatchQueue.main.async {
+            DockPresence.apply(show: settings.showInDock)
+        }
         PasteFollowUp.shared.install()
         SettingsPresenter.shared.show()
         Task { @MainActor in

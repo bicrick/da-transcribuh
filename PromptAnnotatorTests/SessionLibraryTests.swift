@@ -49,6 +49,8 @@ final class SessionLibraryTests: XCTestCase {
         XCTAssertEqual(sessions.count, 1)
         XCTAssertEqual(sessions[0].tiles, 1)
         XCTAssertEqual(sessions[0].words, 1)
+        XCTAssertEqual(sessions[0].transcript, "hello")
+        XCTAssertEqual(sessions[0].preview, "hello")
         XCTAssertEqual(sessions[0].model, "small.en_217MB")
         XCTAssertEqual(sessions[0].duration, 150, accuracy: 0.001)
 

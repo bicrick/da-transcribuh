@@ -113,10 +113,7 @@ struct SessionMarkdown {
 
 enum SessionPaths {
     static func sessionsRoot() throws -> URL {
-        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let root = documents.appendingPathComponent("PromptAnnotator/Sessions", isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        return root
+        try SessionStore.root()
     }
 
     static func makeSessionDirectory(at date: Date) throws -> URL {

@@ -1,5 +1,26 @@
 import Foundation
 
+enum SoundTheme: String, CaseIterable, Identifiable, Codable {
+    case classic
+    case soft
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .classic: return "Classic"
+        case .soft: return "Soft"
+        }
+    }
+
+    var gain: Float {
+        switch self {
+        case .classic: return 1
+        case .soft: return 0.55
+        }
+    }
+}
+
 enum IslandStyle: String, CaseIterable, Identifiable, Codable {
     case classic
     case compact
@@ -38,13 +59,30 @@ final class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
     @Published var chord: HotkeyChord
+    @Published var cancelChord: HotkeyChord?
+    @Published var pushToTalk: Bool
     @Published var islandStyle: IslandStyle
     @Published var soundEnabled: Bool
     @Published var soundVolume: Double
+    @Published var soundTheme: SoundTheme
+    @Published var inputDeviceUID: String
+    @Published var raiseInputVolume: Bool
     @Published var defaultTool: AnnotationTool
     @Published var defaultColorName: String
+    @Published var launchAtLogin: Bool
+    @Published var keepWindowOnTop: Bool
+    @Published var errorLogging: Bool
+    @Published var showInDock: Bool
+    @Published var silenceStopSeconds: Double
+    @Published var maxSessionMinutes: Double
+    @Published var normalizeSpeech: Bool
+    @Published var pasteOnStop: Bool
+    @Published var returnOnShift: Bool
+    @Published var capitalizeTranscript: Bool
+    @Published var loginItemNote: String?
 
     var onChromeChange: (() -> Void)?
+    var onAppChange: (() -> Void)?
 
     private let defaults: UserDefaults
     private var isLoading = false
@@ -63,22 +101,140 @@ final class AppSettings: ObservableObject {
         } else {
             chord = .default
         }
+        cancelChord = Self.chord(key: Keys.cancelKey, mods: Keys.cancelMods, defaults: defaults)
+        pushToTalk = defaults.bool(forKey: Keys.pushToTalk)
         islandStyle = IslandStyle.stored(defaults.string(forKey: Keys.island) ?? "")
         soundEnabled = defaults.object(forKey: Keys.sound) as? Bool ?? true
         let storedVolume = defaults.object(forKey: Keys.volume) as? Double
         soundVolume = min(1, max(0, storedVolume ?? 0.7))
+        soundTheme = SoundTheme(rawValue: defaults.string(forKey: Keys.theme) ?? "") ?? .classic
+        inputDeviceUID = defaults.string(forKey: Keys.input) ?? ""
+        raiseInputVolume = defaults.bool(forKey: Keys.raiseInput)
         defaultTool = AnnotationTool(rawValue: defaults.string(forKey: Keys.tool) ?? "") ?? .pen
         defaultColorName = defaults.string(forKey: Keys.color) ?? InkColor.red.name
+        launchAtLogin = defaults.bool(forKey: Keys.login)
+        keepWindowOnTop = defaults.bool(forKey: Keys.onTop)
+        errorLogging = defaults.bool(forKey: Keys.errorLog)
+        showInDock = defaults.object(forKey: Keys.dock) as? Bool ?? true
+        silenceStopSeconds = defaults.object(forKey: Keys.silence) as? Double ?? 0
+        maxSessionMinutes = defaults.object(forKey: Keys.maxMinutes) as? Double ?? 0
+        normalizeSpeech = defaults.bool(forKey: Keys.normalize)
+        pasteOnStop = defaults.bool(forKey: Keys.pasteOnStop)
+        returnOnShift = defaults.bool(forKey: Keys.returnOnShift)
+        capitalizeTranscript = defaults.bool(forKey: Keys.capitalize)
+        loginItemNote = nil
         isLoading = false
+    }
+
+    private static func chord(key: String, mods: String, defaults: UserDefaults) -> HotkeyChord? {
+        guard let keyCode = defaults.object(forKey: key) as? Int,
+              let modifiers = defaults.object(forKey: mods) as? Int else { return nil }
+        let chord = HotkeyChord(keyCode: UInt32(keyCode), carbonModifiers: UInt32(modifiers))
+        return chord.canRegister ? chord : nil
     }
 
     func setChord(_ chord: HotkeyChord) -> Bool {
         guard chord.canRegister else { return false }
+        guard chord != cancelChord else { return false }
         guard HotkeyCenter.shared.apply(chord) else { return false }
         self.chord = chord
         defaults.set(Int(chord.keyCode), forKey: Keys.chordKey)
         defaults.set(Int(chord.carbonModifiers), forKey: Keys.chordMods)
         return true
+    }
+
+    func setCancelChord(_ chord: HotkeyChord?) -> Bool {
+        if let chord {
+            guard chord.canRegister, chord != self.chord else { return false }
+        }
+        guard HotkeyCenter.shared.applyCancel(chord) else { return false }
+        cancelChord = chord
+        if let chord {
+            defaults.set(Int(chord.keyCode), forKey: Keys.cancelKey)
+            defaults.set(Int(chord.carbonModifiers), forKey: Keys.cancelMods)
+        } else {
+            defaults.removeObject(forKey: Keys.cancelKey)
+            defaults.removeObject(forKey: Keys.cancelMods)
+        }
+        return true
+    }
+
+    func setPushToTalk(_ enabled: Bool) {
+        pushToTalk = enabled
+        persist(Keys.pushToTalk, enabled)
+    }
+
+    func setSoundTheme(_ theme: SoundTheme) {
+        soundTheme = theme
+        persist(Keys.theme, theme.rawValue)
+    }
+
+    func setInputDeviceUID(_ uid: String) {
+        inputDeviceUID = uid
+        persist(Keys.input, uid)
+    }
+
+    func setRaiseInputVolume(_ enabled: Bool) {
+        raiseInputVolume = enabled
+        persist(Keys.raiseInput, enabled)
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            try LoginItem.setEnabled(enabled)
+            launchAtLogin = enabled
+            loginItemNote = nil
+            persist(Keys.login, enabled)
+        } catch {
+            loginItemNote = error.localizedDescription
+        }
+    }
+
+    func setKeepWindowOnTop(_ enabled: Bool) {
+        keepWindowOnTop = enabled
+        persist(Keys.onTop, enabled)
+        onAppChange?()
+    }
+
+    func setErrorLogging(_ enabled: Bool) {
+        errorLogging = enabled
+        persist(Keys.errorLog, enabled)
+    }
+
+    func setShowInDock(_ enabled: Bool) {
+        showInDock = enabled
+        persist(Keys.dock, enabled)
+        onAppChange?()
+    }
+
+    func setSilenceStopSeconds(_ seconds: Double) {
+        silenceStopSeconds = seconds
+        persist(Keys.silence, seconds)
+    }
+
+    func setMaxSessionMinutes(_ minutes: Double) {
+        maxSessionMinutes = minutes
+        persist(Keys.maxMinutes, minutes)
+    }
+
+    func setNormalizeSpeech(_ enabled: Bool) {
+        normalizeSpeech = enabled
+        persist(Keys.normalize, enabled)
+    }
+
+    func setPasteOnStop(_ enabled: Bool) {
+        pasteOnStop = enabled
+        persist(Keys.pasteOnStop, enabled)
+    }
+
+    func setReturnOnShift(_ enabled: Bool) {
+        returnOnShift = enabled
+        persist(Keys.returnOnShift, enabled)
+    }
+
+    func setCapitalizeTranscript(_ enabled: Bool) {
+        capitalizeTranscript = enabled
+        persist(Keys.capitalize, enabled)
     }
 
     func setIslandStyle(_ style: IslandStyle) {
@@ -114,13 +270,39 @@ final class AppSettings: ObservableObject {
         defaults.set(value, forKey: key)
     }
 
+    private func persist(_ key: String, _ value: Bool) {
+        guard !isLoading else { return }
+        defaults.set(value, forKey: key)
+    }
+
+    private func persist(_ key: String, _ value: Double) {
+        guard !isLoading else { return }
+        defaults.set(value, forKey: key)
+    }
+
     private enum Keys {
         static let chordKey = "hotkey.keyCode"
         static let chordMods = "hotkey.modifiers"
+        static let cancelKey = "hotkey.cancel.keyCode"
+        static let cancelMods = "hotkey.cancel.modifiers"
+        static let pushToTalk = "hotkey.pushToTalk"
         static let island = "island.style"
         static let sound = "sound.enabled"
         static let volume = "sound.volume"
+        static let theme = "sound.theme"
+        static let input = "audio.inputUID"
+        static let raiseInput = "audio.raiseVolume"
         static let tool = "tool.default"
         static let color = "ink.default"
+        static let login = "app.launchAtLogin"
+        static let onTop = "app.windowOnTop"
+        static let errorLog = "app.errorLog"
+        static let dock = "app.showInDock"
+        static let silence = "session.silenceStop"
+        static let maxMinutes = "session.maxMinutes"
+        static let normalize = "session.normalize"
+        static let pasteOnStop = "session.pasteOnStop"
+        static let returnOnShift = "session.returnOnShift"
+        static let capitalize = "session.capitalize"
     }
 }

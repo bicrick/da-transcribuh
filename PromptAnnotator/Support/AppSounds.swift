@@ -30,7 +30,7 @@ enum AppSounds {
         let settings = AppSettings.shared
         guard settings.soundEnabled else { return }
         guard let sound = NSSound(data: Earcon.wave(kind)) else { return }
-        sound.volume = Float(settings.soundVolume)
+        sound.volume = Float(settings.soundVolume) * settings.soundTheme.gain
         active = sound
         sound.play()
     }

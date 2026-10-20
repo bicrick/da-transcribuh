@@ -63,6 +63,12 @@ final class AudioRecorder {
         return speechHeard
     }
 
+    func latestLevel() -> CGFloat {
+        sampleLock.lock()
+        defer { sampleLock.unlock() }
+        return currentLevel
+    }
+
     func sampleLevels() -> [CGFloat] {
         let level: CGFloat
         if !usingEngine, let recorder {

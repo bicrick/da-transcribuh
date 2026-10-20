@@ -8,6 +8,8 @@ struct SessionSummary: Identifiable, Equatable {
     var tiles: Int
     var words: Int
     var model: String?
+    var transcript: String
+    var preview: String
 
     var duration: TimeInterval {
         guard let started, let ended else { return 0 }
@@ -66,6 +68,7 @@ enum SessionLibrary {
             let words = document.words.filter {
                 !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             }
+            let transcript = Aligner.spokenText(words)
             return SessionSummary(
                 id: url.lastPathComponent,
                 url: url,
@@ -73,7 +76,9 @@ enum SessionLibrary {
                 ended: Stamp.iso.date(from: document.endedAt),
                 tiles: document.groups.count,
                 words: words.count,
-                model: document.model
+                model: document.model,
+                transcript: transcript,
+                preview: SessionLibrary.preview(transcript)
             )
         }
 
@@ -84,7 +89,15 @@ enum SessionLibrary {
             ended: nil,
             tiles: 0,
             words: 0,
-            model: nil
+            model: nil,
+            transcript: "",
+            preview: ""
         )
+    }
+
+    static func preview(_ transcript: String) -> String {
+        let line = transcript.split(whereSeparator: \.isNewline).first.map(String.init) ?? transcript
+        if line.count <= 90 { return line }
+        return String(line.prefix(89)) + "..."
     }
 }
