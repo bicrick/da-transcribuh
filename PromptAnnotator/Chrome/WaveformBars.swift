@@ -19,11 +19,13 @@ struct WaveformBars: View {
             guard count > 0, size.width > 1, size.height > 1 else { return }
             let gap = count > 24 ? CGFloat(1.15) : CGFloat(2)
             let barWidth = max(1, (size.width - gap * CGFloat(count - 1)) / CGFloat(count))
+            let used = barWidth * CGFloat(count) + gap * CGFloat(count - 1)
+            let origin = (size.width - used) / 2
             for index in 0..<count {
                 let level = min(1, max(0, bars[index]))
                 let height = max(2, 2 + level * (size.height - 2))
                 let rect = CGRect(
-                    x: CGFloat(index) * (barWidth + gap),
+                    x: origin + CGFloat(index) * (barWidth + gap),
                     y: (size.height - height) / 2,
                     width: barWidth,
                     height: height

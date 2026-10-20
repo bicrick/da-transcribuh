@@ -14,6 +14,8 @@ final class AudioRecorder {
     private var bandWindow: [Float] = []
     private var target: [CGFloat] = FrequencyBands.resting(WaveformSamples.count)
     private var bands: [CGFloat] = FrequencyBands.resting(WaveformSamples.count)
+    private var quietFor: TimeInterval = 0
+    private var lastSpectrumAt: CFTimeInterval = 0
     private var currentLevel: CGFloat = 0.12
     private var voicedBuffers = 0
     private var speechHeard = false
@@ -29,6 +31,8 @@ final class AudioRecorder {
         speechHeard = false
         target = FrequencyBands.resting(WaveformSamples.count)
         bands = target
+        quietFor = 0
+        lastSpectrumAt = 0
         sampleLock.unlock()
 
         try startRecorder(url: url)
@@ -178,9 +182,15 @@ final class AudioRecorder {
         SpeechGate.note(level: level, voicedBuffers: &voicedBuffers, heard: &speechHeard)
         sampleLock.unlock()
 
-        let next = FrequencyBands.levels(samples: window, count: WaveformSamples.count)
+        let silent = FrequencyBands.isSilent(window)
+        let next = silent
+            ? FrequencyBands.resting(WaveformSamples.count)
+            : FrequencyBands.levels(samples: window, count: WaveformSamples.count)
+        let now = CACurrentMediaTime()
+        let delta = lastSpectrumAt == 0 ? (1.0 / 48.0) : min(0.08, max(0, now - lastSpectrumAt))
+        lastSpectrumAt = now
         sampleLock.lock()
-        target = next
+        target = FrequencyBands.follow(target, raw: next, silent: silent, quietFor: &quietFor, delta: delta)
         sampleLock.unlock()
     }
 

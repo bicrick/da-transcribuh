@@ -33,10 +33,17 @@ enum FrequencyBands {
 
     /// Eases each slot toward its new height. Rising is quicker than falling, and nothing changes place.
     /// `delta` is seconds since the last frame, so the motion stays the same if the display skips.
-    static func smooth(_ current: [CGFloat], toward target: [CGFloat], delta: TimeInterval = 0.02) -> [CGFloat] {
+    /// The attack is slow enough that one FFT hop cannot yank a bar, and still reaches speech inside a few frames.
+    static func smooth(
+        _ current: [CGFloat],
+        toward target: [CGFloat],
+        delta: TimeInterval = 0.02,
+        attackTau: TimeInterval = 0.062,
+        releaseTau: TimeInterval = 0.26
+    ) -> [CGFloat] {
         let step = max(0, delta)
-        let attack = CGFloat(1 - exp(-step / 0.028))
-        let release = CGFloat(1 - exp(-step / 0.18))
+        let attack = CGFloat(1 - exp(-step / max(attackTau, 0.001)))
+        let release = CGFloat(1 - exp(-step / max(releaseTau, 0.001)))
         let count = max(current.count, target.count)
         return (0..<count).map { index in
             let from = index < current.count ? current[index] : 0.1
@@ -53,6 +60,38 @@ enum FrequencyBands {
 
     static func resting(_ count: Int) -> [CGFloat] {
         rest(count)
+    }
+
+    static func isSilent(_ samples: [Float]) -> Bool {
+        let frame = Array(samples.suffix(window))
+        guard frame.count >= 128 else { return true }
+        return rms(frame) <= 0.0008
+    }
+
+    /// Softens the spectrum before the display ease. A short quiet gap keeps the last shape
+    /// so a single silent hop does not drop the whole comb.
+    static func follow(
+        _ current: [CGFloat],
+        raw: [CGFloat],
+        silent: Bool,
+        quietFor: inout TimeInterval,
+        delta: TimeInterval
+    ) -> [CGFloat] {
+        let step = max(0, delta)
+        if silent {
+            quietFor += step
+            guard quietFor >= 0.12 else { return current }
+            let count = max(current.count, raw.count)
+            return smooth(
+                current,
+                toward: resting(count),
+                delta: step,
+                attackTau: 0.05,
+                releaseTau: 0.08
+            )
+        }
+        quietFor = 0
+        return smooth(current, toward: raw, delta: step, attackTau: 0.04, releaseTau: 0.07)
     }
 
     private static func rest(_ count: Int) -> [CGFloat] {

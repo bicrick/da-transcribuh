@@ -11,7 +11,7 @@ final class WaveformDisplay: ObservableObject {
             self.levels = levels
             return
         }
-        for index in levels.indices where abs(self.levels[index] - levels[index]) > 0.004 {
+        for index in levels.indices where abs(self.levels[index] - levels[index]) > 0.002 {
             self.levels = levels
             return
         }

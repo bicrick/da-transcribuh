@@ -26,7 +26,7 @@ Escape cancels the shape in progress. Undo and redo apply to the marks in the cu
 
 Text is the latch. Shift-click places a single-line label. Releasing Shift leaves the field open so you can type. Return finishes the label and commits the group. Escape cancels the label.
 
-Stop saves any marks still on screen, then ends the session. Paste into the front app is on by default, and Configuration can turn it off. If you never captured, Stop copies the transcript and does not take a screenshot. Each capture is paired with what you said up to that moment. A capture you take without speaking stays a picture, and nothing is pasted after it. Several captures become one numbered tile sheet, and the pasted words use those same numbers when you did speak. While those words are prepared, the recording bar keeps the waveform moving, then closes.
+Stop saves any marks still on screen, then ends the session. Paste into the front app is on by default, and Configuration can turn it off. If you never captured, Stop copies the transcript and does not take a screenshot. Each capture is paired with what you said up to that moment. A capture you take without speaking stays a picture, and nothing is pasted after it. Several captures become one numbered tile sheet, and the pasted words use those same numbers when you did speak. While those words are prepared, the recording bar keeps the waveform moving, then fades closed. The word Recording, the clock, and the capture count ease away with the capsule. Default, Compact, Minimal, and Hidden all use that motion, including a style that only has the waveform.
 
 ## Shortcuts
 

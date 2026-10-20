@@ -8,25 +8,11 @@ final class ChromeHost {
     private var toolbarPanel: ChromePanel?
     private var islandHost: NSHostingView<RecordingIslandView>?
     private var toolbarHost: NSHostingView<MarkupToolbarView>?
+    private var fadeToken = 0
+    private var islandDismissing = false
 
     func attach(_ session: SessionController) {
         self.session = session
-    }
-
-    func showSession() {
-        guard let session else { return }
-        ensureHosts(session)
-        if AppSettings.shared.islandStyle == .hidden {
-            islandPanel?.orderOut(nil)
-        } else {
-            islandPanel?.orderFrontRegardless()
-        }
-        if session.showsToolbar {
-            toolbarPanel?.orderFrontRegardless()
-        } else {
-            toolbarPanel?.orderOut(nil)
-        }
-        relayout()
     }
 
     func setToolbarVisible(_ visible: Bool) {
@@ -40,22 +26,95 @@ final class ChromeHost {
         relayout()
     }
 
-    func showStatus() {
-        guard let session else { return }
-        ensureHosts(session)
+    func hideToolbar() {
         toolbarPanel?.orderOut(nil)
-        islandPanel?.orderFrontRegardless()
-        relayout()
     }
 
-    func hideAll() {
-        islandPanel?.orderOut(nil)
-        toolbarPanel?.orderOut(nil)
+    /// Puts the pill on screen at alpha zero before its contents change, so the swap cannot flash.
+    func beginIslandReveal() {
+        guard let session else { return }
+        ensureHosts(session)
+        islandDismissing = false
+        fadeToken += 1
+        guard let panel = islandPanel else { return }
+        panel.alphaValue = 0
+        panel.orderFrontRegardless()
+    }
+
+    func revealIsland(size: CGSize, fadeIn: Bool) {
+        guard let session else { return }
+        ensureHosts(session)
+        islandDismissing = false
+        guard let panel = islandPanel else { return }
+        if !fadeIn {
+            fadeToken += 1
+            panel.alphaValue = 1
+        }
+        panel.orderFrontRegardless()
+        place(panel, size: size, screen: ScreenGeometry.screenUnderMouse(), animated: false)
+        guard fadeIn else { return }
+        let token = fadeToken
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.26
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.4, 0, 0.2, 1)
+            panel.animator().alphaValue = 1
+        } completionHandler: {
+            DispatchQueue.main.async {
+                guard self.fadeToken == token else { return }
+                panel.alphaValue = 1
+            }
+        }
+    }
+
+    func placeIsland(_ size: CGSize, animated: Bool) {
+        guard !islandDismissing, let panel = islandPanel else { return }
+        place(panel, size: size, screen: ScreenGeometry.screenUnderMouse(), animated: animated)
+    }
+
+    func dismissIsland(animated: Bool, hideToolbar: Bool, completion: @escaping () -> Void) {
+        fadeToken += 1
+        let token = fadeToken
+        if hideToolbar {
+            toolbarPanel?.orderOut(nil)
+        }
+        guard let panel = islandPanel else {
+            completion()
+            return
+        }
+        let visible = panel.isVisible && panel.alphaValue > 0.01
+        guard animated, visible else {
+            panel.orderOut(nil)
+            panel.alphaValue = 1
+            islandDismissing = false
+            completion()
+            return
+        }
+        islandDismissing = true
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.34
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.4, 0, 0.2, 1)
+            panel.animator().alphaValue = 0
+        } completionHandler: {
+            DispatchQueue.main.async {
+                guard self.fadeToken == token else { return }
+                panel.orderOut(nil)
+                panel.alphaValue = 1
+                self.islandDismissing = false
+                completion()
+            }
+        }
     }
 
     func relayout() {
         guard let screen = ScreenGeometry.screenUnderMouse() else { return }
-        resize(islandHost, panel: islandPanel, screen: screen, edge: .top, animated: true)
+        if !islandDismissing, let session, session.islandChrome.presence != .hidden {
+            place(
+                islandPanel,
+                size: session.islandPanelSize(),
+                screen: screen,
+                animated: !session.islandChrome.isAnimating
+            )
+        }
         resize(toolbarHost, panel: toolbarPanel, screen: screen, edge: .bottom, animated: false)
     }
 
@@ -91,6 +150,16 @@ final class ChromeHost {
             toolbarPanel = panel
             toolbarHost = host
         }
+    }
+
+    private func place(_ panel: ChromePanel?, size: CGSize, screen: NSScreen?, animated: Bool) {
+        guard let panel, let screen, size.width > 1, size.height > 1 else { return }
+        let visible = screen.visibleFrame
+        let origin = NSPoint(
+            x: visible.midX - size.width / 2,
+            y: visible.maxY - size.height - 8
+        )
+        panel.adopt(frame: NSRect(origin: origin, size: size), animated: animated)
     }
 
     private func resize<Content: View>(

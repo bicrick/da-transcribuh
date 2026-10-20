@@ -33,6 +33,7 @@ final class SessionController: ObservableObject {
     @Published private(set) var color: InkColor = .red
     @Published private(set) var elapsed: TimeInterval = 0
     let waveform = WaveformDisplay()
+    let islandChrome = IslandChromeMotion()
     @Published private(set) var captureCount = 0
     @Published private(set) var showsPenState = false
     @Published private(set) var canUndo = false
@@ -80,6 +81,7 @@ final class SessionController: ObservableObject {
     private var lastSpeechCount = 0
     private var silenceWatch = SilenceWatch()
     private var stopQueued = false
+    private var clockSpan: CGFloat = 0
 
     var isBusy: Bool {
         switch phase {
@@ -120,6 +122,9 @@ final class SessionController: ObservableObject {
         self.transcriber = transcriber
         monitor.session = self
         chrome.attach(self)
+        islandChrome.onFrame = { [weak self] in
+            self?.placeIsland(animated: false)
+        }
         let settings = AppSettings.shared
         tool = settings.defaultTool
         color = settings.defaultColor
@@ -237,9 +242,9 @@ final class SessionController: ObservableObject {
     func refreshChrome() {
         switch phase {
         case .recording:
-            chrome.showSession()
+            showRecordingChrome()
         case .finishing, .downloading, .preparingModel, .transcribing:
-            chrome.showStatus()
+            showProcessingChrome(from: phase)
         case .idle:
             break
         }
@@ -935,30 +940,102 @@ final class SessionController: ObservableObject {
         let count = groups.count
         let countChanged = count != captureCount
         captureCount = count
-        if countChanged {
-            DispatchQueue.main.async {
-                self.chrome.relayout()
-                DispatchQueue.main.async { self.chrome.relayout() }
-            }
+        if countChanged, phase == .recording {
+            islandChrome.setTargets(
+                IslandSlots.recording(style: AppSettings.shared.islandStyle, captures: count),
+                animated: true
+            )
         }
     }
 
     private func setPhase(_ phase: SessionPhase) {
+        let previous = self.phase
         self.phase = phase
         switch phase {
         case .recording:
             overlay.show()
-            chrome.showSession()
+            showRecordingChrome()
         case .finishing, .downloading, .preparingModel, .transcribing:
             overlay.hide()
-            chrome.showStatus()
+            showProcessingChrome(from: previous)
         case .idle:
             overlay.hide()
-            chrome.hideAll()
+            hideChrome()
         }
-        DispatchQueue.main.async {
-            self.chrome.relayout()
-            DispatchQueue.main.async { self.chrome.relayout() }
+    }
+
+    func islandPanelSize() -> CGSize {
+        IslandMetrics.layout(
+            style: AppSettings.shared.islandStyle,
+            slots: islandChrome.slots,
+            captures: captureCount,
+            elapsed: elapsed
+        ).panel
+    }
+
+    private func placeIsland(animated: Bool) {
+        guard islandChrome.presence != .hidden else { return }
+        chrome.placeIsland(islandPanelSize(), animated: animated && !islandChrome.isAnimating)
+    }
+
+    private func showRecordingChrome() {
+        let style = AppSettings.shared.islandStyle
+        if style == .hidden {
+            let shown = islandChrome.presence != .hidden
+            islandChrome.freeze()
+            chrome.dismissIsland(animated: shown, hideToolbar: false) { [weak self] in
+                self?.islandChrome.setPresence(.hidden)
+                self?.islandChrome.snap(.closed)
+            }
+            return
+        }
+        let fade = islandChrome.presence == .hidden
+        if fade {
+            chrome.beginIslandReveal()
+        }
+        islandChrome.setPresence(.recording)
+        islandChrome.setTargets(
+            IslandSlots.recording(style: style, captures: captureCount),
+            animated: !fade
+        )
+        chrome.revealIsland(size: islandPanelSize(), fadeIn: fade)
+        if showsToolbar {
+            chrome.setToolbarVisible(true)
+        }
+    }
+
+    private func showProcessingChrome(from previous: SessionPhase) {
+        let wasHidden = islandChrome.presence == .hidden
+        let entering = wasHidden || !Self.phaseIsBusy(previous)
+        if wasHidden {
+            chrome.beginIslandReveal()
+        }
+        islandChrome.setPresence(.processing)
+        islandChrome.setTargets(IslandSlots.processing(phase: phase), animated: !wasHidden)
+        showsToolbar = false
+        chrome.hideToolbar()
+        if entering || wasHidden {
+            chrome.revealIsland(size: islandPanelSize(), fadeIn: wasHidden)
+        } else if !islandChrome.isAnimating {
+            placeIsland(animated: false)
+        }
+    }
+
+    private func hideChrome() {
+        islandChrome.freeze()
+        showsToolbar = false
+        chrome.dismissIsland(animated: islandChrome.presence != .hidden, hideToolbar: true) { [weak self] in
+            self?.islandChrome.setPresence(.hidden)
+            self?.islandChrome.snap(.closed)
+        }
+    }
+
+    private static func phaseIsBusy(_ phase: SessionPhase) -> Bool {
+        switch phase {
+        case .finishing, .downloading, .preparingModel, .transcribing:
+            return true
+        case .idle, .recording:
+            return false
         }
     }
 
@@ -1037,6 +1114,11 @@ final class SessionController: ObservableObject {
     private func tick() {
         guard phase == .recording else { return }
         elapsed = Date().timeIntervalSince(startedAt)
+        let span = IslandMetrics.clockSpan(elapsed)
+        if span != clockSpan {
+            clockSpan = span
+            placeIsland(animated: false)
+        }
         let settings = AppSettings.shared
         let quietLongEnough = silenceWatch.tick(
             level: audio.latestLevel(),
