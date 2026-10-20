@@ -15,22 +15,27 @@ enum AppSounds {
     }
 
     static func preview() {
+        previewTask?.cancel()
         play(.start)
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 320_000_000)
+        previewTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 360_000_000)
+            guard !Task.isCancelled else { return }
             play(.stopSpoken)
-            try? await Task.sleep(nanoseconds: 420_000_000)
+            try? await Task.sleep(nanoseconds: 460_000_000)
+            guard !Task.isCancelled else { return }
             play(.stopSilent)
         }
     }
 
     private static var active: NSSound?
+    private static var previewTask: Task<Void, Never>?
 
     private static func play(_ kind: Earcon.Kind) {
         let settings = AppSettings.shared
         guard settings.soundEnabled else { return }
-        guard let sound = NSSound(data: Earcon.wave(kind)) else { return }
+        guard let sound = NSSound(data: Earcon.wave(kind, theme: settings.soundTheme)) else { return }
         sound.volume = Float(settings.soundVolume) * settings.soundTheme.gain
+        active?.stop()
         active = sound
         sound.play()
     }

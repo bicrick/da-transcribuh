@@ -3,6 +3,8 @@ import Foundation
 enum SoundTheme: String, CaseIterable, Identifiable, Codable {
     case classic
     case soft
+    case click
+    case deep
 
     var id: String { rawValue }
 
@@ -10,13 +12,26 @@ enum SoundTheme: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .classic: return "Classic"
         case .soft: return "Soft"
+        case .click: return "Click"
+        case .deep: return "Deep"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .classic: return "Low blips. Start rises, and a spoken stop falls."
+        case .soft: return "The same shape, rounder and a little quieter."
+        case .click: return "Short dry ticks."
+        case .deep: return "Slower bass tones."
         }
     }
 
     var gain: Float {
         switch self {
         case .classic: return 1
-        case .soft: return 0.55
+        case .soft: return 0.78
+        case .click: return 0.9
+        case .deep: return 1
         }
     }
 }

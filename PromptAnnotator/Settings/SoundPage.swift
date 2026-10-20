@@ -67,30 +67,47 @@ struct SoundPage: View {
                         Image(systemName: "speaker.wave.2")
                             .foregroundStyle(.secondary)
                     }
-                    Picker("Theme", selection: Binding(
-                        get: { settings.soundTheme },
-                        set: { settings.setSoundTheme($0) }
-                    )) {
-                        ForEach(SoundTheme.allCases) { theme in
-                            Text(theme.title).tag(theme)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    Text("Low blips. Start rises, a spoken stop falls, and a silent stop is a single softer tone. Soft plays the same tones quieter.")
+                    Text("Choose a set. Selecting one plays start, a spoken stop, and a silent stop.")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack {
-                        Spacer()
-                        Button("Preview") {
-                            AppSounds.preview()
-                        }
-                        .disabled(!settings.soundEnabled)
-                    }
+                    soundChoices
                 }
                 .padding(12)
             }
         }
         .onAppear { devices = AudioInputs.devices() }
+    }
+
+    private var soundChoices: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(SoundTheme.allCases.enumerated()), id: \.element.id) { index, theme in
+                if index > 0 {
+                    SettingsDivider()
+                }
+                Button {
+                    settings.setSoundTheme(theme)
+                    AppSounds.preview()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: settings.soundTheme == theme ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(.primary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(theme.title)
+                                .font(.system(size: 13, weight: .semibold))
+                            Text(theme.detail)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "speaker.wave.2")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(12)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!settings.soundEnabled)
+            }
+        }
     }
 }

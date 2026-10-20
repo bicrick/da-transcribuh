@@ -16,12 +16,9 @@ struct PromptAnnotatorApp: App {
         MenuBarExtra {
             SessionMenu(session: session, settings: AppSettings.shared)
         } label: {
-            // A system image plus a short title. A custom drawing in this label
-            // does not show up in the menu bar, so the app looks like it is not running.
-            Label(
-                session.phase == .recording ? "Rec" : "PA",
-                systemImage: session.phase == .recording ? "record.circle.fill" : "pencil.tip.crop.circle"
-            )
+            // A system image. A custom drawing in this label does not show up in the menu bar.
+            Image(systemName: session.phase == .recording ? "record.circle.fill" : "pencil.tip.crop.circle")
+                .accessibilityLabel(session.phase == .recording ? "Prompt Annotator, recording" : "Prompt Annotator")
         }
     }
 }
@@ -46,6 +43,7 @@ private struct SessionMenu: View {
         if let cancel = settings.cancelChord {
             Text("Cancel: \(cancel.display)")
         }
+        Text(AppVersion.label)
 
         if session.isBusy {
             Text(session.statusText)
@@ -92,7 +90,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DockPresence.apply(show: settings.showInDock)
         }
         PasteFollowUp.shared.install()
-        SettingsPresenter.shared.show()
+        if OnboardingStore.isFinished() {
+            SettingsPresenter.shared.show()
+        } else {
+            OnboardingPresenter.shared.show()
+        }
         Task { @MainActor in
             SessionController.shared.prepareModel()
         }
@@ -100,7 +102,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         guard !Runtime.isUnitTest else { return true }
-        if !flag {
+        if !OnboardingStore.isFinished() {
+            OnboardingPresenter.shared.show()
+        } else if !flag {
             SettingsPresenter.shared.show()
         }
         return true

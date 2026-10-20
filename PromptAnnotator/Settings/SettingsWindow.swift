@@ -61,7 +61,7 @@ struct SettingsRoot: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Prompt Annotator")
                     .font(.system(size: 11, weight: .semibold))
-                Text("Menu bar")
+                Text(AppVersion.label)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }

@@ -5,7 +5,7 @@ struct ConfigurationPage: View {
     @ObservedObject var settings: AppSettings
     @State private var capture: CaptureTarget?
     @State private var message: String?
-    @State private var updateMessage = "This build is \(ReleaseCheck.currentVersion())."
+    @State private var updateMessage = "This build is \(AppVersion.label)."
     @State private var checkingUpdate = false
     @State private var folderNote: String?
     @State private var folderPath = SessionStore.displayPath()
@@ -30,11 +30,16 @@ struct ConfigurationPage: View {
                 .font(.system(size: 13, weight: .semibold))
             advancedCard
 
-            Text("Prompt Annotator is free and open source.")
+            Text("Prompt Annotator \(AppVersion.label) is free and open source.")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
-            Button("View on GitHub") {
-                NSWorkspace.shared.open(ReleaseCheck.repo)
+            HStack {
+                Button("View on GitHub") {
+                    NSWorkspace.shared.open(ReleaseCheck.repo)
+                }
+                Button("Show welcome") {
+                    OnboardingPresenter.shared.show()
+                }
             }
         }
         .background(ShortcutCapture(active: Binding(
@@ -85,14 +90,22 @@ struct ConfigurationPage: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.red)
                         .padding(.horizontal, 12)
-                        .padding(.bottom, 12)
-                } else {
-                    Text("Shift stays free for drawing. Option-Space, Command-Space, and Option-Command-Space stay with the system. Press Escape to clear Cancel.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 4)
                 }
+                Text("Shift stays free for drawing. Option-Space, Command-Space, and Option-Command-Space stay with the system. Press Escape to clear Cancel.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+                HStack {
+                    Spacer()
+                    Button("Reset to ⌃⌥Space") {
+                        capture = nil
+                        message = settings.setChord(.default) ? nil : "macOS would not register the default shortcut."
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
             }
         }
     }

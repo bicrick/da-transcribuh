@@ -10,9 +10,9 @@
   <img src="https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white" alt="Swift 5">
 </p>
 
-A macOS menu bar app that records your voice and on-screen marks, then puts a tile sheet and transcript on the clipboard. It appears in the Dock and it is not sandboxed.
+A macOS menu bar app that records your voice and on-screen marks, then puts a tile sheet and transcript on the clipboard. It appears in the Dock and it is not sandboxed. This repository is in beta. The app shows its version and build number.
 
-The menu bar item opens the Prompt Annotator window: Home, History, Recording, Configuration, Sound, Model, and Performance. History searches past transcripts. Configuration rebinds the shortcuts and holds the advanced session settings. Performance shows the app's memory, the model size on disk, and how much of the Mac that is. The recording bar can be Default, Compact, Minimal, or Hidden. Tones for start, capture, and stop are on by default and can be turned off. A spoken stop and a silent stop use different tones.
+The menu bar item opens the Prompt Annotator window: Home, History, Recording, Configuration, Sound, Model, and Performance. History searches past transcripts. Configuration rebinds the shortcuts and holds the advanced session settings. Performance shows the app's memory, the model size on disk, and how much of the Mac that is. The recording bar can be Default, Compact, Minimal, or Hidden. Tones for start, capture, and stop are on by default and can be turned off. Sound offers Classic, Soft, Click, and Deep. A spoken stop and a silent stop use different tones. The first launch walks through permissions, the shortcut, and how a session works.
 
 ## How a session works
 

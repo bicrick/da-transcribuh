@@ -38,6 +38,9 @@ struct HomePage: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Prompt Annotator")
                     .font(.system(size: 22, weight: .semibold))
+                Text(AppVersion.label)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
                 Text("Talk, and capture the screen when you want the picture with the words.")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
