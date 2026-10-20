@@ -78,6 +78,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         HotkeyCenter.shared.install(AppSettings.shared.chord)
         SettingsPresenter.shared.show()
+        Task { @MainActor in
+            SessionController.shared.prepareModel()
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

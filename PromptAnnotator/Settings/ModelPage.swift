@@ -16,7 +16,7 @@ struct ModelPage: View {
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
-                    Text("English WhisperKit model, about 217 MB, from argmaxinc/whisperkit-coreml (folder openai_whisper-small.en_217MB). The first time you stop a session it downloads into Application Support. Stills and audio are already saved by then. If that variant name does not resolve, the app uses small.en from the same repo.")
+                    Text("English WhisperKit model, about 217 MB, from argmaxinc/whisperkit-coreml (folder openai_whisper-small.en_217MB). It stays in Application Support and is loaded when the app opens, so transcription uses the copy already on disk. It downloads only when those files are missing. If that variant name does not resolve, the app uses small.en from the same repo.")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

@@ -28,9 +28,9 @@ Files land in `~/Documents/PromptAnnotator/Sessions/<timestamp>/`:
 - `session.json` — shapes, bounds, display, and word timestamps. Shape points are display points, origin at the top-left, y down.
 - `audio.m4a` — the microphone.
 
-When the session finishes, the tile sheet and the transcript are placed on the clipboard together. Pasting into Notes or TextEdit inserts the picture and then the words. The done panel can copy them again, and it can show the session in Finder.
+When the session finishes, the tile sheet and the transcript are placed on the clipboard together, and the recording windows close. Pasting into Notes or TextEdit inserts the picture and then the words. The menu can show the last session in Finder.
 
-Stills and audio are written before transcription. The first transcription downloads the model into `~/Library/Application Support/PromptAnnotator/Models` and shows progress on the recording island.
+Stills and audio are written before the transcript is finished. The Whisper model downloads once into `~/Library/Application Support/PromptAnnotator/Models`. After that the app loads it at launch and keeps it in memory. Speech is transcribed while the session is still recording, so stopping only finishes the last moment. The recording island shows a download only when the model is not already on disk.
 
 ## Permissions
 

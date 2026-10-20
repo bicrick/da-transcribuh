@@ -6,10 +6,8 @@ final class ChromeHost {
     private var session: SessionController?
     private var islandPanel: ChromePanel?
     private var toolbarPanel: ChromePanel?
-    private var donePanel: ChromePanel?
     private var islandHost: NSHostingView<RecordingIslandView>?
     private var toolbarHost: NSHostingView<MarkupToolbarView>?
-    private var doneHost: NSHostingView<DonePanelView>?
 
     func attach(_ session: SessionController) {
         self.session = session
@@ -24,7 +22,6 @@ final class ChromeHost {
             islandPanel?.orderFrontRegardless()
         }
         toolbarPanel?.orderFrontRegardless()
-        donePanel?.orderOut(nil)
         relayout()
     }
 
@@ -32,45 +29,32 @@ final class ChromeHost {
         guard let session else { return }
         ensureHosts(session)
         toolbarPanel?.orderOut(nil)
-        donePanel?.orderOut(nil)
         islandPanel?.orderFrontRegardless()
-        relayout()
-    }
-
-    func showDone() {
-        guard let session else { return }
-        ensureHosts(session)
-        islandPanel?.orderOut(nil)
-        toolbarPanel?.orderOut(nil)
-        donePanel?.orderFrontRegardless()
         relayout()
     }
 
     func hideAll() {
         islandPanel?.orderOut(nil)
         toolbarPanel?.orderOut(nil)
-        donePanel?.orderOut(nil)
     }
 
     func relayout() {
         guard let screen = ScreenGeometry.screenUnderMouse() else { return }
         resize(islandHost, panel: islandPanel)
         resize(toolbarHost, panel: toolbarPanel)
-        resize(doneHost, panel: donePanel)
         islandPanel?.place(on: screen, edge: .top)
         toolbarPanel?.place(on: screen, edge: .bottom)
-        donePanel?.placeCentered(on: screen)
     }
 
     func hitRects() -> [CGRect] {
-        [islandPanel, toolbarPanel, donePanel].compactMap { panel in
+        [islandPanel, toolbarPanel].compactMap { panel in
             guard let panel, panel.isVisible else { return nil }
             return panel.frame
         }
     }
 
     func windowIDs() -> [CGWindowID] {
-        [islandPanel, toolbarPanel, donePanel].compactMap { panel in
+        [islandPanel, toolbarPanel].compactMap { panel in
             guard let panel, panel.isVisible, panel.windowNumber > 0 else { return nil }
             return CGWindowID(panel.windowNumber)
         }
@@ -92,14 +76,6 @@ final class ChromeHost {
             panel.contentView = host
             toolbarPanel = panel
             toolbarHost = host
-        }
-        if donePanel == nil {
-            let panel = ChromePanel(radius: 16)
-            let host = NSHostingView(rootView: DonePanelView(session: session))
-            host.sizingOptions = [.intrinsicContentSize]
-            panel.contentView = host
-            donePanel = panel
-            doneHost = host
         }
     }
 

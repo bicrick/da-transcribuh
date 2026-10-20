@@ -8,7 +8,6 @@ enum SessionPhase: Equatable {
     case downloading(Double)
     case preparingModel
     case transcribing
-    case done
 }
 
 private struct StoredGroup {
@@ -33,10 +32,7 @@ final class SessionController: ObservableObject {
     @Published private(set) var showsPenState = false
     @Published private(set) var canUndo = false
     @Published private(set) var canRedo = false
-    @Published private(set) var doneSummary = ""
-    @Published private(set) var copyConfirmation: String?
     @Published private(set) var transcriptionError: String?
-    @Published private(set) var hasSheet = false
     @Published private(set) var lastError: String?
     @Published private(set) var lastSessionURL: URL?
 
@@ -69,12 +65,15 @@ final class SessionController: ObservableObject {
     private var chromeScreenID: CGDirectDisplayID?
     private var lastToggle = Date.distantPast
     private var didOfferPermissions = false
+    private var keepTranscribing = false
+    private var speechTask: Task<Void, Never>?
+    private var lastSpeechCount = 0
 
     var isBusy: Bool {
         switch phase {
         case .finishing, .downloading, .preparingModel, .transcribing:
             return true
-        case .idle, .recording, .done:
+        case .idle, .recording:
             return false
         }
     }
@@ -100,7 +99,7 @@ final class SessionController: ObservableObject {
             return "Preparing model"
         case .transcribing:
             return "Transcribing"
-        case .idle, .done:
+        case .idle:
             return ""
         }
     }
@@ -146,7 +145,7 @@ final class SessionController: ObservableObject {
             chrome.showSession()
         case .finishing, .downloading, .preparingModel, .transcribing:
             chrome.showStatus()
-        case .idle, .done:
+        case .idle:
             break
         }
     }
@@ -179,25 +178,40 @@ final class SessionController: ObservableObject {
         refreshControls()
     }
 
-    func copyToClipboard() {
-        let image = sheetURL.flatMap { NSImage(contentsOf: $0) }
-        let text = pasteText.isEmpty ? notes : pasteText
-        guard SessionClipboard.copy(image: image, transcript: text) else { return }
-        copyConfirmation = "On the clipboard"
-    }
-
     func revealSession() {
         guard let lastSessionURL else { return }
         NSWorkspace.shared.activateFileViewerSelecting([lastSessionURL])
     }
 
-    func dismissDone() {
-        copyConfirmation = nil
-        setPhase(.idle)
+    func prepareModel() {
+        Task { await transcriber.prepare() }
+    }
+
+    private func copyToClipboard() {
+        let image = sheetURL.flatMap { NSImage(contentsOf: $0) }
+        let text = pasteText.isEmpty ? notes : pasteText
+        SessionClipboard.copy(image: image, transcript: text)
+    }
+
+    private func startSpeechFollow() {
+        keepTranscribing = true
+        speechTask = Task { @MainActor in
+            while self.keepTranscribing {
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                guard self.keepTranscribing else { return }
+                let count = self.audio.sampleCount()
+                guard count >= self.lastSpeechCount + 16_000 else { continue }
+                let samples = self.audio.copySamples()
+                self.lastSpeechCount = samples.count
+                await self.transcriber.consume(samples: samples)
+            }
+        }
     }
 
     func abandonIfRecording() {
         guard phase == .recording || phase == .finishing else { return }
+        keepTranscribing = false
+        speechTask?.cancel()
         monitor.stop()
         audio.stop()
         timer?.invalidate()
@@ -359,16 +373,18 @@ final class SessionController: ObservableObject {
             notes = ""
             pasteText = ""
             sheetURL = nil
-            hasSheet = false
             transcriptionError = nil
-            copyConfirmation = nil
             lastError = nil
+            lastSpeechCount = 0
             elapsed = 0
             showsPenState = false
             tool = AppSettings.shared.defaultTool
             color = AppSettings.shared.defaultColor
             setPhase(.recording)
             startTimer()
+            transcriber.resetLive()
+            startSpeechFollow()
+            prepareModel()
             AppSounds.sessionStarted()
             log.info("Session started at \(folder.path, privacy: .public)")
         } catch {
@@ -438,7 +454,11 @@ final class SessionController: ObservableObject {
             )
         }
 
+        keepTranscribing = false
+        await speechTask?.value
+        speechTask = nil
         audio.stop()
+        let spokenSamples = audio.copySamples()
         overlay.hide()
         let ended = Date()
         let sessionEnd = ended.timeIntervalSince(startedAt)
@@ -455,8 +475,18 @@ final class SessionController: ObservableObject {
         var spoken: [TimedWord] = []
         var model: String?
         if let audioURL {
+            if WhisperKitTranscriber.isModelReady {
+                setPhase(.transcribing)
+            } else if WhisperKitTranscriber.modelIsInstalled() {
+                setPhase(.preparingModel)
+            } else {
+                setPhase(.downloading(0))
+            }
             do {
-                let transcript = try await transcriber.transcribe(audioURL: audioURL) { progress in
+                let transcript = try await transcriber.transcribe(
+                    audioURL: audioURL,
+                    samples: spokenSamples
+                ) { progress in
                     Task { @MainActor in
                         switch progress {
                         case .downloading(let fraction):
@@ -497,13 +527,9 @@ final class SessionController: ObservableObject {
             notes = saved.notes
             pasteText = saved.pasteText
             sheetURL = saved.sheetURL
-            hasSheet = saved.sheetURL != nil
             lastSessionURL = directory
             copyToClipboard()
-            let tileCount = groups.count
-            let noun = tileCount == 1 ? "tile" : "tiles"
-            doneSummary = "\(tileCount) \(noun) · \(TimeFormat.clock(sessionEnd))"
-            setPhase(.done)
+            setPhase(.idle)
         } catch {
             lastError = error.localizedDescription
             presentError("Couldn't write the session", error.localizedDescription)
@@ -662,9 +688,6 @@ final class SessionController: ObservableObject {
         case .finishing, .downloading, .preparingModel, .transcribing:
             overlay.hide()
             chrome.showStatus()
-        case .done:
-            overlay.hide()
-            chrome.showDone()
         case .idle:
             overlay.hide()
             chrome.hideAll()

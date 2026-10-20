@@ -50,17 +50,6 @@ final class ChromePanel: NSPanel {
         applyShape()
     }
 
-    func placeCentered(on screen: NSScreen) {
-        let visible = screen.visibleFrame
-        let size = frame.size
-        let origin = NSPoint(
-            x: visible.midX - size.width / 2,
-            y: visible.midY - size.height / 2
-        )
-        setFrameOrigin(origin)
-        applyShape()
-    }
-
     override func sendEvent(_ event: NSEvent) {
         super.sendEvent(event)
         if event.type == .leftMouseUp {
