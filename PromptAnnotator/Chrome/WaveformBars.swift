@@ -4,7 +4,7 @@ enum WaveformSamples {
     static let count = 19
 }
 
-/// The spoken level, drawn as the wide middle of the recording bar.
+/// Frequency bars. Each one stays in its slot and changes height with the sound.
 struct WaveformBars: View {
     var levels: [CGFloat]
     var slotWidth: CGFloat = 188

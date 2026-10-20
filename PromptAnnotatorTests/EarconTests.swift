@@ -31,6 +31,30 @@ final class SpeechGateTests: XCTestCase {
     }
 }
 
+final class FrequencyBandTests: XCTestCase {
+    func testLowAndHighTonesLightDifferentBars() {
+        let count = 19
+        let low = FrequencyBands.levels(samples: tone(band: 2, count: count), count: count)
+        let high = FrequencyBands.levels(samples: tone(band: 16, count: count), count: count)
+        XCTAssertEqual(low.count, count)
+        XCTAssertGreaterThan(low[2], low[16])
+        XCTAssertGreaterThan(high[16], high[2])
+    }
+
+    func testSilenceStaysAtRest() {
+        let quiet = FrequencyBands.levels(samples: Array(repeating: 0, count: 512), count: 8)
+        XCTAssertTrue(quiet.allSatisfy { $0 < 0.2 })
+    }
+
+    private func tone(band: Int, count: Int) -> [Float] {
+        let hz = FrequencyBands.frequency(band: band, count: count)
+        return (0..<FrequencyBands.window).map { index in
+            let angle = 2 * Float.pi * Float(hz) * Float(index) / Float(FrequencyBands.sampleRate)
+            return sin(angle) * 0.6
+        }
+    }
+}
+
 final class WaveformMotionTests: XCTestCase {
     func testLoadingFramesMove() {
         let first = WaveformMotion.loading(frame: 0, count: 8)

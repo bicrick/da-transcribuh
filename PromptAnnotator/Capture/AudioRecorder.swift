@@ -11,7 +11,8 @@ final class AudioRecorder {
     private var speechConverter: AVAudioConverter?
     private var speechFormat: AVAudioFormat?
     private var speechSamples: [Float] = []
-    private var history: [CGFloat] = Array(repeating: 0.12, count: WaveformSamples.count)
+    private var bandWindow: [Float] = []
+    private var bands: [CGFloat] = Array(repeating: 0.12, count: WaveformSamples.count)
     private var currentLevel: CGFloat = 0.12
     private var voicedBuffers = 0
     private var speechHeard = false
@@ -21,10 +22,11 @@ final class AudioRecorder {
     func start(url: URL) throws {
         sampleLock.lock()
         speechSamples = []
+        bandWindow = []
         currentLevel = 0.12
         voicedBuffers = 0
         speechHeard = false
-        history = Array(repeating: 0.12, count: WaveformSamples.count)
+        bands = FrequencyBands.resting(WaveformSamples.count)
         sampleLock.unlock()
 
         try startRecorder(url: url)
@@ -70,24 +72,23 @@ final class AudioRecorder {
     }
 
     func sampleLevels() -> [CGFloat] {
-        let level: CGFloat
         if !usingEngine, let recorder {
             recorder.updateMeters()
             let decibels = recorder.averagePower(forChannel: 0)
             let clamped = min(0, max(-50, decibels))
-            level = CGFloat((clamped + 50) / 50)
+            let level = CGFloat((clamped + 50) / 50)
             currentLevel = level
             sampleLock.lock()
             SpeechGate.note(level: level, voicedBuffers: &voicedBuffers, heard: &speechHeard)
+            bands = FrequencyBands.smooth(bands, toward: FrequencyBands.shaped(level: level, count: bands.count))
+            let snapshot = bands
             sampleLock.unlock()
-        } else {
-            sampleLock.lock()
-            level = currentLevel
-            sampleLock.unlock()
+            return snapshot
         }
-        history.removeFirst()
-        history.append(max(0.08, level))
-        return history
+        sampleLock.lock()
+        let snapshot = bands
+        sampleLock.unlock()
+        return snapshot
     }
 
     private func startRecorder(url: URL) throws {
@@ -162,6 +163,12 @@ final class AudioRecorder {
         let level = Self.unitLevel(floats)
         sampleLock.lock()
         speechSamples.append(contentsOf: floats)
+        bandWindow.append(contentsOf: floats)
+        if bandWindow.count > FrequencyBands.window {
+            bandWindow.removeFirst(bandWindow.count - FrequencyBands.window)
+        }
+        let next = FrequencyBands.levels(samples: bandWindow, count: WaveformSamples.count)
+        bands = FrequencyBands.smooth(bands, toward: next)
         currentLevel = level
         SpeechGate.note(level: level, voicedBuffers: &voicedBuffers, heard: &speechHeard)
         sampleLock.unlock()
