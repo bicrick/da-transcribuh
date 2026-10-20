@@ -1,6 +1,6 @@
 # Prompt Annotator
 
-A macOS 14 menu bar app for marking up the screen while you talk. It has no Dock icon and it is not sandboxed.
+A macOS 14 menu bar app for marking up the screen while you talk. It appears in the Dock and it is not sandboxed.
 
 The menu bar item opens the Prompt Annotator window: Home, Sessions, Recording, Sound, and Model. The default shortcut is **Control-Option-Space**. Change it on the Recording page. A tap starts a session, and a second tap stops it. Clicks keep working. Hold **Shift** to draw. Release Shift and that group of marks becomes one tile. Option-Space, Command-Space, and Option-Command-Space are left alone, and the shortcut cannot include Shift because Shift draws.
 

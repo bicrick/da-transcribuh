@@ -69,11 +69,23 @@ private struct SessionMenu: View {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Runtime.isUnitTest else { return }
+        // MenuBarExtra would otherwise keep this as an agent, which hides the Dock icon.
+        DispatchQueue.main.async {
+            NSApp.setActivationPolicy(.regular)
+        }
         HotkeyCenter.shared.handler = {
             SessionController.shared.toggle()
         }
         HotkeyCenter.shared.install(AppSettings.shared.chord)
         SettingsPresenter.shared.show()
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard !Runtime.isUnitTest else { return true }
+        if !flag {
+            SettingsPresenter.shared.show()
+        }
+        return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
