@@ -22,25 +22,30 @@ struct SheetLayout: Equatable {
     var tiles: [Tile]
     var canvasSize: CGSize
 
-    static func make(imageSizes: [CGSize], metrics: SheetMetrics = .standard) -> SheetLayout {
+    static func make(
+        imageSizes: [CGSize],
+        metrics: SheetMetrics = .standard,
+        showCaptions: Bool = true
+    ) -> SheetLayout {
         guard !imageSizes.isEmpty else {
             return SheetLayout(tiles: [], canvasSize: .zero)
         }
 
         let fitted = imageSizes.map { fittedSize(for: $0, maxWidth: metrics.targetWidth) }
         let contentWidth = fitted
-            .map { max($0.width, metrics.minimumCaptionWidth) }
+            .map { showCaptions ? max($0.width, metrics.minimumCaptionWidth) : $0.width }
             .max() ?? 0
+        let captionHeight = showCaptions ? metrics.captionHeight : 0
 
         var tiles: [Tile] = []
         var y = metrics.margin
         for (offset, size) in fitted.enumerated() {
-            let captionWidth = max(size.width, metrics.minimumCaptionWidth)
+            let captionWidth = showCaptions ? max(size.width, metrics.minimumCaptionWidth) : size.width
             let caption = CGRect(
                 x: metrics.margin,
                 y: y,
                 width: captionWidth,
-                height: metrics.captionHeight
+                height: captionHeight
             )
             let image = CGRect(
                 x: metrics.margin,
@@ -85,10 +90,11 @@ enum ContactSheet {
     static func render(
         images: [CGImage],
         commitOffsets: [TimeInterval],
-        metrics: SheetMetrics = .standard
+        metrics: SheetMetrics = .standard,
+        showCaptions: Bool = true
     ) -> CGImage? {
         let sizes = images.map { CGSize(width: $0.width, height: $0.height) }
-        let layout = SheetLayout.make(imageSizes: sizes, metrics: metrics)
+        let layout = SheetLayout.make(imageSizes: sizes, metrics: metrics, showCaptions: showCaptions)
         guard layout.canvasSize.width > 0, layout.canvasSize.height > 0 else { return nil }
 
         let width = Int(layout.canvasSize.width.rounded())
@@ -113,12 +119,13 @@ enum ContactSheet {
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
 
         for (tile, image) in zip(layout.tiles, images) {
-            let caption = SheetLayout.flipped(tile.captionRect, canvasHeight: canvasHeight)
             let imageRect = SheetLayout.flipped(tile.imageRect, canvasHeight: canvasHeight)
+            context.draw(image, in: imageRect)
+            guard showCaptions else { continue }
 
+            let caption = SheetLayout.flipped(tile.captionRect, canvasHeight: canvasHeight)
             context.setFillColor(NSColor.white.cgColor)
             context.fill(caption)
-            context.draw(image, in: imageRect)
             drawCaption(
                 index: tile.index,
                 offset: commitOffsets.indices.contains(tile.index - 1) ? commitOffsets[tile.index - 1] : 0,

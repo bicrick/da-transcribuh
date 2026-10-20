@@ -53,6 +53,19 @@ final class ContactSheetLayoutTests: XCTestCase {
         XCTAssertEqual(layout.tiles[0].imageRect.height, 213)
     }
 
+    func testSilentSheetDropsTheCaptionBand() {
+        let layout = SheetLayout.make(imageSizes: [CGSize(width: 640, height: 480)], showCaptions: false)
+        XCTAssertEqual(layout.tiles[0].imageRect, CGRect(x: 36, y: 36, width: 640, height: 480))
+        XCTAssertEqual(layout.tiles[0].captionRect.height, 0)
+        XCTAssertEqual(layout.canvasSize, CGSize(width: 640 + 72, height: 480 + 72))
+    }
+
+    func testSilentSnippetStaysAtCaptureWidth() {
+        let layout = SheetLayout.make(imageSizes: [CGSize(width: 40, height: 30)], showCaptions: false)
+        XCTAssertEqual(layout.tiles[0].imageRect.size, CGSize(width: 40, height: 30))
+        XCTAssertEqual(layout.canvasSize.width, 40 + 72)
+    }
+
     func testEmptyInputMakesNoCanvas() {
         let layout = SheetLayout.make(imageSizes: [])
         XCTAssertTrue(layout.tiles.isEmpty)

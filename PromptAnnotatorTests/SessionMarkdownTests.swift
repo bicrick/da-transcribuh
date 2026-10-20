@@ -47,23 +47,18 @@ final class SessionMarkdownTests: XCTestCase {
             transcriptionError: nil
         )
 
-        let parts = notes.components(separatedBy: "## Transcript")
-        XCTAssertEqual(parts.count, 2)
-        XCTAssertTrue(parts[0].contains("## 1 · 0:12"))
-        XCTAssertTrue(parts[0].contains("![1](frames/01.png)"))
-        XCTAssertTrue(parts[0].contains("hello there"))
-        XCTAssertTrue(parts[0].contains("## 2 · 0:40"))
-        XCTAssertTrue(parts[0].contains("![2](frames/02.png)"))
-        XCTAssertTrue(parts[0].contains("is too close"))
-        XCTAssertEqual(parts[0].components(separatedBy: "Closing note:").count, 2)
-        XCTAssertTrue(parts[0].contains("and the label"))
-        XCTAssertTrue(parts[0].contains("Model: small.en_217MB"))
-        XCTAssertFalse(parts[0].components(separatedBy: "## 2").first?.contains("Closing note:") ?? true)
-
-        XCTAssertTrue(parts[1].contains("[0:01.00] hello"))
-        XCTAssertTrue(parts[1].contains("[0:01.50] there"))
-        XCTAssertTrue(parts[1].contains("[0:50.00] and"))
-        XCTAssertTrue(parts[1].contains("[0:52.00] label"))
+        XCTAssertTrue(notes.contains("## 1 · 0:12"))
+        XCTAssertTrue(notes.contains("![1](frames/01.png)"))
+        XCTAssertTrue(notes.contains("hello there"))
+        XCTAssertTrue(notes.contains("## 2 · 0:40"))
+        XCTAssertTrue(notes.contains("![2](frames/02.png)"))
+        XCTAssertTrue(notes.contains("is too close"))
+        XCTAssertEqual(notes.components(separatedBy: "Closing note:").count, 2)
+        XCTAssertTrue(notes.contains("and the label"))
+        XCTAssertTrue(notes.contains("Model: small.en_217MB"))
+        XCTAssertFalse(notes.components(separatedBy: "## 2").first?.contains("Closing note:") ?? true)
+        XCTAssertFalse(notes.contains("## Transcript"))
+        XCTAssertFalse(notes.contains("[0:01.00]"))
     }
 
     func testMissingTranscriptIsExplicit() {
@@ -76,7 +71,88 @@ final class SessionMarkdownTests: XCTestCase {
             transcriptionError: "model unavailable"
         )
         XCTAssertTrue(notes.contains("Transcription failed: model unavailable"))
-        XCTAssertTrue(notes.contains("No speech detected."))
+        XCTAssertFalse(notes.contains("No speech detected."))
+        XCTAssertFalse(notes.contains("## Transcript"))
+    }
+
+    func testSilentCapturesAreImagesOnly() {
+        let notes = SessionMarkdown.render(
+            started: "2026-10-20 09:30:36",
+            ended: "2026-10-20 09:30:39",
+            model: nil,
+            sections: [
+                SessionMarkdown.Section(
+                    index: 1,
+                    commitOffset: 1,
+                    imagePath: "frames/01.png",
+                    words: [],
+                    closingNote: []
+                ),
+                SessionMarkdown.Section(
+                    index: 2,
+                    commitOffset: 4,
+                    imagePath: "frames/02.png",
+                    words: [],
+                    closingNote: []
+                ),
+            ],
+            transcript: [],
+            transcriptionError: nil
+        )
+        XCTAssertTrue(notes.contains("![1](frames/01.png)"))
+        XCTAssertTrue(notes.contains("![2](frames/02.png)"))
+        XCTAssertFalse(notes.contains("## "))
+        XCTAssertFalse(notes.contains("Transcript"))
+        XCTAssertFalse(notes.contains("No speech detected"))
+        XCTAssertFalse(notes.contains("0:01"))
+    }
+
+    func testTimestampOnlyMarksASpokenTile() {
+        let notes = SessionMarkdown.render(
+            started: "start",
+            ended: "end",
+            model: nil,
+            sections: [
+                SessionMarkdown.Section(
+                    index: 1,
+                    commitOffset: 4,
+                    imagePath: "frames/01.png",
+                    words: [],
+                    closingNote: []
+                ),
+                SessionMarkdown.Section(
+                    index: 2,
+                    commitOffset: 18,
+                    imagePath: "frames/02.png",
+                    words: [TimedWord(text: "second", start: 10, end: 10.4)],
+                    closingNote: []
+                ),
+            ],
+            transcript: [TimedWord(text: "second", start: 10, end: 10.4)],
+            transcriptionError: nil
+        )
+        XCTAssertFalse(notes.contains("## 1"))
+        XCTAssertTrue(notes.contains("## 2 · 0:18"))
+        XCTAssertTrue(notes.contains("![1](frames/01.png)"))
+        XCTAssertTrue(notes.contains("second"))
+        XCTAssertFalse(notes.contains("## Transcript"))
+    }
+
+    func testTalkOnlySessionKeepsTheWords() {
+        let notes = SessionMarkdown.render(
+            started: "start",
+            ended: "end",
+            model: nil,
+            sections: [],
+            transcript: [
+                TimedWord(text: "hello", start: 1, end: 1.2),
+                TimedWord(text: "there", start: 1.3, end: 1.6),
+            ],
+            transcriptionError: nil
+        )
+        XCTAssertTrue(notes.contains("hello there"))
+        XCTAssertFalse(notes.contains("## Transcript"))
+        XCTAssertFalse(notes.contains("[0:01.00]"))
     }
 
     func testPasteTextGroupsTilesAndClosingNote() {
@@ -118,7 +194,7 @@ final class SessionMarkdownTests: XCTestCase {
         XCTAssertEqual(text, "hello there")
     }
 
-    func testPasteTextKeepsNumbersWhenATileIsSilent() {
+    func testPasteTextOmitsASilentTile() {
         let text = SessionMarkdown.pasteText(
             sections: [
                 SessionMarkdown.Section(
@@ -139,7 +215,7 @@ final class SessionMarkdownTests: XCTestCase {
             transcript: [],
             transcriptionError: nil
         )
-        XCTAssertEqual(text, "1.\n\n2. second")
+        XCTAssertEqual(text, "2. second")
     }
 
     func testPasteTextOmitsWordsWhenNothingWasSaid() {

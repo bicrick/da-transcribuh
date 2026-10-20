@@ -38,17 +38,28 @@ struct SessionMarkdown {
         }
         lines.append("")
 
-        for section in sections {
-            lines.append("## \(section.index) · \(TimeFormat.clock(section.commitOffset))")
-            lines.append("")
-            lines.append("![\(section.index)](\(section.imagePath))")
-            lines.append("")
-            let spoken = Aligner.spokenText(section.words)
+        if sections.isEmpty {
+            let spoken = Aligner.spokenText(transcript)
             if !spoken.isEmpty {
                 lines.append(spoken)
                 lines.append("")
             }
+        }
+
+        for section in sections {
+            let spoken = Aligner.spokenText(section.words)
             let closing = Aligner.spokenText(section.closingNote)
+            // A timestamp is only there to match a picture with the comment about it.
+            if !spoken.isEmpty || !closing.isEmpty {
+                lines.append("## \(section.index) · \(TimeFormat.clock(section.commitOffset))")
+                lines.append("")
+            }
+            lines.append("![\(section.index)](\(section.imagePath))")
+            lines.append("")
+            if !spoken.isEmpty {
+                lines.append(spoken)
+                lines.append("")
+            }
             if !closing.isEmpty {
                 lines.append("Closing note:")
                 lines.append("")
@@ -57,25 +68,16 @@ struct SessionMarkdown {
             }
         }
 
-        lines.append("## Transcript")
-        lines.append("")
-        if let transcriptionError {
+        if let transcriptionError, !transcriptionError.isEmpty {
             lines.append("Transcription failed: \(transcriptionError)")
-            lines.append("")
-        }
-        if transcript.isEmpty {
-            lines.append("No speech detected.")
-            lines.append("")
-        } else {
-            for word in transcript {
-                let token = word.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !token.isEmpty else { continue }
-                lines.append("[\(TimeFormat.precise(word.start))] \(token)")
-            }
             lines.append("")
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    static func containsSpeech(_ sections: [Section]) -> Bool {
+        sections.contains { !spoken(in: $0).isEmpty }
     }
 
     static func pasteText(
@@ -89,13 +91,13 @@ struct SessionMarkdown {
             if !all.isEmpty {
                 paragraphs.append(all)
             }
-        } else if sections.contains(where: { !spoken(in: $0).isEmpty }) {
-            // The sheet badges are 1, 2, 3. The pasted words use those same numbers,
-            // including a tile that had no speech, so the list stays lined up.
-            // A session where nothing was said pastes the picture alone.
+        } else if containsSpeech(sections) {
+            // The number matches that tile's badge. A silent tile has no comment,
+            // so it stays out of the paste. Nothing said means the picture alone.
             for section in sections {
                 let spoken = spoken(in: section)
-                paragraphs.append(spoken.isEmpty ? "\(section.index)." : "\(section.index). \(spoken)")
+                guard !spoken.isEmpty else { continue }
+                paragraphs.append("\(section.index). \(spoken)")
             }
         }
         if let transcriptionError, !transcriptionError.isEmpty {
@@ -236,7 +238,11 @@ enum SessionWriter {
         var sheetURL: URL?
         let images = groups.map(\.image)
         let offsets = groups.map(\.committedAt)
-        if let sheet = ContactSheet.render(images: images, commitOffsets: offsets) {
+        if let sheet = ContactSheet.render(
+            images: images,
+            commitOffsets: offsets,
+            showCaptions: SessionMarkdown.containsSpeech(sections)
+        ) {
             let url = directory.appendingPathComponent("sheet.png")
             try PNG.write(sheet, to: url)
             sheetURL = url

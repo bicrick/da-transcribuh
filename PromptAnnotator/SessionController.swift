@@ -62,7 +62,6 @@ final class SessionController: ObservableObject {
     private var startedAt = Date()
     private var directory: URL?
     private var audioURL: URL?
-    private var notes = ""
     private var pasteText = ""
     private var sheetURL: URL?
     private var timer: Timer?
@@ -276,8 +275,8 @@ final class SessionController: ObservableObject {
 
     private func copyToClipboard() {
         let image = sheetURL.flatMap { NSImage(contentsOf: $0) }
-        var text = pasteText.isEmpty ? notes : pasteText
-        if AppSettings.shared.capitalizeTranscript {
+        var text = pasteText
+        if AppSettings.shared.capitalizeTranscript, !text.isEmpty {
             text = TranscriptText.leadingCapital(text)
         }
         pasteText = text
@@ -530,7 +529,6 @@ final class SessionController: ObservableObject {
             groups = []
             captureCount = 0
             redoGroups = []
-            notes = ""
             pasteText = ""
             sheetURL = nil
             transcriptionError = nil
@@ -688,7 +686,6 @@ final class SessionController: ObservableObject {
                 model: model,
                 transcriptionError: transcriptionError
             )
-            notes = saved.notes
             pasteText = saved.pasteText
             sheetURL = saved.sheetURL
             lastSessionURL = directory

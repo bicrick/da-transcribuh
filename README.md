@@ -42,7 +42,7 @@ Stop saves any marks still on screen, then ends the session. If you never captur
 
 The default shortcut is **Control-Option-Space**. Change it on the Recording page. Option-Space, Command-Space, and Option-Command-Space are left alone, and the shortcut cannot include Shift because Shift draws.
 
-If the session has captures, press Paste (Command-V). The tile sheet goes in, and the words follow in a second paste. Each block is numbered to match the tile: `1.` is the first picture, `2.` is the second, and a silent tile still keeps its number. If the words do not appear, press Paste once more. Control-Option-V pastes the picture and then the words in one step. A session with no capture puts the transcript on the clipboard by itself. The menu can show the last session in Finder.
+If the session has captures, press Paste (Command-V). The tile sheet goes in, and the words follow in a second paste when you spoke. Each block is numbered to match the tile you commented on. A picture with no words is left out of the text, and a session where nothing was said pastes the picture alone. If the words do not appear, press Paste once more. Control-Option-V pastes the picture and then the words in one step. A session with no capture puts the transcript on the clipboard by itself. The menu can show the last session in Finder.
 
 ## Requirements
 
@@ -66,9 +66,9 @@ Turn the switches on in System Settings, then quit and reopen. If a switch is al
 
 Files land in `~/Documents/PromptAnnotator/Sessions/<timestamp>/`:
 
-- `sheet.png` — numbered tiles in commit order. A frame wider than about 1280px is scaled down. A smaller snippet stays at its capture size. Marks are baked in, with the number and timestamp on the tile.
+- `sheet.png` — tiles in commit order. A frame wider than about 1280px is scaled down. A smaller snippet stays at its capture size. Marks are baked in. When you spoke, each tile shows its number and timestamp so the words line up with that picture. A silent session is the pictures alone.
 - `frames/01.png`, `frames/02.png`, … — the same frames at capture resolution.
-- `session.md` — one section per group: number, timestamp, image, and the words spoken from the previous commit until this one. Speech after the last commit until Stop is a closing note on the last section. The full timed transcript is at the bottom.
+- `session.md` — one image per group. A group you spoke about also has its number, timestamp, and the words from the previous commit until this one, so a comment stays matched to that picture. Speech after the last commit until Stop is a closing note on that section. A session with no speech lists the images and does not add a transcript.
 - `session.json` — shapes, bounds, display, and word timestamps. Shape points are display points, origin at the top-left, y down.
 - `audio.m4a` — the microphone.
 

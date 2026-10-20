@@ -185,6 +185,30 @@ final class ShapeRendererTests: XCTestCase {
         XCTAssertGreaterThan(caption.b, 230)
     }
 
+    func testSilentSheetPaintsTheImageWithoutACaption() throws {
+        let source = solid(width: 20, height: 10, red: 0.86, green: 0.1, blue: 0.1)
+        let sheet = try XCTUnwrap(
+            ContactSheet.render(images: [source], commitOffsets: [1], showCaptions: false)
+        )
+        let layout = SheetLayout.make(imageSizes: [CGSize(width: 20, height: 10)], showCaptions: false)
+        XCTAssertEqual(sheet.width, Int(layout.canvasSize.width.rounded()))
+        XCTAssertEqual(sheet.height, Int(layout.canvasSize.height.rounded()))
+        XCTAssertEqual(layout.canvasSize.height, 10 + 72)
+
+        let imageCenter = CGPoint(
+            x: layout.tiles[0].imageRect.midX,
+            y: layout.tiles[0].imageRect.midY
+        )
+        let painted = color(atX: Int(imageCenter.x), yFromTop: Int(imageCenter.y), image: sheet)
+        XCTAssertGreaterThan(painted.r, 180)
+        XCTAssertLessThan(painted.g, 80)
+
+        let above = color(atX: Int(imageCenter.x), yFromTop: 8, image: sheet)
+        XCTAssertGreaterThan(above.r, 220)
+        XCTAssertGreaterThan(above.g, 220)
+        XCTAssertGreaterThan(above.b, 220)
+    }
+
     private func solid(width: Int, height: Int, red: CGFloat, green: CGFloat, blue: CGFloat) -> CGImage {
         let context = CGContext(
             data: nil,
