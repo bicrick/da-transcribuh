@@ -183,22 +183,33 @@ final class SessionController: ObservableObject {
 
     func selectCapture() {
         guard phase == .recording || phase == .idle else { return }
-        let hadMarks = textEdit != nil || draft != nil || shapes.contains(where: { $0.isSignificant() })
+        let shiftHeld = phase == .recording && monitor.shiftIsDown
+        // Shift is still down: arm the snippet tool and leave the open marks on screen.
+        // Committing here used to dismiss the bar and throw away the drag that followed.
+        if !shiftHeld {
+            let hadMarks = textEdit != nil || draft != nil || shapes.contains(where: { $0.isSignificant() })
+            if phase == .recording, hadMarks {
+                if textEdit != nil {
+                    submitText()
+                } else {
+                    commitCanvas()
+                }
+            }
+        }
         markupMode = .capture
-        showsPenState = false
-        setToolbarVisible(false)
-        monitor.cancelHold()
         selectionRect = nil
-        NSCursor.arrow.set()
-        guard phase == .recording, hadMarks else {
-            syncOverlay()
-            return
-        }
-        if textEdit != nil {
-            submitText()
+        monitor.cancelHold()
+        if shiftHeld {
+            showsPenState = true
+            setToolbarVisible(true)
+            NSCursor.crosshair.set()
         } else {
-            commitCanvas()
+            showsPenState = false
+            setToolbarVisible(false)
+            NSCursor.arrow.set()
         }
+        syncOverlay()
+        refreshControls()
     }
 
     func select(tool: AnnotationTool) {
@@ -345,21 +356,33 @@ final class SessionController: ObservableObject {
 
     func penShift(down: Bool) {
         guard phase == .recording else { return }
-        if down {
-            markupMode = .annotate
-            if textEdit == nil {
-                showsPenState = true
+        let effect = ShiftAnnotation.shiftEdge(
+            down: down,
+            editing: textEdit != nil,
+            selecting: monitor.isSwallowingMouse && !monitor.isAnnotating,
+            stroking: monitor.isAnnotating
+        )
+        switch effect {
+        case .keepEditing:
+            if !down {
+                showsPenState = false
+                setToolbarVisible(false)
             }
+        case .keepSelecting:
+            break
+        case .beginDrawing:
+            markupMode = .annotate
+            showsPenState = true
             setToolbarVisible(true)
             chromeScreenID = ScreenGeometry.screenUnderMouse().flatMap(ScreenGeometry.displayID)
-        } else {
+        case .finishGestureOnRelease:
             showsPenState = false
             setToolbarVisible(false)
-            guard textEdit == nil else { return }
-            if !monitor.isSwallowingMouse {
-                commitCanvas()
-                markupMode = .capture
-            }
+        case .endHold:
+            showsPenState = false
+            setToolbarVisible(false)
+            commitCanvas()
+            markupMode = .capture
         }
         DispatchQueue.main.async { self.chrome.relayout() }
         refreshControls()
@@ -371,14 +394,26 @@ final class SessionController: ObservableObject {
         if tool == .text {
             textAnchor = point
             draft = nil
+            textEdit = TextEdit(origin: point, text: "", color: color)
         } else {
             draft = AnnotationShape(id: UUID(), tool: tool, color: color, points: [point], text: nil)
         }
         syncOverlay()
+        refreshControls()
     }
 
     func penMouseDrag(at point: CGPoint, display: CGDirectDisplayID) {
         guard phase == .recording, display == drawingDisplayID, tool != .text, var draft else { return }
+        if draft.tool == .arrow || draft.tool == .rectangle {
+            if draft.points.count < 2 {
+                draft.points.append(point)
+            } else {
+                draft.points[draft.points.count - 1] = point
+            }
+            self.draft = draft
+            syncOverlay()
+            return
+        }
         if let last = draft.points.last, hypot(last.x - point.x, last.y - point.y) < 0.5 {
             return
         }
@@ -390,7 +425,9 @@ final class SessionController: ObservableObject {
     func penMouseUp(at point: CGPoint, display: CGDirectDisplayID) {
         guard phase == .recording else { return }
         if tool == .text {
-            textEdit = TextEdit(origin: textAnchor ?? point, text: "", color: color)
+            if textEdit == nil {
+                textEdit = TextEdit(origin: textAnchor ?? point, text: "", color: color)
+            }
             textAnchor = nil
             draft = nil
             syncOverlay()
@@ -398,8 +435,16 @@ final class SessionController: ObservableObject {
             return
         }
         if var draft {
-            if display == drawingDisplayID, draft.points.last != point {
-                draft.points.append(point)
+            if display == drawingDisplayID {
+                if draft.tool == .arrow || draft.tool == .rectangle {
+                    if draft.points.count < 2 {
+                        draft.points.append(point)
+                    } else {
+                        draft.points[draft.points.count - 1] = point
+                    }
+                } else if draft.points.last != point {
+                    draft.points.append(point)
+                }
             }
             self.draft = nil
             if draft.isSignificant() {
@@ -424,7 +469,8 @@ final class SessionController: ObservableObject {
     }
 
     func captureDragMoved(origin: CGPoint, current: CGPoint, display: CGDirectDisplayID) {
-        guard phase == .recording, markupMode == .capture, display == drawingDisplayID else { return }
+        guard phase == .recording, display == drawingDisplayID else { return }
+        guard markupMode == .capture || selectionRect != nil else { return }
         selectionRect = CaptureGesture.rect(from: origin, to: current)
         syncOverlay()
     }
@@ -432,10 +478,15 @@ final class SessionController: ObservableObject {
     func captureDragEnded(origin: CGPoint, current: CGPoint, display: CGDirectDisplayID) {
         let rect = CaptureGesture.rect(from: origin, to: current)
         let displayID = drawingDisplayID
+        let armed = markupMode == .capture || selectionRect != nil
         selectionRect = nil
         drawingDisplayID = nil
         syncOverlay()
-        guard phase == .recording, markupMode == .capture, displayID == display else { return }
+        guard phase == .recording, armed, displayID == display else { return }
+        if !monitor.shiftIsDown {
+            markupMode = .capture
+            showsPenState = false
+        }
         guard CaptureGesture.isCapturable(rect) else { return }
         AppSounds.tileCommitted()
         enqueueCapture(
@@ -459,6 +510,11 @@ final class SessionController: ObservableObject {
         case .escape:
             if textEdit != nil {
                 textEdit = nil
+                if !monitor.shiftIsDown {
+                    showsPenState = false
+                    markupMode = .capture
+                    setToolbarVisible(false)
+                }
             } else {
                 draft = nil
             }
@@ -472,8 +528,10 @@ final class SessionController: ObservableObject {
             textEdit = edit
             syncOverlay()
         case .character(let text):
-            guard var edit = textEdit, edit.text.count < 180 else { return }
-            edit.text.append(contentsOf: text)
+            guard var edit = textEdit else { return }
+            let room = 180 - edit.text.count
+            guard room > 0 else { return }
+            edit.text.append(contentsOf: text.prefix(room))
             edit.color = color
             textEdit = edit
             syncOverlay()
@@ -739,6 +797,11 @@ final class SessionController: ObservableObject {
             redoShapes.removeAll()
         }
         textEdit = nil
+        if !monitor.shiftIsDown {
+            showsPenState = false
+            markupMode = .capture
+            setToolbarVisible(false)
+        }
         syncOverlay()
         commitCanvas()
     }

@@ -20,7 +20,7 @@ A tap of the shortcut starts a session. You can just talk. Drag when you want a 
 
 The capture is the stacked screen. Sheets, popovers, and the front window stay in the picture. The recording island, the tool bar, and the draw overlay stay out of it. A drag that is only a few points across does not create a tile. Escape cancels a selection in progress.
 
-While Shift is held, the cursor becomes the selected tool: pen (the default), highlighter, crosshair (arrow and rectangle), or I-beam (text). The draw surface captures the pointer only while Shift is held, so the app underneath does not receive the shift-click. Releasing Shift screenshots that display, bakes the shapes into the bitmap, and hides the tool bar. A Shift tap that does not leave a mark does not create a tile. A tiny click is not a shape.
+While Shift is held, the cursor becomes the selected tool: pen (the default), highlighter, crosshair (arrow and rectangle), or I-beam (text). The viewfinder on that bar snippets the screen without leaving the hold; a click that never becomes a drag still reaches the page. The draw surface captures the pointer only while Shift is held, so the app underneath does not receive the shift-click. Releasing Shift screenshots that display, bakes the shapes into the bitmap, and hides the tool bar. A Shift tap that does not leave a mark does not create a tile. A tiny click is not a shape.
 
 Escape cancels the shape in progress. Undo and redo apply to the marks in the current hold. After a group is saved, Undo on the bar drops that last tile.
 

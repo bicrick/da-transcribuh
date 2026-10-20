@@ -42,9 +42,7 @@ struct MarkupToolbarView: View {
 
     private var captureButton: some View {
         let selected = session.markupMode == .capture
-        return Button {
-            session.selectCapture()
-        } label: {
+        return PressSurface(action: { session.selectCapture() }) {
             Image(systemName: "viewfinder")
                 .font(.system(size: 15, weight: .medium))
                 .frame(width: 32, height: 28)
@@ -54,16 +52,13 @@ struct MarkupToolbarView: View {
                         .fill(selected ? Color.accentColor.opacity(0.16) : Color.clear)
                 )
         }
-        .buttonStyle(.plain)
         .help("Capture a snippet")
         .accessibilityLabel("Capture")
     }
 
     private func toolButton(_ tool: AnnotationTool) -> some View {
         let selected = session.markupMode == .annotate && session.tool == tool
-        return Button {
-            session.select(tool: tool)
-        } label: {
+        return PressSurface(action: { session.select(tool: tool) }) {
             Image(systemName: tool.symbolName)
                 .font(.system(size: 15, weight: .medium))
                 .frame(width: 32, height: 28)
@@ -73,7 +68,6 @@ struct MarkupToolbarView: View {
                         .fill(selected ? Color.accentColor.opacity(0.16) : Color.clear)
                 )
         }
-        .buttonStyle(.plain)
         .help(tool.title)
         .accessibilityLabel(tool.title)
     }
@@ -113,6 +107,29 @@ struct MarkupToolbarView: View {
         .buttonStyle(.plain)
         .help(color.name.capitalized)
         .accessibilityLabel(color.name)
+    }
+
+    private struct PressSurface<Content: View>: View {
+        var action: () -> Void
+        @ViewBuilder var content: () -> Content
+        @State private var armed = false
+
+        var body: some View {
+            content()
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in
+                            guard !armed else { return }
+                            armed = true
+                            action()
+                        }
+                        .onEnded { _ in
+                            armed = false
+                        }
+                )
+                .accessibilityAddTraits(.isButton)
+        }
     }
 
     private var hairline: some View {

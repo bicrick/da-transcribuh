@@ -38,6 +38,7 @@ final class ShiftPenMonitor {
 
     private var shiftDown = false
     private var hold: PointerHold = .idle
+    private var chromePress: PressedClick?
     private var discardUntilLeftUp = false
     private var isReplaying = false
     private var tap: CFMachPort?
@@ -92,6 +93,7 @@ final class ShiftPenMonitor {
         active = false
         shiftDown = false
         hold = .idle
+        chromePress = nil
         discardUntilLeftUp = false
         if let tap {
             CGEvent.tapEnable(tap: tap, enable: false)
@@ -171,29 +173,52 @@ final class ShiftPenMonitor {
             return nil
         }
         if overChrome(event) {
+            if let local = location(of: event) {
+                chromePress = PressedClick(local: local.point, display: local.display)
+            }
             return Unmanaged.passUnretained(event)
         }
+        chromePress = nil
         guard let local = location(of: event) else {
             return Unmanaged.passUnretained(event)
         }
 
-        if session.markupMode == .capture {
+        switch ShiftAnnotation.press(
+            mode: session.markupMode,
+            shiftDown: shiftDown,
+            editing: session.penKeyPolicy() == .editing
+        ) {
+        case .passThrough:
+            return Unmanaged.passUnretained(event)
+        case .select:
             hold = .pending(PressedClick(local: local.point, display: local.display))
             return nil
+        case .draw:
+            hold = .drawing
+            session.penMouseDown(at: local.point, display: local.display)
+            updateCursor(session: session)
+            return nil
         }
-
-        guard session.markupMode == .annotate, shiftDown else {
-            return Unmanaged.passUnretained(event)
-        }
-        hold = .drawing
-        session.penMouseDown(at: local.point, display: local.display)
-        updateCursor(session: session)
-        return nil
     }
 
     private func handleLeftDragged(_ event: CGEvent, session: SessionController) -> Unmanaged<CGEvent>? {
         if discardUntilLeftUp {
             return nil
+        }
+        if case .idle = hold, let press = chromePress, session.markupMode == .capture {
+            guard let local = location(of: event), local.display == press.display else {
+                return Unmanaged.passUnretained(event)
+            }
+            let moved = CaptureGesture.isDrag(from: press.local, to: local.point)
+            if moved, !overChrome(event) {
+                let start = PressedClick(local: local.point, display: local.display)
+                hold = .capturing(start)
+                chromePress = nil
+                session.captureDragBegan(origin: start.local, current: start.local, display: start.display)
+                NSCursor.crosshair.set()
+                return nil
+            }
+            return Unmanaged.passUnretained(event)
         }
         switch hold {
         case .pending(let press):
@@ -213,6 +238,7 @@ final class ShiftPenMonitor {
         case .drawing:
             guard let local = location(of: event) else { return nil }
             session.penMouseDrag(at: local.point, display: local.display)
+            updateCursor(session: session)
             return nil
         case .idle:
             return Unmanaged.passUnretained(event)
@@ -226,8 +252,10 @@ final class ShiftPenMonitor {
     ) -> Unmanaged<CGEvent>? {
         if discardUntilLeftUp {
             discardUntilLeftUp = false
+            chromePress = nil
             return nil
         }
+        chromePress = nil
         switch hold {
         case .pending(let press):
             hold = .idle
@@ -355,6 +383,16 @@ final class ShiftPenMonitor {
                 session.penKey(.backspace)
                 return nil
             }
+            if command && code == KeyCode.v {
+                let pasted = (NSPasteboard.general.string(forType: .string) ?? "")
+                    .replacingOccurrences(of: "\n", with: " ")
+                    .replacingOccurrences(of: "\r", with: " ")
+                    .trimmingCharacters(in: .whitespaces)
+                if !pasted.isEmpty {
+                    session.penKey(.character(pasted))
+                }
+                return nil
+            }
             if command {
                 return nil
             }
@@ -378,6 +416,10 @@ final class ShiftPenMonitor {
         }
         if session.penKeyPolicy() == .editing {
             NSCursor.iBeam.set()
+            return
+        }
+        if session.markupMode == .capture, shiftDown {
+            NSCursor.crosshair.set()
             return
         }
         guard session.markupMode == .annotate, shiftDown || isAnnotating else { return }
@@ -409,8 +451,12 @@ final class ShiftPenMonitor {
             actualStringLength: &length,
             unicodeString: &buffer
         )
-        guard length > 0 else { return nil }
-        return String(utf16CodeUnits: buffer, count: length)
+        if length > 0 {
+            return String(utf16CodeUnits: buffer, count: length)
+        }
+        let typed = NSEvent(cgEvent: event)?.characters
+        guard let typed, !typed.isEmpty else { return nil }
+        return typed
     }
 
     private static let replayToken: Int64 = 0x5041_5265
@@ -439,4 +485,5 @@ private enum KeyCode {
     static let delete: Int64 = 51
     static let forwardDelete: Int64 = 117
     static let z: Int64 = 6
+    static let v: Int64 = 9
 }
