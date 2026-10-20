@@ -52,6 +52,9 @@ struct RecordingPage: View {
                 .font(.system(size: 13, weight: .semibold))
             SettingsCard {
                 VStack(alignment: .leading, spacing: 10) {
+                    Text("A session starts in capture. Drag to snippet the screen. These tools are for Shift drawing.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                     Text("Tool")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)

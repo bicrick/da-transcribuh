@@ -132,10 +132,15 @@ struct DisplaySnapshot: Codable, Equatable {
     var frameWidth: Double
     var frameHeight: Double
 
-    init(screen: NSScreen, pixelWidth: Int, pixelHeight: Int) {
+    init(screen: NSScreen, pixelWidth: Int, pixelHeight: Int, contentSize: CGSize? = nil) {
         id = ScreenGeometry.displayID(of: screen) ?? 0
-        widthPoints = Double(screen.frame.width)
-        heightPoints = Double(screen.frame.height)
+        if let contentSize {
+            widthPoints = Double(contentSize.width)
+            heightPoints = Double(contentSize.height)
+        } else {
+            widthPoints = Double(screen.frame.width)
+            heightPoints = Double(screen.frame.height)
+        }
         widthPixels = pixelWidth
         heightPixels = pixelHeight
         frameX = Double(screen.frame.origin.x)

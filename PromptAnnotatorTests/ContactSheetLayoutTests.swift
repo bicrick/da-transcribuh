@@ -18,16 +18,25 @@ final class ContactSheetLayoutTests: XCTestCase {
             CGSize(width: 2000, height: 1000),
         ])
         XCTAssertEqual(layout.tiles.map(\.index), [1, 2])
-        XCTAssertEqual(layout.tiles[0].imageRect.height, 640)
-        XCTAssertEqual(layout.tiles[1].imageRect.height, 640)
+        XCTAssertEqual(layout.tiles[0].imageRect.size, CGSize(width: 1000, height: 500))
+        XCTAssertEqual(layout.tiles[1].imageRect.size, CGSize(width: 1280, height: 640))
         XCTAssertEqual(layout.tiles[1].captionRect.minY, layout.tiles[0].imageRect.maxY + 28)
         XCTAssertEqual(layout.tiles[0].captionRect.minX, layout.tiles[1].imageRect.minX)
-        XCTAssertEqual(layout.tiles[0].imageRect.width, layout.tiles[1].imageRect.width)
+        XCTAssertEqual(layout.canvasSize.width, 1280 + 72)
     }
 
-    func testNarrowImageScalesUp() {
+    func testNarrowImageStaysAtCaptureSize() {
         let layout = SheetLayout.make(imageSizes: [CGSize(width: 640, height: 480)])
-        XCTAssertEqual(layout.tiles[0].imageRect.size, CGSize(width: 1280, height: 960))
+        XCTAssertEqual(layout.tiles[0].imageRect.size, CGSize(width: 640, height: 480))
+        XCTAssertEqual(layout.tiles[0].captionRect.width, 640)
+        XCTAssertEqual(layout.canvasSize.width, 640 + 72)
+    }
+
+    func testTinySnippetIsNotUpscaled() {
+        let layout = SheetLayout.make(imageSizes: [CGSize(width: 40, height: 30)])
+        XCTAssertEqual(layout.tiles[0].imageRect.size, CGSize(width: 40, height: 30))
+        XCTAssertEqual(layout.tiles[0].captionRect.width, 180)
+        XCTAssertEqual(layout.canvasSize.width, 180 + 72)
     }
 
     func testCaptionSitsOnTopOfTheImage() {
@@ -40,8 +49,8 @@ final class ContactSheetLayoutTests: XCTestCase {
     }
 
     func testOddHeightRoundsToWholePixels() {
-        let layout = SheetLayout.make(imageSizes: [CGSize(width: 1000, height: 333)])
-        XCTAssertEqual(layout.tiles[0].imageRect.height, 426)
+        let layout = SheetLayout.make(imageSizes: [CGSize(width: 2000, height: 333)])
+        XCTAssertEqual(layout.tiles[0].imageRect.height, 213)
     }
 
     func testEmptyInputMakesNoCanvas() {

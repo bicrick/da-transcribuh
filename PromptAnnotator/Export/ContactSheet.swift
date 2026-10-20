@@ -6,6 +6,8 @@ struct SheetMetrics: Equatable {
     var captionHeight: CGFloat = 56
     var spacing: CGFloat = 28
     var margin: CGFloat = 36
+    /// Keeps the number and clock readable when a snippet is narrower than the caption.
+    var minimumCaptionWidth: CGFloat = 180
 
     static let standard = SheetMetrics()
 }
@@ -25,21 +27,26 @@ struct SheetLayout: Equatable {
             return SheetLayout(tiles: [], canvasSize: .zero)
         }
 
+        let fitted = imageSizes.map { fittedSize(for: $0, maxWidth: metrics.targetWidth) }
+        let contentWidth = fitted
+            .map { max($0.width, metrics.minimumCaptionWidth) }
+            .max() ?? 0
+
         var tiles: [Tile] = []
         var y = metrics.margin
-        for (offset, source) in imageSizes.enumerated() {
-            let scaled = scaledSize(for: source, targetWidth: metrics.targetWidth)
+        for (offset, size) in fitted.enumerated() {
+            let captionWidth = max(size.width, metrics.minimumCaptionWidth)
             let caption = CGRect(
                 x: metrics.margin,
                 y: y,
-                width: metrics.targetWidth,
+                width: captionWidth,
                 height: metrics.captionHeight
             )
             let image = CGRect(
                 x: metrics.margin,
                 y: caption.maxY,
-                width: metrics.targetWidth,
-                height: scaled.height
+                width: size.width,
+                height: size.height
             )
             tiles.append(Tile(index: offset + 1, captionRect: caption, imageRect: image))
             y = image.maxY + metrics.spacing
@@ -49,16 +56,18 @@ struct SheetLayout: Equatable {
 
         return SheetLayout(
             tiles: tiles,
-            canvasSize: CGSize(width: metrics.margin * 2 + metrics.targetWidth, height: y)
+            canvasSize: CGSize(width: metrics.margin * 2 + contentWidth, height: y)
         )
     }
 
-    static func scaledSize(for source: CGSize, targetWidth: CGFloat) -> CGSize {
+    /// Scales a frame down to `maxWidth`. A narrower snippet keeps its capture size.
+    static func fittedSize(for source: CGSize, maxWidth: CGFloat) -> CGSize {
         guard source.width > 0 else {
-            return CGSize(width: targetWidth, height: 0)
+            return CGSize(width: maxWidth, height: 0)
         }
-        let scale = targetWidth / source.width
-        return CGSize(width: targetWidth, height: (source.height * scale).rounded())
+        let width = min(source.width, maxWidth)
+        let scale = width / source.width
+        return CGSize(width: width.rounded(), height: (source.height * scale).rounded())
     }
 
     /// Converts a top-left rect into Core Graphics' bottom-left space.

@@ -5,6 +5,7 @@ final class AnnotationCanvasView: NSView {
     var draft: AnnotationShape?
     var textEdit: TextEdit?
     var caretOn = true
+    var selection: CGRect?
 
     override var isOpaque: Bool { false }
 
@@ -14,6 +15,9 @@ final class AnnotationCanvasView: NSView {
         // The view is y-up. Put the renderer in display space: origin top-left, y down.
         context.translateBy(x: 0, y: bounds.height)
         context.scaleBy(x: 1, y: -1)
+        if let selection {
+            drawSelectionShade(selection, in: context)
+        }
         ShapeRenderer.draw(
             shapes: shapes,
             draft: draft,
@@ -21,7 +25,32 @@ final class AnnotationCanvasView: NSView {
             caretOn: caretOn,
             in: context
         )
+        if let selection {
+            drawSelectionBorder(selection, in: context)
+        }
         context.restoreGState()
+    }
+
+    /// Dims the display around the snippet. The hole stays clear so the page shows through.
+    private func drawSelectionShade(_ rect: CGRect, in context: CGContext) {
+        let box = rect.standardized
+        guard box.width >= 1, box.height >= 1 else { return }
+        let shade = CGMutablePath()
+        shade.addRect(bounds)
+        shade.addRect(box)
+        context.addPath(shade)
+        context.setFillColor(NSColor.black.withAlphaComponent(0.28).cgColor)
+        context.fillPath(using: .evenOdd)
+    }
+
+    private func drawSelectionBorder(_ rect: CGRect, in context: CGContext) {
+        let box = rect.standardized
+        guard box.width >= 1, box.height >= 1 else { return }
+        context.setLineWidth(1)
+        context.setStrokeColor(NSColor.black.withAlphaComponent(0.85).cgColor)
+        context.stroke(box)
+        context.setStrokeColor(NSColor.white.cgColor)
+        context.stroke(box.insetBy(dx: 1, dy: 1))
     }
 }
 
@@ -50,8 +79,9 @@ final class OverlayPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// Clear full-display surfaces. The windows ignore the mouse; `ShiftPenMonitor`
-/// captures the pointer while Shift is held.
+/// Clear full-display surfaces. The windows ignore the mouse. `ShiftPenMonitor`
+/// captures a drag in capture mode, and captures the pointer while Shift is held
+/// in annotate mode.
 @MainActor
 final class OverlayController {
     private var panels: [CGDirectDisplayID: OverlayPanel] = [:]
@@ -75,6 +105,7 @@ final class OverlayController {
         draft: AnnotationShape?,
         textEdit: TextEdit?,
         caretOn: Bool,
+        selection: CGRect?,
         displayID: CGDirectDisplayID?
     ) {
         for (id, canvas) in canvases {
@@ -82,6 +113,7 @@ final class OverlayController {
             canvas.shapes = active ? shapes : []
             canvas.draft = active ? draft : nil
             canvas.textEdit = active ? textEdit : nil
+            canvas.selection = active ? selection : nil
             canvas.caretOn = caretOn
             canvas.needsDisplay = true
         }
@@ -113,6 +145,7 @@ final class OverlayController {
                 canvas.shapes = []
                 canvas.draft = nil
                 canvas.textEdit = nil
+                canvas.selection = nil
             }
             nextPanels[id] = panel
             nextCanvases[id] = canvas

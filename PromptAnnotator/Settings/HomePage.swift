@@ -122,11 +122,11 @@ struct HomePage: View {
 
     private var drawRow: some View {
         HStack(spacing: 12) {
-            rowIcon("pencil.tip")
+            rowIcon("viewfinder")
             VStack(alignment: .leading, spacing: 2) {
-                Text("Hold Shift to draw")
+                Text("Drag to capture a snippet")
                     .font(.system(size: 13, weight: .semibold))
-                Text("Release Shift to save that group. Clicks pass through the rest of the time.")
+                Text("A click or scroll still reaches the page. Pick a draw tool, then hold Shift to mark.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }

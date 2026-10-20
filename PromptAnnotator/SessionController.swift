@@ -18,6 +18,8 @@ private struct StoredGroup {
     var image: CGImage
     var frameURL: URL
     var isClean: Bool
+    /// The full-frame shot saved at Stop when the session has no other tiles.
+    var isFallbackFrame: Bool
 }
 
 @MainActor
@@ -25,6 +27,7 @@ final class SessionController: ObservableObject {
     static let shared = SessionController()
 
     @Published private(set) var phase: SessionPhase = .idle
+    @Published private(set) var markupMode: MarkupMode = .capture
     @Published private(set) var tool: AnnotationTool = .pen
     @Published private(set) var color: InkColor = .red
     @Published private(set) var elapsed: TimeInterval = 0
@@ -49,6 +52,7 @@ final class SessionController: ObservableObject {
     private var textEdit: TextEdit?
     private var textAnchor: CGPoint?
     private var drawingDisplayID: CGDirectDisplayID?
+    private var selectionRect: CGRect?
     private var groups: [StoredGroup] = []
     private var redoGroups: [StoredGroup] = []
     private var caretOn = true
@@ -122,12 +126,42 @@ final class SessionController: ObservableObject {
         }
     }
 
+    func selectCapture() {
+        guard phase == .recording || phase == .idle else { return }
+        let hadMarks = textEdit != nil || draft != nil || shapes.contains(where: { $0.isSignificant() })
+        markupMode = .capture
+        showsPenState = false
+        monitor.cancelHold()
+        selectionRect = nil
+        NSCursor.arrow.set()
+        guard phase == .recording, hadMarks else {
+            syncOverlay()
+            return
+        }
+        if textEdit != nil {
+            submitText()
+        } else {
+            commitCanvas()
+        }
+    }
+
     func select(tool: AnnotationTool) {
+        let switching = markupMode != .annotate
+        markupMode = .annotate
+        selectionRect = nil
+        if switching {
+            monitor.cancelHold()
+        }
         self.tool = tool
         AppSettings.shared.setDefaultTool(tool)
-        if showsPenState {
+        if phase == .recording, monitor.shiftIsDown, textEdit == nil {
+            showsPenState = true
+            chrome.relayout()
+            ToolCursors.cursor(for: tool).set()
+        } else if showsPenState {
             ToolCursors.cursor(for: tool).set()
         }
+        syncOverlay()
     }
 
     func select(color: InkColor) {
@@ -228,12 +262,14 @@ final class SessionController: ObservableObject {
 
     func penKeyPolicy() -> KeyPolicy {
         if textEdit != nil { return .editing }
-        if showsPenState || draft != nil || monitor.isSwallowingMouse { return .drawing }
+        if markupMode == .annotate, showsPenState || draft != nil || monitor.isAnnotating {
+            return .drawing
+        }
         return .passThrough
     }
 
     func penShift(down: Bool) {
-        guard phase == .recording, textEdit == nil else { return }
+        guard phase == .recording, markupMode == .annotate, textEdit == nil else { return }
         showsPenState = down
         if down {
             chrome.relayout()
@@ -292,6 +328,43 @@ final class SessionController: ObservableObject {
         if !showsPenState, textEdit == nil {
             commitCanvas()
         }
+    }
+
+    func captureDragBegan(origin: CGPoint, current: CGPoint, display: CGDirectDisplayID) {
+        guard phase == .recording, markupMode == .capture else { return }
+        drawingDisplayID = display
+        selectionRect = CaptureGesture.rect(from: origin, to: current)
+        syncOverlay()
+    }
+
+    func captureDragMoved(origin: CGPoint, current: CGPoint, display: CGDirectDisplayID) {
+        guard phase == .recording, markupMode == .capture, display == drawingDisplayID else { return }
+        selectionRect = CaptureGesture.rect(from: origin, to: current)
+        syncOverlay()
+    }
+
+    func captureDragEnded(origin: CGPoint, current: CGPoint, display: CGDirectDisplayID) {
+        let rect = CaptureGesture.rect(from: origin, to: current)
+        let displayID = drawingDisplayID
+        selectionRect = nil
+        drawingDisplayID = nil
+        syncOverlay()
+        guard phase == .recording, markupMode == .capture, displayID == display else { return }
+        guard CaptureGesture.isCapturable(rect) else { return }
+        AppSounds.tileCommitted()
+        enqueueCapture(
+            shapes: [],
+            displayID: display,
+            committedAt: Date().timeIntervalSince(startedAt),
+            allowEmpty: true,
+            crop: rect
+        )
+    }
+
+    func captureDragCancelled() {
+        selectionRect = nil
+        drawingDisplayID = nil
+        syncOverlay()
     }
 
     func penKey(_ key: PenKey) {
@@ -354,8 +427,8 @@ final class SessionController: ObservableObject {
             if !AXIsProcessTrusted() {
                 offerPermissions(Permissions.Status(accessibility: false, microphone: true, screen: true))
             } else {
-                lastError = "Couldn't watch Shift."
-                presentError("Couldn't watch the keyboard", "Accessibility is on, but the event tap did not install. Quit and reopen Prompt Annotator.")
+                lastError = "Couldn't watch the pointer."
+                presentError("Couldn't watch the pointer", "Accessibility is on, but the event tap did not install. Quit and reopen Prompt Annotator.")
             }
             return
         }
@@ -378,6 +451,8 @@ final class SessionController: ObservableObject {
             lastSpeechCount = 0
             elapsed = 0
             showsPenState = false
+            markupMode = .capture
+            selectionRect = nil
             tool = AppSettings.shared.defaultTool
             color = AppSettings.shared.defaultColor
             setPhase(.recording)
@@ -406,6 +481,7 @@ final class SessionController: ObservableObject {
         setPhase(.finishing)
         monitor.stop()
         showsPenState = false
+        selectionRect = nil
         NSCursor.arrow.set()
         stopTimer()
 
@@ -450,7 +526,8 @@ final class SessionController: ObservableObject {
                 shapes: [],
                 displayID: ScreenGeometry.screenUnderMouse().flatMap(ScreenGeometry.displayID),
                 committedAt: Date().timeIntervalSince(startedAt),
-                allowEmpty: true
+                allowEmpty: true,
+                fallbackFrame: true
             )
         }
 
@@ -462,7 +539,7 @@ final class SessionController: ObservableObject {
         overlay.hide()
         let ended = Date()
         let sessionEnd = ended.timeIntervalSince(startedAt)
-        if groups.count == 1, groups[0].shapes.isEmpty {
+        if groups.count == 1, groups[0].isFallbackFrame {
             groups[0].committedAt = sessionEnd
         }
 
@@ -579,7 +656,9 @@ final class SessionController: ObservableObject {
         shapes: [AnnotationShape],
         displayID: CGDirectDisplayID?,
         committedAt: TimeInterval,
-        allowEmpty: Bool
+        allowEmpty: Bool,
+        crop: CGRect? = nil,
+        fallbackFrame: Bool = false
     ) {
         let previous = captureTail
         captureTail = Task { @MainActor in
@@ -588,7 +667,9 @@ final class SessionController: ObservableObject {
                 shapes: shapes,
                 displayID: displayID,
                 committedAt: committedAt,
-                allowEmpty: allowEmpty
+                allowEmpty: allowEmpty,
+                crop: crop,
+                fallbackFrame: fallbackFrame
             )
         }
     }
@@ -597,7 +678,9 @@ final class SessionController: ObservableObject {
         shapes: [AnnotationShape],
         displayID: CGDirectDisplayID?,
         committedAt: TimeInterval,
-        allowEmpty: Bool
+        allowEmpty: Bool,
+        crop: CGRect? = nil,
+        fallbackFrame: Bool = false
     ) async {
         let significant = shapes.filter { $0.isSignificant() }
         if significant.isEmpty, !allowEmpty { return }
@@ -616,12 +699,22 @@ final class SessionController: ObservableObject {
         }
 
         do {
-            let image = try await DisplayCapture.capture(
+            let captured = try await DisplayCapture.capture(
                 displayID: resolvedID,
                 pointSize: screen.frame.size,
                 shapes: significant,
                 excludedWindowIDs: overlay.windowIDs() + chrome.windowIDs()
             )
+            let image: CGImage
+            if let crop {
+                guard let cropped = RegionCrop.crop(captured, selection: crop, pointSize: screen.frame.size) else {
+                    lastError = "The selection was too small to capture."
+                    return
+                }
+                image = cropped
+            } else {
+                image = captured
+            }
             let index = groups.count + 1
             let url = directory.appendingPathComponent(String(format: "frames/%02d.png", index))
             try PNG.write(image, to: url)
@@ -629,11 +722,17 @@ final class SessionController: ObservableObject {
                 StoredGroup(
                     index: index,
                     committedAt: committedAt,
-                    display: DisplaySnapshot(screen: screen, pixelWidth: image.width, pixelHeight: image.height),
+                    display: DisplaySnapshot(
+                        screen: screen,
+                        pixelWidth: image.width,
+                        pixelHeight: image.height,
+                        contentSize: crop?.standardized.size
+                    ),
                     shapes: significant,
                     image: image,
                     frameURL: url,
-                    isClean: significant.isEmpty
+                    isClean: significant.isEmpty,
+                    isFallbackFrame: fallbackFrame && crop == nil
                 )
             )
             redoGroups.removeAll()
@@ -659,6 +758,7 @@ final class SessionController: ObservableObject {
         textEdit = nil
         textAnchor = nil
         drawingDisplayID = nil
+        selectionRect = nil
         caretOn = true
         syncOverlay()
         refreshControls()
@@ -670,6 +770,7 @@ final class SessionController: ObservableObject {
             draft: draft,
             textEdit: textEdit,
             caretOn: caretOn,
+            selection: selectionRect,
             displayID: drawingDisplayID
         )
     }

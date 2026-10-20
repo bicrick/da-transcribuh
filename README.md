@@ -16,11 +16,11 @@ The menu bar item opens the Prompt Annotator window: Home, Sessions, Recording, 
 
 ## How a session works
 
-A tap of the shortcut starts a session. Clicks keep working. Hold **Shift** to draw, and release Shift to save that group of marks as one tile. A second tap stops the session.
+A tap of the shortcut starts a session in capture mode. Drag to grab a rectangular snippet of the screen. A click that does not turn into a drag still reaches the page, and scrolling is left alone. Pick a draw tool to annotate, then hold **Shift** to draw and release Shift to save that group of marks as one tile. A second tap stops the session.
 
-While a session is recording, the pointer behaves normally. Hold Shift and the cursor becomes the selected tool: pen (the default), highlighter, crosshair (arrow and rectangle), or I-beam (text). The draw surface captures the pointer only while Shift is held, so the app underneath does not receive the shift-click. The recording island and the markup bar still receive clicks with or without Shift.
+While capture is selected, the pointer stays normal until you drag. The drag draws a selection rectangle and, on release, screenshots that region. The recording island and the markup bar stay clickable. A drag that is only a few points across does not create a tile. Escape cancels a selection in progress.
 
-Everything you draw before you release Shift is one group. Releasing Shift screenshots that display with ScreenCaptureKit, leaves the overlay, island, and markup bar out of the capture, and bakes the shapes into the bitmap. The canvas clears and the normal cursor comes back. A Shift tap that does not leave a mark does not create a tile. A tiny click is not a shape.
+Switch to pen (the default draw tool), highlighter, arrow, rectangle, or text when you want to mark. Hold Shift and the cursor becomes that tool. The draw surface captures the pointer only while Shift is held, so the app underneath does not receive the shift-click. Releasing Shift screenshots that display with ScreenCaptureKit, leaves the overlay, island, and markup bar out of the capture, and bakes the shapes into the bitmap. The canvas clears and the normal cursor comes back. A Shift tap that does not leave a mark does not create a tile. A tiny click is not a shape.
 
 Escape cancels the shape in progress. Undo and redo apply to the marks in the current hold. After a group is saved, Undo on the bar drops that last tile.
 
@@ -33,8 +33,9 @@ Stop captures any marks still on screen, then ends the session. If you only talk
 | Action | How |
 | --- | --- |
 | Start and stop a session | Control-Option-Space |
-| Draw | Hold Shift |
-| Save one tile | Release Shift |
+| Capture a snippet | Drag while capture is selected |
+| Draw | Choose a tool, then hold Shift |
+| Save one marked tile | Release Shift |
 | Put the tile sheet and transcript on the clipboard | Stop |
 | Paste the picture; the words follow | Command-V |
 | Paste the picture and the words | Control-Option-V |
@@ -55,7 +56,7 @@ Prompt Annotator asks for:
 
 - **Screen Recording**, to capture the display
 - **Microphone**, to record the session
-- **Accessibility**, to see Shift and the pointer while another app is focused
+- **Accessibility**, to see the pointer and Shift while another app is focused
 
 It does not request Speech Recognition. Transcription is on-device WhisperKit.
 
@@ -65,7 +66,7 @@ Turn the switches on in System Settings, then quit and reopen. If a switch is al
 
 Files land in `~/Documents/PromptAnnotator/Sessions/<timestamp>/`:
 
-- `sheet.png` — numbered tiles in commit order. Each display is scaled to about 1280px wide, with the marks baked in and the number and timestamp on the tile.
+- `sheet.png` — numbered tiles in commit order. A frame wider than about 1280px is scaled down. A smaller snippet stays at its capture size. Marks are baked in, with the number and timestamp on the tile.
 - `frames/01.png`, `frames/02.png`, … — the same frames at capture resolution.
 - `session.md` — one section per group: number, timestamp, image, and the words spoken from the previous commit until this one. Speech after the last commit until Stop is a closing note on the last section. The full timed transcript is at the bottom.
 - `session.json` — shapes, bounds, display, and word timestamps. Shape points are display points, origin at the top-left, y down.
@@ -94,4 +95,4 @@ swift Config/render-icon.swift PromptAnnotator/Assets.xcassets
 cp PromptAnnotator/Assets.xcassets/AppIcon.appiconset/icon_512.png assets/mark.png
 ```
 
-Unit tests cover word alignment, the contact-sheet layout, markdown, and the shape composite. They do not download the model and they do not click through a live session.
+Unit tests cover word alignment, the contact-sheet layout, snippet cropping, markdown, and the shape composite. They do not download the model and they do not click through a live session.

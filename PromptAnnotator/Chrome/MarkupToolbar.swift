@@ -5,6 +5,8 @@ struct MarkupToolbarView: View {
 
     var body: some View {
         HStack(spacing: 2) {
+            captureButton
+            hairline
             ForEach(AnnotationTool.allCases, id: \.self) { tool in
                 toolButton(tool)
             }
@@ -38,8 +40,27 @@ struct MarkupToolbarView: View {
         )
     }
 
+    private var captureButton: some View {
+        let selected = session.markupMode == .capture
+        return Button {
+            session.selectCapture()
+        } label: {
+            Image(systemName: "viewfinder")
+                .font(.system(size: 15, weight: .medium))
+                .frame(width: 32, height: 28)
+                .foregroundStyle(selected ? Color.accentColor : Color.primary)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(selected ? Color.accentColor.opacity(0.16) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .help("Capture a snippet")
+        .accessibilityLabel("Capture")
+    }
+
     private func toolButton(_ tool: AnnotationTool) -> some View {
-        let selected = session.tool == tool
+        let selected = session.markupMode == .annotate && session.tool == tool
         return Button {
             session.select(tool: tool)
         } label: {
