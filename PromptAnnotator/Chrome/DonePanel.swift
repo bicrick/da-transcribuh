@@ -25,21 +25,20 @@ struct DonePanelView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            if let confirmation = session.copyConfirmation {
-                Text(confirmation)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else if let error = session.transcriptionError {
+            if let error = session.transcriptionError {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if let confirmation = session.copyConfirmation {
+                Text(confirmation)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             HStack(spacing: 8) {
-                Button("Copy notes") { session.copyNotes() }
-                Button("Copy tile sheet") { session.copySheet() }
-                    .disabled(!session.hasSheet)
+                Button("Copy again") { session.copyToClipboard() }
                 Button("Show in Finder") { session.revealSession() }
             }
         }

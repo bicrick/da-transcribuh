@@ -28,7 +28,7 @@ Files land in `~/Documents/PromptAnnotator/Sessions/<timestamp>/`:
 - `session.json` — shapes, bounds, display, and word timestamps. Shape points are display points, origin at the top-left, y down.
 - `audio.m4a` — the microphone.
 
-A done panel offers Copy notes, Copy tile sheet, and Show in Finder.
+When the session finishes, the tile sheet and the transcript are placed on the clipboard together. Pasting into Notes or TextEdit inserts the picture and then the words. The done panel can copy them again, and it can show the session in Finder.
 
 Stills and audio are written before transcription. The first transcription downloads the model into `~/Library/Application Support/PromptAnnotator/Models` and shows progress on the recording island.
 

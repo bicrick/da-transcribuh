@@ -78,4 +78,31 @@ final class SessionMarkdownTests: XCTestCase {
         XCTAssertTrue(notes.contains("Transcription failed: model unavailable"))
         XCTAssertTrue(notes.contains("No speech detected."))
     }
+
+    func testPasteTextGroupsTilesAndClosingNote() {
+        let text = SessionMarkdown.pasteText(
+            sections: [
+                SessionMarkdown.Section(
+                    index: 1,
+                    commitOffset: 12,
+                    imagePath: "frames/01.png",
+                    words: [
+                        TimedWord(text: "hello", start: 1, end: 1.4),
+                        TimedWord(text: "there", start: 1.5, end: 2),
+                    ],
+                    closingNote: []
+                ),
+                SessionMarkdown.Section(
+                    index: 2,
+                    commitOffset: 40,
+                    imagePath: "frames/02.png",
+                    words: [TimedWord(text: "next", start: 15, end: 15.4)],
+                    closingNote: [TimedWord(text: "done", start: 50, end: 50.2)]
+                ),
+            ],
+            transcript: [],
+            transcriptionError: nil
+        )
+        XCTAssertEqual(text, "hello there\n\nnext done")
+    }
 }

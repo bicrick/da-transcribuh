@@ -77,6 +77,32 @@ struct SessionMarkdown {
 
         return lines.joined(separator: "\n")
     }
+
+    static func pasteText(
+        sections: [Section],
+        transcript: [TimedWord],
+        transcriptionError: String?
+    ) -> String {
+        var paragraphs: [String] = []
+        for section in sections {
+            let spoken = [Aligner.spokenText(section.words), Aligner.spokenText(section.closingNote)]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            if !spoken.isEmpty {
+                paragraphs.append(spoken)
+            }
+        }
+        if paragraphs.isEmpty {
+            let all = Aligner.spokenText(transcript)
+            if !all.isEmpty {
+                paragraphs.append(all)
+            }
+        }
+        if let transcriptionError, !transcriptionError.isEmpty {
+            paragraphs.append("Transcription failed: \(transcriptionError)")
+        }
+        return paragraphs.joined(separator: "\n\n")
+    }
 }
 
 enum SessionPaths {
@@ -129,6 +155,7 @@ enum SessionWriter {
     struct Saved {
         var directory: URL
         var notes: String
+        var pasteText: String
         var sheetURL: URL?
     }
 
@@ -173,6 +200,11 @@ enum SessionWriter {
             )
         }
 
+        let pasteText = SessionMarkdown.pasteText(
+            sections: sections,
+            transcript: words.sorted { $0.start < $1.start },
+            transcriptionError: transcriptionError
+        )
         let notes = SessionMarkdown.render(
             started: Stamp.readable.string(from: started),
             ended: Stamp.readable.string(from: ended),
@@ -207,7 +239,7 @@ enum SessionWriter {
             sheetURL = url
         }
 
-        return Saved(directory: directory, notes: notes, sheetURL: sheetURL)
+        return Saved(directory: directory, notes: notes, pasteText: pasteText, sheetURL: sheetURL)
     }
 }
 

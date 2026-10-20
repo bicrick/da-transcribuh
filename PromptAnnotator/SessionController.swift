@@ -61,6 +61,7 @@ final class SessionController: ObservableObject {
     private var directory: URL?
     private var audioURL: URL?
     private var notes = ""
+    private var pasteText = ""
     private var sheetURL: URL?
     private var timer: Timer?
     private var captureTail: Task<Void, Never> = Task {}
@@ -178,20 +179,11 @@ final class SessionController: ObservableObject {
         refreshControls()
     }
 
-    func copyNotes() {
-        guard !notes.isEmpty else { return }
-        let board = NSPasteboard.general
-        board.clearContents()
-        board.setString(notes, forType: .string)
-        copyConfirmation = "Notes copied"
-    }
-
-    func copySheet() {
-        guard let sheetURL, let image = NSImage(contentsOf: sheetURL) else { return }
-        let board = NSPasteboard.general
-        board.clearContents()
-        board.writeObjects([image])
-        copyConfirmation = "Tile sheet copied"
+    func copyToClipboard() {
+        let image = sheetURL.flatMap { NSImage(contentsOf: $0) }
+        let text = pasteText.isEmpty ? notes : pasteText
+        guard SessionClipboard.copy(image: image, transcript: text) else { return }
+        copyConfirmation = "On the clipboard"
     }
 
     func revealSession() {
@@ -365,6 +357,7 @@ final class SessionController: ObservableObject {
             groups = []
             redoGroups = []
             notes = ""
+            pasteText = ""
             sheetURL = nil
             hasSheet = false
             transcriptionError = nil
@@ -502,9 +495,11 @@ final class SessionController: ObservableObject {
                 transcriptionError: transcriptionError
             )
             notes = saved.notes
+            pasteText = saved.pasteText
             sheetURL = saved.sheetURL
             hasSheet = saved.sheetURL != nil
             lastSessionURL = directory
+            copyToClipboard()
             let tileCount = groups.count
             let noun = tileCount == 1 ? "tile" : "tiles"
             doneSummary = "\(tileCount) \(noun) · \(TimeFormat.clock(sessionEnd))"

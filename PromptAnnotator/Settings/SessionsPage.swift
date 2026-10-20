@@ -42,8 +42,8 @@ struct SessionsPage: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
-            Button("Copy notes") {
-                copyNotes(at: session.url)
+            Button("Copy") {
+                copySession(at: session.url)
             }
             Button("Show") {
                 NSWorkspace.shared.activateFileViewerSelecting([session.url])
@@ -65,11 +65,9 @@ struct SessionsPage: View {
         return "\(session.tiles) \(tileNoun) · \(session.words) \(wordNoun) · \(TimeFormat.clock(session.duration))"
     }
 
-    private func copyNotes(at url: URL) {
-        let notes = url.appendingPathComponent("session.md")
-        guard let text = try? String(contentsOf: notes, encoding: .utf8), !text.isEmpty else { return }
-        let board = NSPasteboard.general
-        board.clearContents()
-        board.setString(text, forType: .string)
+    private func copySession(at url: URL) {
+        let image = NSImage(contentsOf: url.appendingPathComponent("sheet.png"))
+        let notes = (try? String(contentsOf: url.appendingPathComponent("session.md"), encoding: .utf8)) ?? ""
+        SessionClipboard.copy(image: image, transcript: notes)
     }
 }
