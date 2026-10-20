@@ -1,6 +1,6 @@
 import Foundation
 
-/// First launch walks through permissions, the shortcut, and how a session works.
+/// First launch walks through permissions, the shortcut, a session, and the speech model.
 enum OnboardingStore {
     static let key = "onboarding.finished"
 

@@ -106,7 +106,7 @@ actor WhisperKitTranscriber: Transcribing {
             let size = (attributes[.size] as? NSNumber)?.intValue ?? 0
             if size < 2048 {
                 live.reset()
-                return Transcript(words: [], model: Self.preferredVariant)
+                return Transcript(words: [], model: Self.selectedVariant())
             }
         }
 
@@ -148,6 +148,10 @@ actor WhisperKitTranscriber: Transcribing {
         return Transcript(words: Self.words(from: results), model: resolved.variant)
     }
 
+    nonisolated static func selectedVariant() -> String {
+        SpeechModelChoice.stored(UserDefaults.standard.string(forKey: SpeechModelChoice.defaultsKey)).variant
+    }
+
     nonisolated static func modelsFolder() -> URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return support.appendingPathComponent("PromptAnnotator/Models", isDirectory: true)
@@ -158,7 +162,7 @@ actor WhisperKitTranscriber: Transcribing {
     }
 
     nonisolated private static func installedModel() -> WhisperModelFolder? {
-        WhisperModelLocator.locate(in: modelsFolder())
+        WhisperModelLocator.locate(in: modelsFolder(), variant: selectedVariant())
     }
 
     private static func modelsDirectory() throws -> URL {
@@ -177,7 +181,8 @@ actor WhisperKitTranscriber: Transcribing {
         onProgress: @escaping @Sendable (SpeechProgress) -> Void
     ) async throws -> ResolvedModel {
         let directory = try Self.modelsDirectory()
-        if let installed = WhisperModelLocator.locate(in: directory) {
+        let variant = Self.selectedVariant()
+        if let installed = WhisperModelLocator.locate(in: directory, variant: variant) {
             if pipe == nil || loadedFolder != installed.url.path {
                 onProgress(.preparing)
                 _ = try await load(folder: installed.url, directory: directory, variant: installed.variant)
@@ -186,10 +191,39 @@ actor WhisperKitTranscriber: Transcribing {
         }
 
         onProgress(.downloading(0))
-        let downloaded = try await Self.download(into: directory, onProgress: onProgress)
+        let downloaded = try await Self.fetchResult(variant: variant, into: directory, onProgress: onProgress)
         onProgress(.preparing)
         _ = try await load(folder: downloaded.url, directory: directory, variant: downloaded.variant)
         return ResolvedModel(url: downloaded.url, variant: downloaded.variant, directory: directory)
+    }
+
+    /// Downloads the chosen model when it is not already complete. Tests do not call this.
+    static func fetch(
+        variant: String,
+        onProgress: @escaping @Sendable (Double) -> Void
+    ) async throws -> URL {
+        let directory = try modelsDirectory()
+        if let installed = WhisperModelLocator.locate(in: directory, variant: variant) {
+            return installed.url
+        }
+        let report: @Sendable (SpeechProgress) -> Void = { update in
+            if case .downloading(let fraction) = update {
+                onProgress(fraction)
+            }
+        }
+        return try await fetchResult(variant: variant, into: directory, onProgress: report).url
+    }
+
+    private static func fetchResult(
+        variant: String,
+        into directory: URL,
+        onProgress: @escaping @Sendable (SpeechProgress) -> Void
+    ) async throws -> (url: URL, variant: String) {
+        if variant == preferredVariant {
+            return try await download(into: directory, onProgress: onProgress)
+        }
+        let url = try await download(variant: variant, into: directory, onProgress: onProgress)
+        return (url, variant)
     }
 
     private static func download(

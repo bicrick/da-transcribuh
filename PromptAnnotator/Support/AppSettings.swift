@@ -94,6 +94,7 @@ final class AppSettings: ObservableObject {
     @Published var pasteOnStop: Bool
     @Published var returnOnShift: Bool
     @Published var capitalizeTranscript: Bool
+    @Published var speechModel: String
     @Published var loginItemNote: String?
 
     var onChromeChange: (() -> Void)?
@@ -137,6 +138,7 @@ final class AppSettings: ObservableObject {
         pasteOnStop = defaults.object(forKey: Keys.pasteOnStop) as? Bool ?? true
         returnOnShift = defaults.bool(forKey: Keys.returnOnShift)
         capitalizeTranscript = defaults.bool(forKey: Keys.capitalize)
+        speechModel = SpeechModelChoice.stored(defaults.string(forKey: Keys.speechModel)).variant
         loginItemNote = nil
         isLoading = false
     }
@@ -252,6 +254,11 @@ final class AppSettings: ObservableObject {
         persist(Keys.capitalize, enabled)
     }
 
+    func setSpeechModel(_ variant: String) {
+        speechModel = SpeechModelChoice.stored(variant).variant
+        persist(Keys.speechModel, speechModel)
+    }
+
     func setIslandStyle(_ style: IslandStyle) {
         islandStyle = style
         persist(Keys.island, style.rawValue)
@@ -319,5 +326,6 @@ final class AppSettings: ObservableObject {
         static let pasteOnStop = "session.pasteOnStop"
         static let returnOnShift = "session.returnOnShift"
         static let capitalize = "session.capitalize"
+        static let speechModel = SpeechModelChoice.defaultsKey
     }
 }

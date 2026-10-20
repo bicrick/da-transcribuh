@@ -12,7 +12,7 @@
 
 A macOS menu bar app that records your voice and on-screen marks, then puts a tile sheet and transcript on the clipboard. It appears in the Dock and it is not sandboxed. This repository is in beta. The app shows its version and build number.
 
-The menu bar item opens the Prompt Annotator window: Home, History, Recording, Configuration, Sound, Model, and Performance. History searches past transcripts. Configuration rebinds the shortcuts and holds the advanced session settings. Performance shows the app's memory, the model size on disk, and how much of the Mac that is. The recording bar can be Default, Compact, Minimal, or Hidden. Default is a wide voice trace with Stop and Cancel under it. Tones for start, capture, and stop are on by default and can be turned off. Sound offers Classic, Soft, Click, and Deep. A spoken stop and a silent stop use different tones. The first launch walks through permissions, the shortcut, and how a session works.
+The menu bar item opens the Prompt Annotator window: Home, History, Recording, Configuration, Sound, Model, and Performance. History searches past transcripts. Configuration rebinds the shortcuts and holds the advanced session settings. Performance shows the app's memory, the model size on disk, and how much of the Mac that is. The recording bar can be Default, Compact, Minimal, or Hidden. Default is a wide voice trace with Stop and Cancel under it. Tones for start, capture, and stop are on by default and can be turned off. Sound offers Classic, Soft, Click, and Deep. A spoken stop and a silent stop use different tones. The first launch walks through permissions, the shortcut, how a session works, and which speech model to download.
 
 ## How a session works
 
@@ -76,9 +76,9 @@ Files land in `~/Documents/PromptAnnotator/Sessions/<timestamp>/`:
 
 The model is `small.en_217MB`. The Swift package is [argmaxinc/argmax-oss-swift](https://github.com/argmaxinc/argmax-oss-swift) version 1.1.1, product `WhisperKit`. `https://github.com/argmaxinc/WhisperKit` redirects there.
 
-The weights come from [argmaxinc/whisperkit-coreml](https://huggingface.co/argmaxinc/whisperkit-coreml), folder `openai_whisper-small.en_217MB` (about 217 MB). WhisperKit's downloader searches for `*small.en_217MB/*`, which matches that folder. If that variant name does not resolve at runtime, the app downloads `small.en` from the same repo instead and records the name it used in `session.md` and `session.json`.
+The weights come from [argmaxinc/whisperkit-coreml](https://huggingface.co/argmaxinc/whisperkit-coreml). Setup and the Model page offer three English models from that repo. `small.en_217MB` (about 217 MB, folder `openai_whisper-small.en_217MB`) is the default. `tiny.en` (about 153 MB) is the fast one. `large-v3_turbo` (about 954 MB) is the higher-quality one. Each row has bars for download size, speed, and quality, compared with the other two. WhisperKit's downloader searches for `*<variant>/*`. If the default name does not resolve, the app downloads `small.en` from the same repo instead and records the name it used in `session.md` and `session.json`.
 
-Stills and audio are written before the transcript is finished. The model downloads once into `~/Library/Application Support/PromptAnnotator/Models`. After that the app loads it at launch and keeps it in memory. Speech is transcribed while the session is still recording, so stopping only finishes the last moment. A session with no speech skips that step. The recording bar shows a percent only while the model is downloading.
+Stills and audio are written before the transcript is finished. The chosen model downloads once into `~/Library/Application Support/PromptAnnotator/Models`. After that the app loads it at launch and keeps it in memory. Speech is transcribed while the session is still recording, so stopping only finishes the last moment. A session with no speech skips that step. The recording bar shows a percent only while the model is downloading.
 
 ## Build
 

@@ -16,6 +16,10 @@ final class ProductSurfaceTests: XCTestCase {
         XCTAssertFalse(OnboardingStore.isFinished(defaults))
         OnboardingStore.finish(defaults)
         XCTAssertTrue(OnboardingStore.isFinished(defaults))
+        XCTAssertEqual(
+            OnboardingStep.allCases.map(\.title),
+            ["Welcome", "Permissions", "Shortcut", "A session", "Model", "Ready"]
+        )
     }
 
     func testSoundSetsAreDistinct() {

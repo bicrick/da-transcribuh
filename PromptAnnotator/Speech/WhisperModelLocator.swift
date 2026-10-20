@@ -10,37 +10,49 @@ enum WhisperModelLocator {
     static let fallbackVariant = "small.en"
     static let bundleStems = ["MelSpectrogram", "AudioEncoder", "TextDecoder"]
 
-    static func locate(in root: URL) -> WhisperModelFolder? {
+    /// Finds one complete model. With no variant, the default `small.en_217MB` wins,
+    /// then `small.en`. A shorter name does not match a longer one: `small.en` is not
+    /// `small.en_217MB`, and `large-v3` is not `large-v3_turbo`.
+    static func locate(in root: URL, variant: String? = nil) -> WhisperModelFolder? {
+        let folders = completeFolders(in: root)
+        if let variant {
+            if let match = folders.first(where: { folderMatches($0.lastPathComponent, variant: variant) }) {
+                return WhisperModelFolder(url: match, variant: variant)
+            }
+            if variant == preferredVariant,
+               let fallback = folders.first(where: { folderMatches($0.lastPathComponent, variant: fallbackVariant) }) {
+                return WhisperModelFolder(url: fallback, variant: fallbackVariant)
+            }
+            return nil
+        }
+        if let preferred = folders.first(where: { folderMatches($0.lastPathComponent, variant: preferredVariant) }) {
+            return WhisperModelFolder(url: preferred, variant: preferredVariant)
+        }
+        if let fallback = folders.first(where: { folderMatches($0.lastPathComponent, variant: fallbackVariant) }) {
+            return WhisperModelFolder(url: fallback, variant: fallbackVariant)
+        }
+        return nil
+    }
+
+    static func folderMatches(_ name: String, variant: String) -> Bool {
+        name.contains(variant) && !name.contains(variant + "_")
+    }
+
+    private static func completeFolders(in root: URL) -> [URL] {
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         ) else {
-            return nil
+            return []
         }
-
-        var preferred: URL?
-        var fallback: URL?
+        var folders: [URL] = []
         for case let url as URL in enumerator {
             let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
             guard values?.isDirectory == true, isComplete(url) else { continue }
-            let name = url.lastPathComponent
-            if name.contains(preferredVariant) {
-                preferred = url
-                break
-            }
-            if name.contains(fallbackVariant), fallback == nil {
-                fallback = url
-            }
+            folders.append(url)
         }
-
-        if let preferred {
-            return WhisperModelFolder(url: preferred, variant: preferredVariant)
-        }
-        if let fallback {
-            return WhisperModelFolder(url: fallback, variant: fallbackVariant)
-        }
-        return nil
+        return folders
     }
 
     static func isComplete(_ folder: URL) -> Bool {

@@ -6,6 +6,7 @@ enum OnboardingStep: Int, CaseIterable {
     case permissions
     case shortcut
     case capture
+    case model
     case ready
 
     var title: String {
@@ -14,9 +15,15 @@ enum OnboardingStep: Int, CaseIterable {
         case .permissions: return "Permissions"
         case .shortcut: return "Shortcut"
         case .capture: return "A session"
+        case .model: return "Model"
         case .ready: return "Ready"
         }
     }
+}
+
+enum OnboardingMetrics {
+    static let width: CGFloat = 560
+    static let height: CGFloat = 680
 }
 
 struct OnboardingFlow: View {
@@ -25,6 +32,7 @@ struct OnboardingFlow: View {
     @State private var step: OnboardingStep = .welcome
     @State private var listening = false
     @State private var shortcutNote: String?
+    @StateObject private var transfer = ModelTransfer()
     var onFinish: () -> Void
 
     var body: some View {
@@ -41,8 +49,10 @@ struct OnboardingFlow: View {
             }
             Text(step.title)
                 .font(.system(size: 15, weight: .semibold))
-            stepBody
-            Spacer(minLength: 0)
+            ScrollView {
+                stepBody
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             HStack {
                 Text("\(step.rawValue + 1) of \(OnboardingStep.allCases.count)")
                     .font(.system(size: 12))
@@ -54,14 +64,15 @@ struct OnboardingFlow: View {
                 if step != .ready {
                     Button("Skip setup") { onFinish() }
                 }
-                Button(step == .ready ? "Open Prompt Annotator" : "Continue") {
-                    advance()
+                Button(primaryTitle) {
+                    primaryAction()
                 }
+                .disabled(transfer.isWorking && step == .model)
                 .keyboardShortcut(.defaultAction)
             }
         }
         .padding(28)
-        .frame(width: 520, height: 460)
+        .frame(width: OnboardingMetrics.width, height: OnboardingMetrics.height)
         .background(ShortcutCapture(active: $listening) { event in
             applyShortcut(event)
         })
@@ -85,6 +96,8 @@ struct OnboardingFlow: View {
             shortcutBody
         case .capture:
             captureBody
+        case .model:
+            modelBody
         case .ready:
             Text("The menu bar item opens this window again. \(settings.chord.display) starts a session, and the same shortcut stops it.")
                 .font(.system(size: 13))
@@ -152,6 +165,41 @@ struct OnboardingFlow: View {
                     .foregroundStyle(.red)
             }
         }
+    }
+
+    private var modelBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Download an English model before the first session. Balanced is the one this app is built around.")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            SpeechModelPicker(settings: settings, transfer: transfer, showsDownloadButton: false)
+        }
+    }
+
+    private var modelIsReady: Bool {
+        WhisperModelLocator.locate(
+            in: WhisperKitTranscriber.modelsFolder(),
+            variant: settings.speechModel
+        ) != nil
+    }
+
+    private var primaryTitle: String {
+        guard step == .model, !modelIsReady else {
+            return step == .ready ? "Open Prompt Annotator" : "Continue"
+        }
+        if transfer.isWorking, let fraction = transfer.fraction {
+            return "Downloading \(Int((fraction * 100).rounded()))%"
+        }
+        return "Download"
+    }
+
+    private func primaryAction() {
+        if step == .model, !modelIsReady {
+            transfer.download(settings.speechModel)
+            return
+        }
+        advance()
     }
 
     private var captureBody: some View {
@@ -233,7 +281,7 @@ final class OnboardingPresenter {
         }
         let host = NSHostingView(rootView: root)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 460),
+            contentRect: NSRect(x: 0, y: 0, width: OnboardingMetrics.width, height: OnboardingMetrics.height),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false

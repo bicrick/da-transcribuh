@@ -59,6 +59,30 @@ final class WhisperModelLocatorTests: XCTestCase {
         XCTAssertEqual(found?.variant, WhisperModelLocator.preferredVariant)
         XCTAssertTrue(WhisperKitTranscriber.modelIsInstalled())
     }
+
+    func testShorterVariantDoesNotMatchALongerFolder() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeCompleteModel(named: "openai_whisper-small.en_217MB", in: root)
+        try writeCompleteModel(named: "openai_whisper-tiny.en", in: root)
+        XCTAssertTrue(WhisperModelLocator.folderMatches("openai_whisper-small.en_217MB", variant: "small.en_217MB"))
+        XCTAssertFalse(WhisperModelLocator.folderMatches("openai_whisper-small.en_217MB", variant: "small.en"))
+        XCTAssertFalse(WhisperModelLocator.folderMatches("openai_whisper-large-v3_turbo", variant: "large-v3"))
+        let tiny = try XCTUnwrap(WhisperModelLocator.locate(in: root, variant: "tiny.en"))
+        XCTAssertEqual(tiny.variant, "tiny.en")
+        let balanced = try XCTUnwrap(WhisperModelLocator.locate(in: root, variant: "small.en_217MB"))
+        XCTAssertEqual(balanced.url.lastPathComponent, "openai_whisper-small.en_217MB")
+        XCTAssertNil(WhisperModelLocator.locate(in: root, variant: "large-v3_turbo"))
+    }
+
+    private func writeCompleteModel(named name: String, in root: URL) throws {
+        let model = root.appendingPathComponent(name, isDirectory: true)
+        for stem in WhisperModelLocator.bundleStems {
+            let bundle = model.appendingPathComponent("\(stem).mlmodelc", isDirectory: true)
+            try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+            try Data("coreml".utf8).write(to: bundle.appendingPathComponent("model.mil"))
+        }
+    }
 }
 
 final class LiveWordBufferTests: XCTestCase {
