@@ -11,7 +11,7 @@ final class AudioRecorder {
     private var speechConverter: AVAudioConverter?
     private var speechFormat: AVAudioFormat?
     private var speechSamples: [Float] = []
-    private var history: [CGFloat] = Array(repeating: 0.12, count: 5)
+    private var history: [CGFloat] = Array(repeating: 0.12, count: WaveformSamples.count)
     private var currentLevel: CGFloat = 0.12
     private var tapInstalled = false
     private var usingEngine = false
@@ -20,7 +20,7 @@ final class AudioRecorder {
         sampleLock.lock()
         speechSamples = []
         currentLevel = 0.12
-        history = Array(repeating: 0.12, count: 5)
+        history = Array(repeating: 0.12, count: WaveformSamples.count)
         sampleLock.unlock()
 
         try startRecorder(url: url)

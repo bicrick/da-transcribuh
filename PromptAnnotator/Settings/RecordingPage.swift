@@ -79,7 +79,7 @@ struct RecordingPage: View {
     }
 
     private var styleRow: some View {
-        HStack(spacing: 10) {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             ForEach(IslandStyle.allCases) { style in
                 Button {
                     settings.setIslandStyle(style)
@@ -117,18 +117,27 @@ struct RecordingPage: View {
 
     @ViewBuilder
     private func styleGlyph(_ style: IslandStyle) -> some View {
+        let preview = [CGFloat(0.25), 0.7, 0.4, 0.9, 0.35, 0.6, 0.3]
         switch style {
         case .classic:
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 Circle().fill(Color.red).frame(width: 6, height: 6)
-                Capsule().frame(width: 28, height: 4)
-                WaveformBars(levels: [0.3, 0.7, 0.45, 0.9, 0.4])
+                WaveformBars(levels: preview, slotWidth: 64, slotHeight: 16)
+                Text("1")
+                    .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                Image(systemName: "photo")
+                    .font(.system(size: 8, weight: .medium))
             }
-        case .mini:
-            HStack(spacing: 4) {
-                Capsule().frame(width: 22, height: 4)
-                WaveformBars(levels: [0.4, 0.8, 0.5, 0.7, 0.35])
+        case .compact:
+            HStack(spacing: 5) {
+                Circle().fill(Color.red).frame(width: 6, height: 6)
+                WaveformBars(levels: preview, slotWidth: 72, slotHeight: 16)
+                Text("0:12")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
+        case .minimal:
+            WaveformBars(levels: preview, slotWidth: 96, slotHeight: 16)
         case .hidden:
             Image(systemName: "eye.slash")
                 .font(.system(size: 16, weight: .medium))

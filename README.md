@@ -12,7 +12,7 @@
 
 A macOS menu bar app that records your voice and on-screen marks, then puts a tile sheet and transcript on the clipboard. It appears in the Dock and it is not sandboxed.
 
-The menu bar item opens the Prompt Annotator window: Home, Sessions, Recording, Sound, and Model. The recording island can be Classic, Mini, or Hidden. Sound effects for start, tile, and stop are on by default and can be turned off.
+The menu bar item opens the Prompt Annotator window: Home, Sessions, Recording, Sound, and Model. The recording bar can be Default, Compact, Minimal, or Hidden. Default keeps the waveform in the middle and adds a capture count beside the time. Sound effects for start, tile, and stop are on by default and can be turned off.
 
 ## How a session works
 

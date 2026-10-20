@@ -12,26 +12,7 @@ struct RecordingIslandView: View {
     var body: some View {
         Group {
             if session.phase == .recording {
-                switch settings.islandStyle {
-                case .classic:
-                    HStack(spacing: 10) {
-                        recordDot
-                        Text("Recording")
-                            .font(.system(size: 13, weight: .semibold))
-                        timer
-                        WaveformBars(levels: session.levels)
-                        penState(includeTitle: true)
-                    }
-                case .mini:
-                    HStack(spacing: 8) {
-                        recordDot
-                        timer
-                        WaveformBars(levels: session.levels)
-                        penState(includeTitle: false)
-                    }
-                case .hidden:
-                    EmptyView()
-                }
+                recordingBody
             } else {
                 HStack(spacing: 10) {
                     ProgressView()
@@ -42,9 +23,11 @@ struct RecordingIslandView: View {
             }
         }
         .foregroundStyle(.primary)
-        .padding(.horizontal, showsChrome ? 14 : 0)
-        .frame(height: showsChrome ? 36 : 0)
+        .padding(.horizontal, showsChrome ? 16 : 0)
+        .frame(height: barHeight)
         .fixedSize(horizontal: showsChrome, vertical: false)
+        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: session.captureCount)
+        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: settings.islandStyle)
         .background {
             if showsChrome {
                 Capsule(style: .continuous)
@@ -57,24 +40,66 @@ struct RecordingIslandView: View {
         }
     }
 
+    @ViewBuilder
+    private var recordingBody: some View {
+        switch settings.islandStyle {
+        case .classic:
+            HStack(spacing: 14) {
+                recordLabel
+                WaveformBars(levels: session.levels)
+                trailingClock
+            }
+        case .compact:
+            HStack(spacing: 12) {
+                recordDot
+                WaveformBars(levels: session.levels, slotWidth: 132, slotHeight: 20)
+                trailingClock
+            }
+        case .minimal:
+            WaveformBars(levels: session.levels, slotWidth: 168, slotHeight: 22)
+        case .hidden:
+            EmptyView()
+        }
+    }
+
+    private var recordLabel: some View {
+        HStack(spacing: 8) {
+            recordDot
+            Text("Recording")
+                .font(.system(size: 13, weight: .semibold))
+        }
+        .fixedSize()
+    }
+
+    private var trailingClock: some View {
+        HStack(spacing: 10) {
+            timer
+            if session.captureCount > 0 {
+                CaptureCountChip(count: session.captureCount)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .fixedSize()
+    }
+
+    private var barHeight: CGFloat {
+        guard showsChrome else { return 0 }
+        guard session.phase == .recording else { return 36 }
+        switch settings.islandStyle {
+        case .classic:
+            return 46
+        case .compact, .minimal:
+            return 40
+        case .hidden:
+            return 0
+        }
+    }
+
     private var timer: some View {
         Text(TimeFormat.clock(session.elapsed))
             .font(.system(size: 13, weight: .medium, design: .monospaced))
             .foregroundStyle(.secondary)
             .frame(minWidth: 44, alignment: .trailing)
-    }
-
-    @ViewBuilder
-    private func penState(includeTitle: Bool) -> some View {
-        if session.showsPenState {
-            hairline
-            Image(systemName: session.tool.symbolName)
-                .font(.system(size: 12, weight: .semibold))
-            if includeTitle {
-                Text(session.tool.title)
-                    .font(.system(size: 12, weight: .medium))
-            }
-        }
     }
 
     private var recordDot: some View {
@@ -87,26 +112,5 @@ struct RecordingIslandView: View {
                     pulse = true
                 }
             }
-    }
-
-    private var hairline: some View {
-        Rectangle()
-            .fill(Color(nsColor: .separatorColor))
-            .frame(width: 1, height: 16)
-    }
-}
-
-struct WaveformBars: View {
-    var levels: [CGFloat]
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 2) {
-            ForEach(Array(levels.enumerated()), id: \.offset) { _, level in
-                Capsule(style: .continuous)
-                    .fill(Color.secondary)
-                    .frame(width: 3, height: max(4, 4 + level * 12))
-            }
-        }
-        .frame(width: 23, height: 16)
     }
 }

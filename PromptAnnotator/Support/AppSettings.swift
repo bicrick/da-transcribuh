@@ -2,25 +2,34 @@ import Foundation
 
 enum IslandStyle: String, CaseIterable, Identifiable, Codable {
     case classic
-    case mini
+    case compact
+    case minimal
     case hidden
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .classic: return "Classic"
-        case .mini: return "Mini"
+        case .classic: return "Default"
+        case .compact: return "Compact"
+        case .minimal: return "Minimal"
         case .hidden: return "Hidden"
         }
     }
 
     var detail: String {
         switch self {
-        case .classic: return "Dot, timer, and waveform"
-        case .mini: return "Timer and waveform only"
-        case .hidden: return "No island while you record"
+        case .classic: return "Waveform in the middle"
+        case .compact: return "Dot, waveform, and time"
+        case .minimal: return "Waveform only"
+        case .hidden: return "No bar while you record"
         }
+    }
+
+    /// Older builds stored Mini for the smaller full bar.
+    static func stored(_ raw: String) -> IslandStyle {
+        if raw == "mini" { return .compact }
+        return IslandStyle(rawValue: raw) ?? .classic
     }
 }
 
@@ -54,7 +63,7 @@ final class AppSettings: ObservableObject {
         } else {
             chord = .default
         }
-        islandStyle = IslandStyle(rawValue: defaults.string(forKey: Keys.island) ?? "") ?? .classic
+        islandStyle = IslandStyle.stored(defaults.string(forKey: Keys.island) ?? "")
         soundEnabled = defaults.object(forKey: Keys.sound) as? Bool ?? true
         let storedVolume = defaults.object(forKey: Keys.volume) as? Double
         soundVolume = min(1, max(0, storedVolume ?? 0.7))

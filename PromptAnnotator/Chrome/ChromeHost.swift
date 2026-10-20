@@ -55,10 +55,8 @@ final class ChromeHost {
 
     func relayout() {
         guard let screen = ScreenGeometry.screenUnderMouse() else { return }
-        resize(islandHost, panel: islandPanel)
-        resize(toolbarHost, panel: toolbarPanel)
-        islandPanel?.place(on: screen, edge: .top)
-        toolbarPanel?.place(on: screen, edge: .bottom)
+        resize(islandHost, panel: islandPanel, screen: screen, edge: .top, animated: true)
+        resize(toolbarHost, panel: toolbarPanel, screen: screen, edge: .bottom, animated: false)
     }
 
     func hitRects() -> [CGRect] {
@@ -80,6 +78,7 @@ final class ChromeHost {
             let panel = ChromePanel(radius: 18)
             let host = NSHostingView(rootView: RecordingIslandView(session: session))
             host.sizingOptions = [.intrinsicContentSize]
+            host.autoresizingMask = [.width, .height]
             panel.contentView = host
             islandPanel = panel
             islandHost = host
@@ -94,15 +93,24 @@ final class ChromeHost {
         }
     }
 
-    private func resize<Content: View>(_ host: NSHostingView<Content>?, panel: ChromePanel?) {
+    private func resize<Content: View>(
+        _ host: NSHostingView<Content>?,
+        panel: ChromePanel?,
+        screen: NSScreen,
+        edge: VerticalEdge,
+        animated: Bool
+    ) {
         guard let host, let panel else { return }
         var size = host.fittingSize
         if size.width < 40 || size.height < 20 {
             size = host.intrinsicContentSize
         }
         guard size.width > 1, size.height > 1 else { return }
-        if abs(panel.frame.width - size.width) > 0.5 || abs(panel.frame.height - size.height) > 0.5 {
-            panel.setContentSize(size)
-        }
+        let visible = screen.visibleFrame
+        let origin = NSPoint(
+            x: visible.midX - size.width / 2,
+            y: edge == .top ? visible.maxY - size.height - 8 : visible.minY + 12
+        )
+        panel.adopt(frame: NSRect(origin: origin, size: size), animated: animated)
     }
 }

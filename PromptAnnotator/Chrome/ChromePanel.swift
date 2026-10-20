@@ -35,6 +35,28 @@ final class ChromePanel: NSPanel {
         applyShape()
     }
 
+    func adopt(frame: NSRect, animated: Bool) {
+        guard frame.width > 1, frame.height > 1 else { return }
+        let current = self.frame
+        let moved = abs(current.width - frame.width) > 0.5
+            || abs(current.height - frame.height) > 0.5
+            || abs(current.origin.x - frame.origin.x) > 0.5
+            || abs(current.origin.y - frame.origin.y) > 0.5
+        guard moved else { return }
+        let travel = hypot(current.midX - frame.midX, current.midY - frame.midY)
+        let glides = animated && isVisible && travel < 140
+        if glides {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.38
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                animator().setFrame(frame, display: true)
+            }
+        } else {
+            setFrame(frame, display: true)
+        }
+        applyShape()
+    }
+
     func place(on screen: NSScreen, edge: VerticalEdge) {
         let size = frame.size
         let visible = screen.visibleFrame

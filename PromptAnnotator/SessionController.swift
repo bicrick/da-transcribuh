@@ -32,7 +32,8 @@ final class SessionController: ObservableObject {
     @Published private(set) var tool: AnnotationTool = .pen
     @Published private(set) var color: InkColor = .red
     @Published private(set) var elapsed: TimeInterval = 0
-    @Published private(set) var levels: [CGFloat] = Array(repeating: 0.12, count: 5)
+    @Published private(set) var levels: [CGFloat] = Array(repeating: 0.12, count: WaveformSamples.count)
+    @Published private(set) var captureCount = 0
     @Published private(set) var showsPenState = false
     @Published private(set) var canUndo = false
     @Published private(set) var canRedo = false
@@ -117,7 +118,9 @@ final class SessionController: ObservableObject {
         tool = settings.defaultTool
         color = settings.defaultColor
         settings.onChromeChange = { [weak self] in
-            self?.refreshChrome()
+            DispatchQueue.main.async {
+                self?.refreshChrome()
+            }
         }
     }
 
@@ -454,6 +457,7 @@ final class SessionController: ObservableObject {
             audioURL = audioFile
             resetCanvas()
             groups = []
+            captureCount = 0
             redoGroups = []
             notes = ""
             pasteText = ""
@@ -776,6 +780,15 @@ final class SessionController: ObservableObject {
     private func refreshControls() {
         canUndo = draft != nil || !shapes.isEmpty || textEdit != nil || !groups.isEmpty
         canRedo = !redoShapes.isEmpty || (textEdit == nil && draft == nil && shapes.isEmpty && !redoGroups.isEmpty)
+        let count = groups.count
+        let countChanged = count != captureCount
+        captureCount = count
+        if countChanged {
+            DispatchQueue.main.async {
+                self.chrome.relayout()
+                DispatchQueue.main.async { self.chrome.relayout() }
+            }
+        }
     }
 
     private func setPhase(_ phase: SessionPhase) {
