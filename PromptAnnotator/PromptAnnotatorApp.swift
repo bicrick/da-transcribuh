@@ -55,6 +55,9 @@ private struct SessionMenu: View {
         Divider()
 
         if session.lastSessionURL != nil {
+            Button("Paste Image and Text (\(PasteFollowUp.shortcut))") {
+                PasteFollowUp.shared.pasteBoth()
+            }
             Button("Show Last Session in Finder") {
                 session.revealSession()
             }
@@ -77,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SessionController.shared.toggle()
         }
         HotkeyCenter.shared.install(AppSettings.shared.chord)
+        PasteFollowUp.shared.install()
         SettingsPresenter.shared.show()
         Task { @MainActor in
             SessionController.shared.prepareModel()
@@ -93,6 +97,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         HotkeyCenter.shared.remove()
+        MainActor.assumeIsolated {
+            PasteFollowUp.shared.remove()
+        }
         MainActor.assumeIsolated {
             SessionController.shared.abandonIfRecording()
         }
