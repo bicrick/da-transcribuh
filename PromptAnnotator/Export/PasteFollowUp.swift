@@ -128,7 +128,7 @@ final class PasteFollowUp {
         InstallEventHandler(
             GetApplicationEventTarget(),
             { _, event, userData -> OSStatus in
-                guard let event, let userData else { return noErr }
+                guard let event, let userData else { return OSStatus(eventNotHandledErr) }
                 var pressed = EventHotKeyID()
                 let parameter = GetEventParameter(
                     event,
@@ -142,7 +142,7 @@ final class PasteFollowUp {
                 guard parameter == noErr else { return parameter }
                 let followUp = Unmanaged<PasteFollowUp>.fromOpaque(userData).takeUnretainedValue()
                 guard pressed.signature == followUp.signature, pressed.id == followUp.hotKeyID else {
-                    return noErr
+                    return OSStatus(eventNotHandledErr)
                 }
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated {

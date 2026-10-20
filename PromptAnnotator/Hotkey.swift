@@ -44,7 +44,9 @@ final class HotkeyCenter {
         let status = InstallEventHandler(
             GetApplicationEventTarget(),
             { _, event, userData -> OSStatus in
-                guard let event, let userData else { return noErr }
+                // noErr means "handled". The paste shortcut shares this event
+                // class, so a mismatch has to fall through to that handler.
+                guard let event, let userData else { return OSStatus(eventNotHandledErr) }
                 var pressed = EventHotKeyID()
                 let parameter = GetEventParameter(
                     event,
@@ -58,7 +60,7 @@ final class HotkeyCenter {
                 guard parameter == noErr else { return parameter }
                 let center = Unmanaged<HotkeyCenter>.fromOpaque(userData).takeUnretainedValue()
                 guard pressed.signature == center.signature, pressed.id == center.hotKeyID else {
-                    return noErr
+                    return OSStatus(eventNotHandledErr)
                 }
                 DispatchQueue.main.async {
                     center.handler?()
