@@ -1,6 +1,8 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import ImageIO
+import QuartzCore
 import UniformTypeIdentifiers
 
 let root = URL(fileURLWithPath: CommandLine.arguments[1])
@@ -46,12 +48,17 @@ func render(size: Int) -> CGImage {
     )!
     context.clear(CGRect(x: 0, y: 0, width: s, height: s))
 
-    // macOS app icons are a superellipse, not a filled square. Transparent
-    // corners let the Dock draw its own shadow and the system outline.
-    let shape = squircle(size: s, inset: s * 0.012)
+    // Terminal and Notes use the same footprint: a 824px continuous
+    // rounded square on a 1024px canvas, with a 100px transparent margin.
+    // Filling the canvas is what made this icon look larger than the others.
+    let inset = s * 100 / 1024
+    let body = CGRect(x: inset, y: inset, width: s - inset * 2, height: s - inset * 2)
+    let radius = body.width * 0.2237
+    let mask = continuousPlate(size: size, body: body, radius: radius, fill: CGColor(gray: 1, alpha: 1), border: nil)
     context.saveGState()
-    context.addPath(shape)
-    context.clip()
+    context.clip(to: CGRect(x: 0, y: 0, width: s, height: s), mask: mask)
+    context.translateBy(x: body.minX, y: body.minY)
+    context.scaleBy(x: body.width / s, y: body.height / s)
     if let gradient = CGGradient(
         colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
         colors: [
@@ -80,8 +87,8 @@ func render(size: Int) -> CGImage {
     context.saveGState()
     context.translateBy(x: s * 0.46, y: s * 0.52)
     context.rotate(by: -.pi * 0.22)
-    let body = CGRect(x: -s * 0.075, y: -s * 0.22, width: s * 0.15, height: s * 0.40)
-    context.addPath(CGPath(roundedRect: body, cornerWidth: s * 0.075, cornerHeight: s * 0.075, transform: nil))
+    let pen = CGRect(x: -s * 0.075, y: -s * 0.22, width: s * 0.15, height: s * 0.40)
+    context.addPath(CGPath(roundedRect: pen, cornerWidth: s * 0.075, cornerHeight: s * 0.075, transform: nil))
     context.setFillColor(CGColor(srgbRed: 0.12, green: 0.12, blue: 0.13, alpha: 1))
     context.fillPath()
 
@@ -94,44 +101,42 @@ func render(size: Int) -> CGImage {
     context.restoreGState()
     context.restoreGState()
 
-    context.addPath(shape)
-    context.setStrokeColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.18))
-    context.setLineWidth(max(1, s * 0.016))
-    context.strokePath()
-
-    context.saveGState()
-    context.addPath(shape)
-    context.clip()
-    context.addPath(shape)
-    context.setStrokeColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.55))
-    context.setLineWidth(max(1, s * 0.012))
-    context.strokePath()
-    context.restoreGState()
+    let border = continuousPlate(
+        size: size,
+        body: body,
+        radius: radius,
+        fill: nil,
+        border: (max(1, body.width * 0.012), CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.22))
+    )
+    context.draw(border, in: CGRect(x: 0, y: 0, width: s, height: s))
     return context.makeImage()!
 }
 
-func squircle(size: CGFloat, inset: CGFloat) -> CGPath {
-    let path = CGMutablePath()
-    let n: CGFloat = 5
-    let radius = size / 2 - inset
-    let center = size / 2
-    let steps = max(96, Int(size))
-    for i in 0...steps {
-        let t = CGFloat(i) / CGFloat(steps) * 2 * .pi
-        let ct = cos(t)
-        let st = sin(t)
-        let point = CGPoint(
-            x: center + radius * copysign(pow(abs(ct), 2 / n), ct),
-            y: center + radius * copysign(pow(abs(st), 2 / n), st)
-        )
-        if i == 0 {
-            path.move(to: point)
-        } else {
-            path.addLine(to: point)
-        }
+func continuousPlate(size: Int, body: CGRect, radius: CGFloat, fill: CGColor?, border: (CGFloat, CGColor)?) -> CGImage {
+    let layer = CALayer()
+    layer.bounds = CGRect(x: 0, y: 0, width: size, height: size)
+    layer.isGeometryFlipped = true
+    let plate = CALayer()
+    plate.frame = body
+    plate.backgroundColor = fill ?? CGColor(gray: 0, alpha: 0)
+    plate.cornerRadius = radius
+    plate.cornerCurve = .continuous
+    if let border {
+        plate.borderWidth = border.0
+        plate.borderColor = border.1
     }
-    path.closeSubpath()
-    return path
+    layer.addSublayer(plate)
+    let context = CGContext(
+        data: nil,
+        width: size,
+        height: size,
+        bitsPerComponent: 8,
+        bytesPerRow: 0,
+        space: CGColorSpace(name: CGColorSpace.sRGB)!,
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    )!
+    layer.render(in: context)
+    return context.makeImage()!
 }
 
 func writePNG(_ image: CGImage, to url: URL) throws {
