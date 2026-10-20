@@ -126,7 +126,7 @@ struct HomePage: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Drag to capture, or just talk")
                     .font(.system(size: 13, weight: .semibold))
-                Text("A capture includes the front window. Hold Shift to annotate. No capture copies the transcript only.")
+                Text("A capture includes the front window. Hold Shift to annotate. A quiet capture is only the picture. No capture copies the transcript only.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }

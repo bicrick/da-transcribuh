@@ -89,13 +89,12 @@ struct SessionMarkdown {
             if !all.isEmpty {
                 paragraphs.append(all)
             }
-        } else {
+        } else if sections.contains(where: { !spoken(in: $0).isEmpty }) {
             // The sheet badges are 1, 2, 3. The pasted words use those same numbers,
             // including a tile that had no speech, so the list stays lined up.
+            // A session where nothing was said pastes the picture alone.
             for section in sections {
-                let spoken = [Aligner.spokenText(section.words), Aligner.spokenText(section.closingNote)]
-                    .filter { !$0.isEmpty }
-                    .joined(separator: " ")
+                let spoken = spoken(in: section)
                 paragraphs.append(spoken.isEmpty ? "\(section.index)." : "\(section.index). \(spoken)")
             }
         }
@@ -103,6 +102,12 @@ struct SessionMarkdown {
             paragraphs.append("Transcription failed: \(transcriptionError)")
         }
         return paragraphs.joined(separator: "\n\n")
+    }
+
+    private static func spoken(in section: Section) -> String {
+        [Aligner.spokenText(section.words), Aligner.spokenText(section.closingNote)]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 }
 

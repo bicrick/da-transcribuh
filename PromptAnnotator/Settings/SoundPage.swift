@@ -24,7 +24,7 @@ struct SoundPage: View {
                 .font(.system(size: 13, weight: .semibold))
             SettingsCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    Toggle("Play a sound when a session starts, a tile is saved, and a session stops", isOn: Binding(
+                    Toggle("Play a tone when a session starts, a capture lands, and a session stops", isOn: Binding(
                         get: { settings.soundEnabled },
                         set: { settings.setSoundEnabled($0) }
                     ))
@@ -40,10 +40,11 @@ struct SoundPage: View {
                         Image(systemName: "speaker.wave.2")
                             .foregroundStyle(.secondary)
                     }
+                    Text("Start rises. A spoken stop resolves downward. A silent stop, including screenshots with no speech, is one soft tone.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     HStack {
-                        Text("Uses the system Tink, Pop, and Glass sounds.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
                         Spacer()
                         Button("Preview") {
                             AppSounds.preview()

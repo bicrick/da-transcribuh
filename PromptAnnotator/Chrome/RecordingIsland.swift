@@ -13,13 +13,8 @@ struct RecordingIslandView: View {
         Group {
             if session.phase == .recording {
                 recordingBody
-            } else {
-                HStack(spacing: 10) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(session.statusText)
-                        .font(.system(size: 13, weight: .semibold))
-                }
+            } else if session.isBusy {
+                processingBody
             }
         }
         .foregroundStyle(.primary)
@@ -62,6 +57,31 @@ struct RecordingIslandView: View {
         }
     }
 
+    private var processingBody: some View {
+        HStack(spacing: 12) {
+            WaveformBars(levels: session.levels, slotWidth: processingWidth, slotHeight: 26)
+            if case .downloading(let fraction) = session.phase, fraction >= 0.01 {
+                Text("\(Int((fraction * 100).rounded()))%")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            if session.captureCount > 0 {
+                CaptureCountChip(count: session.captureCount)
+            }
+        }
+    }
+
+    private var processingWidth: CGFloat {
+        switch settings.islandStyle {
+        case .classic:
+            return 188
+        case .compact:
+            return 148
+        case .minimal, .hidden:
+            return 168
+        }
+    }
+
     private var recordLabel: some View {
         HStack(spacing: 8) {
             recordDot
@@ -83,15 +103,21 @@ struct RecordingIslandView: View {
     }
 
     private var barHeight: CGFloat {
-        guard showsChrome else { return 0 }
-        guard session.phase == .recording else { return 36 }
-        switch settings.islandStyle {
-        case .classic:
-            return 46
-        case .compact, .minimal:
-            return 40
-        case .hidden:
+        switch session.phase {
+        case .idle:
             return 0
+        case .recording:
+            guard showsChrome else { return 0 }
+            switch settings.islandStyle {
+            case .classic:
+                return 46
+            case .compact, .minimal:
+                return 40
+            case .hidden:
+                return 0
+            }
+        case .finishing, .downloading, .preparingModel, .transcribing:
+            return 46
         }
     }
 

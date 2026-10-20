@@ -66,6 +66,8 @@ final class SessionController: ObservableObject {
     private var pasteText = ""
     private var sheetURL: URL?
     private var timer: Timer?
+    private var motionTimer: Timer?
+    private var motionFrame = 0
     private var captureTail: Task<Void, Never> = Task {}
     private var isStarting = false
     private var chromeScreenID: CGDirectDisplayID?
@@ -254,6 +256,7 @@ final class SessionController: ObservableObject {
         audio.stop()
         timer?.invalidate()
         timer = nil
+        stopProcessingMotion()
     }
 
     func hitRects() -> [CGRect] {
@@ -494,8 +497,11 @@ final class SessionController: ObservableObject {
 
     private func finish() async {
         guard phase == .recording else { return }
-        AppSounds.sessionStopped()
+        let heardSpeech = audio.heardSpeech()
+        AppSounds.sessionStopped(heardSpeech: heardSpeech)
         setPhase(.finishing)
+        startProcessingMotion()
+        defer { stopProcessingMotion() }
         monitor.stop()
         showsPenState = false
         selectionRect = nil
@@ -553,7 +559,7 @@ final class SessionController: ObservableObject {
 
         var spoken: [TimedWord] = []
         var model: String?
-        if let audioURL {
+        if heardSpeech, let audioURL {
             if WhisperKitTranscriber.isModelReady {
                 setPhase(.transcribing)
             } else if WhisperKitTranscriber.modelIsInstalled() {
@@ -804,7 +810,34 @@ final class SessionController: ObservableObject {
             overlay.hide()
             chrome.hideAll()
         }
-        DispatchQueue.main.async { self.chrome.relayout() }
+        DispatchQueue.main.async {
+            self.chrome.relayout()
+            DispatchQueue.main.async { self.chrome.relayout() }
+        }
+    }
+
+    private func startProcessingMotion() {
+        motionTimer?.invalidate()
+        motionFrame = 0
+        levels = WaveformMotion.loading(frame: 0)
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.advanceProcessingMotion()
+            }
+        }
+        motionTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func advanceProcessingMotion() {
+        guard isBusy else { return }
+        motionFrame += 1
+        levels = WaveformMotion.loading(frame: motionFrame)
+    }
+
+    private func stopProcessingMotion() {
+        motionTimer?.invalidate()
+        motionTimer = nil
     }
 
     private func startTimer() {

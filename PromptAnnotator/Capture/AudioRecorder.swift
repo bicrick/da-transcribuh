@@ -13,6 +13,8 @@ final class AudioRecorder {
     private var speechSamples: [Float] = []
     private var history: [CGFloat] = Array(repeating: 0.12, count: WaveformSamples.count)
     private var currentLevel: CGFloat = 0.12
+    private var voicedBuffers = 0
+    private var speechHeard = false
     private var tapInstalled = false
     private var usingEngine = false
 
@@ -20,6 +22,8 @@ final class AudioRecorder {
         sampleLock.lock()
         speechSamples = []
         currentLevel = 0.12
+        voicedBuffers = 0
+        speechHeard = false
         history = Array(repeating: 0.12, count: WaveformSamples.count)
         sampleLock.unlock()
 
@@ -53,6 +57,12 @@ final class AudioRecorder {
         return speechSamples
     }
 
+    func heardSpeech() -> Bool {
+        sampleLock.lock()
+        defer { sampleLock.unlock() }
+        return speechHeard
+    }
+
     func sampleLevels() -> [CGFloat] {
         let level: CGFloat
         if !usingEngine, let recorder {
@@ -61,6 +71,9 @@ final class AudioRecorder {
             let clamped = min(0, max(-50, decibels))
             level = CGFloat((clamped + 50) / 50)
             currentLevel = level
+            sampleLock.lock()
+            SpeechGate.note(level: level, voicedBuffers: &voicedBuffers, heard: &speechHeard)
+            sampleLock.unlock()
         } else {
             sampleLock.lock()
             level = currentLevel
@@ -144,6 +157,7 @@ final class AudioRecorder {
         sampleLock.lock()
         speechSamples.append(contentsOf: floats)
         currentLevel = level
+        SpeechGate.note(level: level, voicedBuffers: &voicedBuffers, heard: &speechHeard)
         sampleLock.unlock()
     }
 

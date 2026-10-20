@@ -141,4 +141,28 @@ final class SessionMarkdownTests: XCTestCase {
         )
         XCTAssertEqual(text, "1.\n\n2. second")
     }
+
+    func testPasteTextOmitsWordsWhenNothingWasSaid() {
+        let text = SessionMarkdown.pasteText(
+            sections: [
+                SessionMarkdown.Section(
+                    index: 1,
+                    commitOffset: 4,
+                    imagePath: "frames/01.png",
+                    words: [],
+                    closingNote: []
+                ),
+                SessionMarkdown.Section(
+                    index: 2,
+                    commitOffset: 9,
+                    imagePath: "frames/02.png",
+                    words: [],
+                    closingNote: []
+                ),
+            ],
+            transcript: [],
+            transcriptionError: nil
+        )
+        XCTAssertEqual(text, "")
+    }
 }

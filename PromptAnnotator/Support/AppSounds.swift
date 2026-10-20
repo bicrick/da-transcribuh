@@ -3,26 +3,35 @@ import AppKit
 @MainActor
 enum AppSounds {
     static func sessionStarted() {
-        play("Tink")
+        play(.start)
     }
 
     static func tileCommitted() {
-        play("Pop")
+        play(.tile)
     }
 
-    static func sessionStopped() {
-        play("Glass")
+    static func sessionStopped(heardSpeech: Bool) {
+        play(heardSpeech ? .stopSpoken : .stopSilent)
     }
 
     static func preview() {
-        play("Tink")
+        play(.start)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 320_000_000)
+            play(.stopSpoken)
+            try? await Task.sleep(nanoseconds: 420_000_000)
+            play(.stopSilent)
+        }
     }
 
-    private static func play(_ name: String) {
+    private static var active: NSSound?
+
+    private static func play(_ kind: Earcon.Kind) {
         let settings = AppSettings.shared
         guard settings.soundEnabled else { return }
-        guard let sound = NSSound(named: NSSound.Name(name))?.copy() as? NSSound else { return }
+        guard let sound = NSSound(data: Earcon.wave(kind)) else { return }
         sound.volume = Float(settings.soundVolume)
+        active = sound
         sound.play()
     }
 }

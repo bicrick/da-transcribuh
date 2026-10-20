@@ -12,7 +12,7 @@
 
 A macOS menu bar app that records your voice and on-screen marks, then puts a tile sheet and transcript on the clipboard. It appears in the Dock and it is not sandboxed.
 
-The menu bar item opens the Prompt Annotator window: Home, Sessions, Recording, Sound, and Model. The recording bar can be Default, Compact, Minimal, or Hidden. Default keeps the waveform in the middle and adds a capture count beside the time. Sound effects for start, tile, and stop are on by default and can be turned off.
+The menu bar item opens the Prompt Annotator window: Home, Sessions, Recording, Sound, and Model. The recording bar can be Default, Compact, Minimal, or Hidden. Default keeps the waveform in the middle and adds a capture count beside the time. Tones for start, capture, and stop are on by default and can be turned off. A spoken stop and a silent stop use different tones.
 
 ## How a session works
 
@@ -26,7 +26,7 @@ Escape cancels the shape in progress. Undo and redo apply to the marks in the cu
 
 Text is the latch. Shift-click places a single-line label. Releasing Shift leaves the field open so you can type. Return finishes the label and commits the group. Escape cancels the label.
 
-Stop saves any marks still on screen, then ends the session. If you never captured, Stop copies the transcript and does not take a screenshot. Each capture is paired with what you said up to that moment. Several captures become one numbered tile sheet, and the pasted words use those same numbers. The recording windows close.
+Stop saves any marks still on screen, then ends the session. If you never captured, Stop copies the transcript and does not take a screenshot. Each capture is paired with what you said up to that moment. A capture you take without speaking stays a picture, and nothing is pasted after it. Several captures become one numbered tile sheet, and the pasted words use those same numbers when you did speak. While those words are prepared, the recording bar keeps the waveform moving, then closes.
 
 ## Shortcuts
 
@@ -78,7 +78,7 @@ The model is `small.en_217MB`. The Swift package is [argmaxinc/argmax-oss-swift]
 
 The weights come from [argmaxinc/whisperkit-coreml](https://huggingface.co/argmaxinc/whisperkit-coreml), folder `openai_whisper-small.en_217MB` (about 217 MB). WhisperKit's downloader searches for `*small.en_217MB/*`, which matches that folder. If that variant name does not resolve at runtime, the app downloads `small.en` from the same repo instead and records the name it used in `session.md` and `session.json`.
 
-Stills and audio are written before the transcript is finished. The model downloads once into `~/Library/Application Support/PromptAnnotator/Models`. After that the app loads it at launch and keeps it in memory. Speech is transcribed while the session is still recording, so stopping only finishes the last moment. The recording island shows a download only when the model is not already on disk.
+Stills and audio are written before the transcript is finished. The model downloads once into `~/Library/Application Support/PromptAnnotator/Models`. After that the app loads it at launch and keeps it in memory. Speech is transcribed while the session is still recording, so stopping only finishes the last moment. A session with no speech skips that step. The recording bar shows a percent only while the model is downloading.
 
 ## Build
 
