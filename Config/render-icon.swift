@@ -44,9 +44,29 @@ func render(size: Int) -> CGImage {
         space: CGColorSpace(name: CGColorSpace.sRGB)!,
         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
     )!
-    context.setFillColor(CGColor(srgbRed: 0.91, green: 0.885, blue: 0.835, alpha: 1))
-    context.fill(CGRect(x: 0, y: 0, width: s, height: s))
+    context.clear(CGRect(x: 0, y: 0, width: s, height: s))
 
+    // macOS app icons are a superellipse, not a filled square. Transparent
+    // corners let the Dock draw its own shadow and the system outline.
+    let shape = squircle(size: s, inset: s * 0.012)
+    context.saveGState()
+    context.addPath(shape)
+    context.clip()
+    if let gradient = CGGradient(
+        colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
+        colors: [
+            CGColor(srgbRed: 0.95, green: 0.93, blue: 0.89, alpha: 1),
+            CGColor(srgbRed: 0.88, green: 0.85, blue: 0.79, alpha: 1),
+        ] as CFArray,
+        locations: [0, 1]
+    ) {
+        context.drawLinearGradient(
+            gradient,
+            start: CGPoint(x: s * 0.5, y: s),
+            end: CGPoint(x: s * 0.5, y: 0),
+            options: []
+        )
+    }
     context.setStrokeColor(CGColor(srgbRed: 0.78, green: 0.16, blue: 0.14, alpha: 1))
     context.setLineWidth(s * 0.078)
     context.setLineCap(.round)
@@ -72,7 +92,46 @@ func render(size: Int) -> CGImage {
     context.closePath()
     context.fillPath()
     context.restoreGState()
+    context.restoreGState()
+
+    context.addPath(shape)
+    context.setStrokeColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.18))
+    context.setLineWidth(max(1, s * 0.016))
+    context.strokePath()
+
+    context.saveGState()
+    context.addPath(shape)
+    context.clip()
+    context.addPath(shape)
+    context.setStrokeColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.55))
+    context.setLineWidth(max(1, s * 0.012))
+    context.strokePath()
+    context.restoreGState()
     return context.makeImage()!
+}
+
+func squircle(size: CGFloat, inset: CGFloat) -> CGPath {
+    let path = CGMutablePath()
+    let n: CGFloat = 5
+    let radius = size / 2 - inset
+    let center = size / 2
+    let steps = max(96, Int(size))
+    for i in 0...steps {
+        let t = CGFloat(i) / CGFloat(steps) * 2 * .pi
+        let ct = cos(t)
+        let st = sin(t)
+        let point = CGPoint(
+            x: center + radius * copysign(pow(abs(ct), 2 / n), ct),
+            y: center + radius * copysign(pow(abs(st), 2 / n), st)
+        )
+        if i == 0 {
+            path.move(to: point)
+        } else {
+            path.addLine(to: point)
+        }
+    }
+    path.closeSubpath()
+    return path
 }
 
 func writePNG(_ image: CGImage, to url: URL) throws {
