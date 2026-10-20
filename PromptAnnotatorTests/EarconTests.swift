@@ -106,11 +106,32 @@ final class FrequencyBandTests: XCTestCase {
         XCTAssertLessThan(eased[0], 1)
     }
 
-    private func tone(band: Int, count: Int) -> [Float] {
+    func testAQuietToneStillRises() {
+        let count = 19
+        let levels = FrequencyBands.levels(samples: tone(band: 8, count: count, amplitude: 0.01), count: count)
+        XCTAssertGreaterThan(levels[8], 0.4)
+        XCTAssertGreaterThan(levels[8], levels[2])
+        XCTAssertGreaterThan(levels[8], levels[16])
+    }
+
+    func testSmoothingFollowsTheFrameClock() {
+        let target: [CGFloat] = [1, 0.2, 0.2, 1]
+        var levels = FrequencyBands.resting(4)
+        levels = FrequencyBands.smooth(levels, toward: target, delta: 1.0 / 60.0)
+        XCTAssertGreaterThan(levels[0], 0.2)
+        XCTAssertLessThan(levels[0], 0.7)
+        for _ in 0..<8 {
+            levels = FrequencyBands.smooth(levels, toward: target, delta: 1.0 / 60.0)
+        }
+        XCTAssertGreaterThan(levels[0], 0.85)
+        XCTAssertGreaterThan(levels[0], levels[1])
+    }
+
+    private func tone(band: Int, count: Int, amplitude: Float = 0.6) -> [Float] {
         let hz = FrequencyBands.frequency(band: band, count: count)
         return (0..<FrequencyBands.window).map { index in
             let angle = 2 * Float.pi * Float(hz) * Float(index) / Float(FrequencyBands.sampleRate)
-            return sin(angle) * 0.6
+            return sin(angle) * amplitude
         }
     }
 }

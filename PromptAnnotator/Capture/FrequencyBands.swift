@@ -11,14 +11,14 @@ enum FrequencyBands {
     static func levels(samples: [Float], count: Int) -> [CGFloat] {
         guard count > 0 else { return [] }
         let frame = Array(samples.suffix(window))
-        guard frame.count >= 128, rms(frame) > 0.008 else { return rest(count) }
+        // Only a dead buffer collapses to the rest shape. A hard loudness gate
+        // made quiet speech and the gaps between syllables flash the whole comb.
+        guard frame.count >= 128, rms(frame) > 0.0008 else { return rest(count) }
         guard let magnitudes = spectrum(frame) else { return rest(count) }
-        return (0..<count).map { band in
-            let energy = bandEnergy(magnitudes, band: band, count: count)
-            let decibels = 20 * log10(max(energy, 1e-8))
-            let scaled = (decibels + 58) / 40
-            return CGFloat(min(1, max(0.08, scaled)))
+        let raw = (0..<count).map { band in
+            height(for: bandEnergy(magnitudes, band: band, count: count))
         }
+        return soften(raw)
     }
 
     static func shaped(level: CGFloat, count: Int) -> [CGFloat] {
@@ -32,12 +32,16 @@ enum FrequencyBands {
     }
 
     /// Eases each slot toward its new height. Rising is quicker than falling, and nothing changes place.
-    static func smooth(_ current: [CGFloat], toward target: [CGFloat]) -> [CGFloat] {
+    /// `delta` is seconds since the last frame, so the motion stays the same if the display skips.
+    static func smooth(_ current: [CGFloat], toward target: [CGFloat], delta: TimeInterval = 0.02) -> [CGFloat] {
+        let step = max(0, delta)
+        let attack = CGFloat(1 - exp(-step / 0.028))
+        let release = CGFloat(1 - exp(-step / 0.18))
         let count = max(current.count, target.count)
         return (0..<count).map { index in
             let from = index < current.count ? current[index] : 0.1
             let to = index < target.count ? target[index] : 0.1
-            let rate: CGFloat = to > from ? 0.38 : 0.14
+            let rate: CGFloat = to > from ? attack : release
             return from + (to - from) * rate
         }
     }
@@ -56,6 +60,25 @@ enum FrequencyBands {
             let position = Double(index) / Double(max(count - 1, 1))
             let center = max(0, 1 - abs(position - 0.5) * 2)
             return CGFloat(0.08 + 0.05 * center)
+        }
+    }
+
+    /// A full-scale sine lands near −7 dB with this FFT. The knee is low enough that
+    /// quiet speech leaves the floor, and a pure tone's distant bins stay there.
+    private static func height(for energy: Float) -> CGFloat {
+        let decibels = 20 * log10(max(energy, 1e-8))
+        let normalized = min(1, max(0, (decibels + 72) / 46))
+        let curved = pow(normalized, 0.85)
+        return CGFloat(min(1, 0.08 + curved * 0.92))
+    }
+
+    /// Shares a little of each bar with its neighbors so a single bin doesn't spike alone.
+    private static func soften(_ levels: [CGFloat]) -> [CGFloat] {
+        guard levels.count > 2 else { return levels }
+        return levels.indices.map { index in
+            let left = levels[max(0, index - 1)]
+            let right = levels[min(levels.count - 1, index + 1)]
+            return left * 0.22 + levels[index] * 0.56 + right * 0.22
         }
     }
 

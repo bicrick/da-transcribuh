@@ -12,6 +12,7 @@ final class AudioRecorder {
     private var speechFormat: AVAudioFormat?
     private var speechSamples: [Float] = []
     private var bandWindow: [Float] = []
+    private var target: [CGFloat] = FrequencyBands.resting(WaveformSamples.count)
     private var bands: [CGFloat] = FrequencyBands.resting(WaveformSamples.count)
     private var currentLevel: CGFloat = 0.12
     private var voicedBuffers = 0
@@ -26,7 +27,8 @@ final class AudioRecorder {
         currentLevel = 0.12
         voicedBuffers = 0
         speechHeard = false
-        bands = FrequencyBands.resting(WaveformSamples.count)
+        target = FrequencyBands.resting(WaveformSamples.count)
+        bands = target
         sampleLock.unlock()
 
         try startRecorder(url: url)
@@ -71,24 +73,25 @@ final class AudioRecorder {
         return currentLevel
     }
 
-    func sampleLevels() -> [CGFloat] {
+    /// One display step. The spectrum itself is updated on the audio queue; this only eases toward it.
+    func sampleLevels(delta: TimeInterval = 1.0 / 60.0) -> [CGFloat] {
+        var meterTarget: [CGFloat]?
         if !usingEngine, let recorder {
             recorder.updateMeters()
             let decibels = recorder.averagePower(forChannel: 0)
             let clamped = min(0, max(-50, decibels))
             let level = CGFloat((clamped + 50) / 50)
             currentLevel = level
+            meterTarget = FrequencyBands.shaped(level: level, count: WaveformSamples.count)
             sampleLock.lock()
             SpeechGate.note(level: level, voicedBuffers: &voicedBuffers, heard: &speechHeard)
-            if bands.count != WaveformSamples.count {
-                bands = FrequencyBands.resting(WaveformSamples.count)
-            }
-            bands = FrequencyBands.smooth(bands, toward: FrequencyBands.shaped(level: level, count: bands.count))
-            let snapshot = bands
             sampleLock.unlock()
-            return snapshot
         }
         sampleLock.lock()
+        if let meterTarget {
+            target = meterTarget
+        }
+        bands = FrequencyBands.smooth(bands, toward: target, delta: delta)
         let snapshot = bands
         sampleLock.unlock()
         return snapshot
@@ -128,7 +131,7 @@ final class AudioRecorder {
 
         self.speechConverter = speechConverter
         self.speechFormat = speechFormat
-        input.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak self] buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 1024, format: tapFormat) { [weak self] buffer, _ in
             guard let self, buffer.frameLength > 0 else { return }
             self.captureQueue.async {
                 self.capture(buffer)
@@ -171,15 +174,13 @@ final class AudioRecorder {
             bandWindow.removeFirst(bandWindow.count - FrequencyBands.window)
         }
         let window = bandWindow
-        let previous = bands
         currentLevel = level
         SpeechGate.note(level: level, voicedBuffers: &voicedBuffers, heard: &speechHeard)
         sampleLock.unlock()
 
         let next = FrequencyBands.levels(samples: window, count: WaveformSamples.count)
-        let eased = FrequencyBands.smooth(previous, toward: next)
         sampleLock.lock()
-        bands = eased
+        target = next
         sampleLock.unlock()
     }
 

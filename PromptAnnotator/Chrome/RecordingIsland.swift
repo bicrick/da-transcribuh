@@ -41,17 +41,17 @@ struct RecordingIslandView: View {
         case .classic:
             HStack(spacing: 14) {
                 recordLabel
-                WaveformBars(levels: session.levels)
+                LiveWaveform(display: session.waveform)
                 trailingClock
             }
         case .compact:
             HStack(spacing: 12) {
                 recordDot
-                WaveformBars(levels: session.levels, slotWidth: 156, slotHeight: 20)
+                LiveWaveform(display: session.waveform, slotWidth: 156, slotHeight: 20)
                 trailingClock
             }
         case .minimal:
-            WaveformBars(levels: session.levels, slotWidth: 196, slotHeight: 22)
+            LiveWaveform(display: session.waveform, slotWidth: 196, slotHeight: 22)
         case .hidden:
             EmptyView()
         }
@@ -59,7 +59,7 @@ struct RecordingIslandView: View {
 
     private var processingBody: some View {
         HStack(spacing: 12) {
-            WaveformBars(levels: session.levels, slotWidth: processingWidth, slotHeight: 26)
+            LiveWaveform(display: session.waveform, slotWidth: processingWidth, slotHeight: 26)
             if case .downloading(let fraction) = session.phase, fraction >= 0.01 {
                 Text("\(Int((fraction * 100).rounded()))%")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))

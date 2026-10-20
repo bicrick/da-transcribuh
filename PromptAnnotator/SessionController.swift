@@ -32,7 +32,7 @@ final class SessionController: ObservableObject {
     @Published private(set) var tool: AnnotationTool = .pen
     @Published private(set) var color: InkColor = .red
     @Published private(set) var elapsed: TimeInterval = 0
-    @Published private(set) var levels: [CGFloat] = FrequencyBands.resting(WaveformSamples.count)
+    let waveform = WaveformDisplay()
     @Published private(set) var captureCount = 0
     @Published private(set) var showsPenState = false
     @Published private(set) var canUndo = false
@@ -65,6 +65,8 @@ final class SessionController: ObservableObject {
     private var pasteText = ""
     private var sheetURL: URL?
     private var timer: Timer?
+    private var levelsTimer: Timer?
+    private var lastLevelTime: CFTimeInterval = 0
     private var motionTimer: Timer?
     private var motionFrame = 0
     private var captureTail: Task<Void, Never> = Task {}
@@ -537,6 +539,7 @@ final class SessionController: ObservableObject {
             silenceWatch = SilenceWatch()
             stopQueued = false
             elapsed = 0
+            waveform.set(FrequencyBands.resting(WaveformSamples.count))
             showsPenState = false
             markupMode = .capture
             showsToolbar = false
@@ -898,7 +901,7 @@ final class SessionController: ObservableObject {
     private func startProcessingMotion() {
         motionTimer?.invalidate()
         motionFrame = 0
-        levels = WaveformMotion.loading(frame: 0)
+        waveform.set(WaveformMotion.loading(frame: 0))
         let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.advanceProcessingMotion()
@@ -911,7 +914,7 @@ final class SessionController: ObservableObject {
     private func advanceProcessingMotion() {
         guard isBusy else { return }
         motionFrame += 1
-        levels = WaveformMotion.loading(frame: motionFrame)
+        waveform.set(WaveformMotion.loading(frame: motionFrame))
     }
 
     private func stopProcessingMotion() {
@@ -926,17 +929,45 @@ final class SessionController: ObservableObject {
                 self?.tick()
             }
         }
+        startLevelTimer()
     }
 
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
+        stopLevelTimer()
+    }
+
+    private func startLevelTimer() {
+        levelsTimer?.invalidate()
+        lastLevelTime = 0
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.refreshLevels()
+            }
+        }
+        timer.tolerance = 1.0 / 240.0
+        levelsTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func stopLevelTimer() {
+        levelsTimer?.invalidate()
+        levelsTimer = nil
+        lastLevelTime = 0
+    }
+
+    private func refreshLevels() {
+        guard phase == .recording else { return }
+        let now = CACurrentMediaTime()
+        let delta = lastLevelTime == 0 ? (1.0 / 60.0) : min(0.05, now - lastLevelTime)
+        lastLevelTime = now
+        waveform.set(audio.sampleLevels(delta: delta))
     }
 
     private func tick() {
         guard phase == .recording else { return }
         elapsed = Date().timeIntervalSince(startedAt)
-        levels = audio.sampleLevels()
         let settings = AppSettings.shared
         let quietLongEnough = silenceWatch.tick(
             level: audio.latestLevel(),
