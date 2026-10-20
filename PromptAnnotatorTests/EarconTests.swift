@@ -144,4 +144,27 @@ final class WaveformMotionTests: XCTestCase {
         XCTAssertNotEqual(first, later)
         XCTAssertTrue(first.allSatisfy { $0 >= 0.08 && $0 <= 1 })
     }
+
+    func testRippleTravelsAndLeavesMostBarsQuiet() {
+        let count = 32
+        let early = WaveformMotion.loading(time: 0.15, count: count)
+        let later = WaveformMotion.loading(time: 0.9, count: count)
+        XCTAssertNotEqual(peakIndex(early), peakIndex(later))
+        XCTAssertLessThan(early.filter { $0 > 0.22 }.count, count / 2)
+        XCTAssertLessThan(early.max() ?? 0, 0.7)
+    }
+
+    func testMixKeepsTheRecordingShapeAtTheStart() {
+        let from: [CGFloat] = [0.2, 0.8, 0.2]
+        let to: [CGFloat] = [0.5, 0.5, 0.5]
+        XCTAssertEqual(WaveformMotion.mix(from, to, amount: 0), from)
+        XCTAssertEqual(WaveformMotion.mix(from, to, amount: 1), to)
+        XCTAssertEqual(WaveformMotion.mix(from, to, amount: WaveformMotion.blend(0)), from)
+        let mid = WaveformMotion.mix(from, to, amount: 0.5)
+        XCTAssertEqual(mid[1], 0.65, accuracy: 0.001)
+    }
+
+    private func peakIndex(_ levels: [CGFloat]) -> Int {
+        levels.enumerated().max { $0.element < $1.element }?.offset ?? -1
+    }
 }

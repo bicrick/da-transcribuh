@@ -68,7 +68,8 @@ final class SessionController: ObservableObject {
     private var levelsTimer: Timer?
     private var lastLevelTime: CFTimeInterval = 0
     private var motionTimer: Timer?
-    private var motionFrame = 0
+    private var processingOrigin: [CGFloat] = []
+    private var processingStartedAt: CFTimeInterval = 0
     private var captureTail: Task<Void, Never> = Task {}
     private var isStarting = false
     private var chromeScreenID: CGDirectDisplayID?
@@ -900,26 +901,31 @@ final class SessionController: ObservableObject {
 
     private func startProcessingMotion() {
         motionTimer?.invalidate()
-        motionFrame = 0
-        waveform.set(WaveformMotion.loading(frame: 0))
-        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+        processingOrigin = waveform.levels
+        processingStartedAt = CACurrentMediaTime()
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
                 self?.advanceProcessingMotion()
             }
         }
+        timer.tolerance = 1.0 / 240.0
         motionTimer = timer
         RunLoop.main.add(timer, forMode: .common)
+        advanceProcessingMotion()
     }
 
     private func advanceProcessingMotion() {
         guard isBusy else { return }
-        motionFrame += 1
-        waveform.set(WaveformMotion.loading(frame: motionFrame))
+        let elapsed = CACurrentMediaTime() - processingStartedAt
+        let wave = WaveformMotion.loading(time: elapsed)
+        let from = processingOrigin.isEmpty ? wave : processingOrigin
+        waveform.set(WaveformMotion.mix(from, wave, amount: WaveformMotion.blend(elapsed)))
     }
 
     private func stopProcessingMotion() {
         motionTimer?.invalidate()
         motionTimer = nil
+        processingOrigin = []
     }
 
     private func startTimer() {

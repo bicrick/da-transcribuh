@@ -9,20 +9,32 @@ struct RecordingIslandView: View {
         !(session.phase == .recording && settings.islandStyle == .hidden)
     }
 
+    /// Recording and transcribing share one layout, so the capsule can ease between them.
+    /// Download progress is left out: it ticks often and would restart the spring.
+    private var layoutToken: String {
+        let mode: String
+        switch session.phase {
+        case .recording:
+            mode = "recording"
+        case .idle:
+            mode = "idle"
+        case .finishing, .downloading, .preparingModel, .transcribing:
+            mode = "processing"
+        }
+        return "\(mode)|\(settings.islandStyle.rawValue)|\(session.captureCount)|\(showsPercent ? 1 : 0)"
+    }
+
     var body: some View {
         Group {
-            if session.phase == .recording {
-                recordingBody
-            } else if session.isBusy {
-                processingBody
+            if session.phase == .recording || session.isBusy {
+                island
             }
         }
         .foregroundStyle(.primary)
         .padding(.horizontal, showsChrome ? 16 : 0)
         .frame(height: barHeight)
         .fixedSize(horizontal: showsChrome, vertical: false)
-        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: session.captureCount)
-        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: settings.islandStyle)
+        .animation(.spring(response: 0.48, dampingFraction: 0.92), value: layoutToken)
         .background {
             if showsChrome {
                 Capsule(style: .continuous)
@@ -35,50 +47,105 @@ struct RecordingIslandView: View {
         }
     }
 
-    @ViewBuilder
-    private var recordingBody: some View {
-        switch settings.islandStyle {
-        case .classic:
-            HStack(spacing: 14) {
-                recordLabel
-                LiveWaveform(display: session.waveform)
-                trailingClock
-            }
-        case .compact:
-            HStack(spacing: 12) {
+    private var island: some View {
+        HStack(spacing: barSpacing) {
+            if showsCompactDot {
                 recordDot
-                LiveWaveform(display: session.waveform, slotWidth: 156, slotHeight: 20)
-                trailingClock
+                    .transition(.opacity)
             }
-        case .minimal:
-            LiveWaveform(display: session.waveform, slotWidth: 196, slotHeight: 22)
-        case .hidden:
-            EmptyView()
-        }
-    }
-
-    private var processingBody: some View {
-        HStack(spacing: 12) {
-            LiveWaveform(display: session.waveform, slotWidth: processingWidth, slotHeight: 26)
-            if case .downloading(let fraction) = session.phase, fraction >= 0.01 {
+            if showsRecordLabel {
+                recordLabel
+                    .transition(.opacity)
+            }
+            if showsWaveform {
+                LiveWaveform(
+                    display: session.waveform,
+                    slotWidth: waveformWidth,
+                    slotHeight: waveformHeight
+                )
+            }
+            if showsClock {
+                timer
+                    .transition(.opacity)
+            }
+            if showsChip {
+                CaptureCountChip(count: session.captureCount)
+                    .transition(.opacity)
+            }
+            if showsPercent, case .downloading(let fraction) = session.phase {
                 Text("\(Int((fraction * 100).rounded()))%")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
-            }
-            if session.captureCount > 0 {
-                CaptureCountChip(count: session.captureCount)
+                    .frame(minWidth: 36, alignment: .leading)
+                    .transition(.opacity)
             }
         }
     }
 
-    private var processingWidth: CGFloat {
+    private var showsSideChrome: Bool {
+        session.phase == .recording && settings.islandStyle != .minimal && settings.islandStyle != .hidden
+    }
+
+    private var showsRecordLabel: Bool {
+        session.phase == .recording && settings.islandStyle == .classic
+    }
+
+    private var showsCompactDot: Bool {
+        session.phase == .recording && settings.islandStyle == .compact
+    }
+
+    private var showsClock: Bool {
+        showsSideChrome
+    }
+
+    private var showsWaveform: Bool {
+        if session.phase == .recording {
+            return settings.islandStyle != .hidden
+        }
+        return session.isBusy
+    }
+
+    private var showsChip: Bool {
+        guard session.captureCount > 0 else { return false }
+        if session.phase == .recording {
+            return showsSideChrome
+        }
+        return session.isBusy
+    }
+
+    private var showsPercent: Bool {
+        if case .downloading(let fraction) = session.phase, fraction >= 0.01 {
+            return true
+        }
+        return false
+    }
+
+    private var barSpacing: CGFloat {
+        session.phase == .recording && settings.islandStyle == .classic ? 14 : 12
+    }
+
+    private var waveformWidth: CGFloat {
         switch settings.islandStyle {
         case .classic:
             return 210
         case .compact:
             return 156
         case .minimal, .hidden:
-            return 196
+            return session.phase == .recording ? 196 : 210
+        }
+    }
+
+    private var waveformHeight: CGFloat {
+        guard session.phase == .recording else { return 26 }
+        switch settings.islandStyle {
+        case .classic:
+            return 26
+        case .compact:
+            return 20
+        case .minimal:
+            return 22
+        case .hidden:
+            return 26
         }
     }
 
@@ -87,17 +154,6 @@ struct RecordingIslandView: View {
             recordDot
             Text("Recording")
                 .font(.system(size: 13, weight: .semibold))
-        }
-        .fixedSize()
-    }
-
-    private var trailingClock: some View {
-        HStack(spacing: 10) {
-            timer
-            if session.captureCount > 0 {
-                CaptureCountChip(count: session.captureCount)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
         }
         .fixedSize()
     }

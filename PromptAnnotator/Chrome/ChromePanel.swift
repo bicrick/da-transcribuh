@@ -47,8 +47,8 @@ final class ChromePanel: NSPanel {
         let glides = animated && isVisible && travel < 140
         if glides {
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.38
-                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                context.duration = 0.48
+                context.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 0.84, 0.28, 1)
                 animator().setFrame(frame, display: true)
             }
         } else {

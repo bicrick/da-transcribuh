@@ -101,6 +101,7 @@ final class ChromeHost {
         animated: Bool
     ) {
         guard let host, let panel else { return }
+        host.layoutSubtreeIfNeeded()
         var size = host.fittingSize
         if size.width < 40 || size.height < 20 {
             size = host.intrinsicContentSize
