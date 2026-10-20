@@ -65,15 +65,16 @@ struct InkColor: Codable, Equatable, Hashable {
 
 enum InkStyle {
     static let penWidth: CGFloat = 7
-    static let penHalo: CGFloat = 8
     static let highlighterWidth: CGFloat = 32
     static let highlighterAlpha: CGFloat = 0.35
     static let lineWidth: CGFloat = 6
-    static let lineHalo: CGFloat = 8
     static let fontSize: CGFloat = 22
     static let minimumDistance: CGFloat = 4
     static let arrowHeadLength: CGFloat = 18
     static let arrowHeadWidth: CGFloat = 14
+    /// Inset of the glyphs inside the live text field. Committed labels use the same origin.
+    static let textPadX: CGFloat = 8
+    static let textPadY: CGFloat = 4
 }
 
 struct AnnotationShape: Identifiable, Equatable {
@@ -117,7 +118,8 @@ struct TextEdit: Equatable {
     var color: InkColor
 
     func shape() -> AnnotationShape {
-        AnnotationShape(id: UUID(), tool: .text, color: color, points: [origin], text: text)
+        let glyph = CGPoint(x: origin.x + InkStyle.textPadX, y: origin.y + InkStyle.textPadY)
+        return AnnotationShape(id: UUID(), tool: .text, color: color, points: [glyph], text: text)
     }
 }
 

@@ -3,6 +3,9 @@ import CoreText
 
 /// Draws annotation shapes in a y-down point space (origin at the top-left).
 enum ShapeRenderer {
+    /// Head length as a fraction of the whole arrow. A short drag stays in front of its start.
+    private static let arrowHeadShare: CGFloat = 0.42
+
     static func draw(
         shapes: [AnnotationShape],
         draft: AnnotationShape?,
@@ -64,8 +67,9 @@ enum ShapeRenderer {
                 path: linePath(shape.points),
                 color: shape.color,
                 width: InkStyle.penWidth,
-                halo: InkStyle.penHalo,
                 alpha: 1,
+                cap: .round,
+                join: .round,
                 in: context
             )
         case .highlighter:
@@ -73,8 +77,9 @@ enum ShapeRenderer {
                 path: linePath(shape.points),
                 color: shape.color,
                 width: InkStyle.highlighterWidth,
-                halo: 0,
                 alpha: InkStyle.highlighterAlpha,
+                cap: .round,
+                join: .round,
                 in: context
             )
         case .arrow:
@@ -86,8 +91,9 @@ enum ShapeRenderer {
                 path: CGPath(rect: rect, transform: nil),
                 color: shape.color,
                 width: InkStyle.lineWidth,
-                halo: InkStyle.lineHalo,
                 alpha: 1,
+                cap: .butt,
+                join: .miter,
                 in: context
             )
         case .text:
@@ -98,28 +104,45 @@ enum ShapeRenderer {
 
     private static func drawArrow(_ shape: AnnotationShape, in context: CGContext) {
         guard let start = shape.points.first, let end = shape.points.last, start != end else { return }
-        let angle = atan2(end.y - start.y, end.x - start.x)
-        let headLength = InkStyle.arrowHeadLength
-        let headWidth = InkStyle.arrowHeadWidth
-        let shaftEnd = CGPoint(
-            x: end.x - cos(angle) * headLength * 0.72,
-            y: end.y - sin(angle) * headLength * 0.72
-        )
-        let shaft = CGMutablePath()
-        shaft.move(to: start)
-        shaft.addLine(to: shaftEnd)
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let length = hypot(dx, dy)
+        guard length >= 1 else { return }
 
-        let base = CGPoint(
-            x: end.x - cos(angle) * headLength,
-            y: end.y - sin(angle) * headLength
-        )
+        let angle = atan2(dy, dx)
+        let scale = min(1, length / (InkStyle.arrowHeadLength / arrowHeadShare))
+        let headLength = InkStyle.arrowHeadLength * scale
+        let headWidth = InkStyle.arrowHeadWidth * scale
+        let width = max(1.5, InkStyle.lineWidth * scale)
+        let ux = cos(angle)
+        let uy = sin(angle)
+
+        let overlap = min(width * 0.55, headLength * 0.35)
+        let shaftLength = max(0, length - headLength + overlap)
+        if shaftLength > 0.5 {
+            let shaftEnd = CGPoint(x: start.x + ux * shaftLength, y: start.y + uy * shaftLength)
+            let shaft = CGMutablePath()
+            shaft.move(to: start)
+            shaft.addLine(to: shaftEnd)
+            stroke(
+                path: shaft,
+                color: shape.color,
+                width: width,
+                alpha: 1,
+                cap: .round,
+                join: .round,
+                in: context
+            )
+        }
+
+        let base = CGPoint(x: end.x - ux * headLength, y: end.y - uy * headLength)
         let left = CGPoint(
-            x: base.x + (-sin(angle)) * headWidth / 2,
-            y: base.y + cos(angle) * headWidth / 2
+            x: base.x + (-uy) * headWidth / 2,
+            y: base.y + ux * headWidth / 2
         )
         let right = CGPoint(
-            x: base.x - (-sin(angle)) * headWidth / 2,
-            y: base.y - cos(angle) * headWidth / 2
+            x: base.x - (-uy) * headWidth / 2,
+            y: base.y - ux * headWidth / 2
         )
         let head = CGMutablePath()
         head.move(to: end)
@@ -127,23 +150,8 @@ enum ShapeRenderer {
         head.addLine(to: right)
         head.closeSubpath()
 
-        stroke(
-            path: shaft,
-            color: shape.color,
-            width: InkStyle.lineWidth,
-            halo: InkStyle.lineHalo,
-            alpha: 1,
-            in: context
-        )
         context.saveGState()
-        context.setFillColor(haloColor(for: shape.color).cgColor)
-        context.addPath(head)
-        context.fillPath()
         context.setFillColor(shape.color.nsColor.cgColor)
-        // Inset the colored head slightly so the halo reads as an edge.
-        context.translateBy(x: end.x, y: end.y)
-        context.scaleBy(x: 0.82, y: 0.82)
-        context.translateBy(x: -end.x, y: -end.y)
         context.addPath(head)
         context.fillPath()
         context.restoreGState()
@@ -153,20 +161,16 @@ enum ShapeRenderer {
         path: CGPath?,
         color: InkColor,
         width: CGFloat,
-        halo: CGFloat,
         alpha: CGFloat,
+        cap: CGLineCap,
+        join: CGLineJoin,
         in context: CGContext
     ) {
         guard let path else { return }
         context.saveGState()
-        context.setLineCap(.round)
-        context.setLineJoin(.round)
-        if halo > 0 {
-            context.setStrokeColor(haloColor(for: color).cgColor)
-            context.setLineWidth(width + halo)
-            context.addPath(path)
-            context.strokePath()
-        }
+        context.setLineCap(cap)
+        context.setLineJoin(join)
+        context.setMiterLimit(2)
         context.setStrokeColor(color.nsColor.withAlphaComponent(alpha).cgColor)
         context.setLineWidth(width)
         context.addPath(path)
@@ -197,28 +201,12 @@ enum ShapeRenderer {
         )
     }
 
-    private static func haloColor(for color: InkColor) -> NSColor {
-        if color.isNearWhite {
-            return NSColor.black.withAlphaComponent(0.55)
-        }
-        return NSColor.white.withAlphaComponent(0.92)
-    }
-
     private static func labelFont() -> NSFont {
         NSFont.systemFont(ofSize: InkStyle.fontSize, weight: .semibold)
     }
 
     private static func drawLabel(_ text: String, at origin: CGPoint, color: InkColor, in context: CGContext) {
         let font = labelFont()
-        let halo = NSAttributedString(
-            string: text,
-            attributes: [
-                .font: font,
-                .foregroundColor: haloColor(for: color),
-                .strokeColor: haloColor(for: color),
-                .strokeWidth: 8,
-            ]
-        )
         let fill = NSAttributedString(
             string: text,
             attributes: [
@@ -227,9 +215,9 @@ enum ShapeRenderer {
             ]
         )
         context.saveGState()
+        context.setShouldSmoothFonts(false)
         context.translateBy(x: origin.x, y: origin.y + font.ascender)
         context.scaleBy(x: 1, y: -1)
-        CTLineDraw(CTLineCreateWithAttributedString(halo), context)
         CTLineDraw(CTLineCreateWithAttributedString(fill), context)
         context.restoreGState()
     }
@@ -250,12 +238,16 @@ enum ShapeRenderer {
         context.fillPath()
         context.restoreGState()
 
+        let glyph = CGPoint(
+            x: edit.origin.x + InkStyle.textPadX,
+            y: edit.origin.y + InkStyle.textPadY
+        )
         if !edit.text.isEmpty {
-            drawLabel(edit.text, at: CGPoint(x: edit.origin.x + 8, y: edit.origin.y + 4), color: edit.color, in: context)
+            drawLabel(edit.text, at: glyph, color: edit.color, in: context)
         }
         if caretOn {
             let caret = CGRect(
-                x: edit.origin.x + 8 + textWidth + 1,
+                x: glyph.x + textWidth + 1,
                 y: edit.origin.y + 6,
                 width: 1.5,
                 height: 20
