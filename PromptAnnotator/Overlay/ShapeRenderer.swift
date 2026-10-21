@@ -202,7 +202,7 @@ enum ShapeRenderer {
     }
 
     private static func labelFont() -> NSFont {
-        NSFont.systemFont(ofSize: InkStyle.fontSize, weight: .semibold)
+        FontMetrics.font(size: InkStyle.fontSize, weight: .semibold)
     }
 
     private static func drawLabel(_ text: String, at origin: CGPoint, color: InkColor, in context: CGContext) {

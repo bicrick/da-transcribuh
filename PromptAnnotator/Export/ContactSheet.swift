@@ -146,7 +146,7 @@ enum ContactSheet {
         let number = NSAttributedString(
             string: "\(index)",
             attributes: [
-                .font: NSFont.systemFont(ofSize: 16, weight: .bold),
+                .font: FontMetrics.font(size: 16, weight: .bold),
                 .foregroundColor: NSColor.white,
             ]
         )
@@ -159,7 +159,7 @@ enum ContactSheet {
         let time = NSAttributedString(
             string: TimeFormat.clock(offset),
             attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 20, weight: .semibold),
+                .font: FontMetrics.font(size: 20, weight: .semibold, mono: true),
                 .foregroundColor: NSColor.black,
             ]
         )
