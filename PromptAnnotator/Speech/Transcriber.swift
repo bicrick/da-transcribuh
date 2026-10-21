@@ -75,7 +75,7 @@ actor WhisperKitTranscriber: Transcribing {
         defer { decodeInFlight = false }
 
         do {
-            let words = try await decode(
+            let decoded = try await decode(
                 samples: samples,
                 bufferStart: bufferStart,
                 pipe: pipe,
@@ -83,8 +83,12 @@ actor WhisperKitTranscriber: Transcribing {
                 workers: 2,
                 capWindow: true
             )
-            let duration = bufferStart + Double(samples.count) / Double(WhisperKit.sampleRate)
-            let stable = words.filter { $0.end <= duration - LiveWordBuffer.holdback }
+            // Holdback is relative to the decode window end — not the full buffer tail.
+            // After the live ~45 s head-cap, using buffer duration would mark the whole
+            // window stable (including the trailing second meant for revision).
+            let stable = decoded.words.filter {
+                $0.end <= decoded.windowEnd - LiveWordBuffer.holdback
+            }
             let merged = LiveWordBuffer.appending(shot.confirmed, stable, confirmedEnd: shot.confirmedEnd)
             _ = live.save(
                 generation: shot.generation,
@@ -146,7 +150,7 @@ actor WhisperKitTranscriber: Transcribing {
                     clipStart: shot.confirmedEnd,
                     workers: 4,
                     capWindow: false
-                )
+                ).words
             } catch {
                 log.error("Tail transcription failed: \(error.localizedDescription, privacy: .public)")
                 // Fall back to full-file decode so the live holdback second isn't dropped.
@@ -367,7 +371,7 @@ actor WhisperKitTranscriber: Transcribing {
         clipStart: TimeInterval,
         workers: Int,
         capWindow: Bool
-    ) async throws -> [TimedWord] {
+    ) async throws -> (words: [TimedWord], windowEnd: TimeInterval) {
         let window = LiveSampleWindow.slice(
             samples: samples,
             bufferStart: bufferStart,
@@ -375,7 +379,9 @@ actor WhisperKitTranscriber: Transcribing {
             sampleRate: WhisperKit.sampleRate,
             maxSeconds: capWindow ? LiveSampleWindow.maxSeconds : nil
         )
-        guard !window.samples.isEmpty else { return [] }
+        let windowEnd = window.timeOffset
+            + Double(window.samples.count) / Double(WhisperKit.sampleRate)
+        guard !window.samples.isEmpty else { return ([], windowEnd) }
 
         // Live tails stay unclipped (`windowClipTime: 0`) so a sub-second remainder still decodes.
         var options = Self.decodingOptions(chunking: nil, windowClipTime: 0, workers: workers)
@@ -387,10 +393,11 @@ actor WhisperKitTranscriber: Transcribing {
         }
         let results = try await pipe.transcribe(audioArray: window.samples, decodeOptions: options)
         let words = Self.words(from: results)
-        guard window.timeOffset > 0.000_5 else { return words }
-        return words.map {
+        guard window.timeOffset > 0.000_5 else { return (words, windowEnd) }
+        let shifted = words.map {
             TimedWord(text: $0.text, start: $0.start + window.timeOffset, end: $0.end + window.timeOffset)
         }
+        return (shifted, windowEnd)
     }
 
     /// Shared decode settings. `suppressBlank` cuts silent-window hallucinations;

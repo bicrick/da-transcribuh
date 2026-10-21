@@ -108,4 +108,29 @@ final class LiveWordBufferTests: XCTestCase {
         XCTAssertEqual(update.words.map(\.text), ["keep"])
         XCTAssertEqual(LiveWordBuffer.holdback, 1)
     }
+
+    /// Live head-cap must measure holdback from the window end, not the full buffer tail.
+    func testHoldbackUsesCappedWindowEndNotFullBuffer() {
+        let rate = 16_000
+        let samples = Array(repeating: Float(0.1), count: rate * 90)
+        let window = LiveSampleWindow.slice(
+            samples: samples,
+            bufferStart: 0,
+            clipStart: 0,
+            sampleRate: rate
+        )
+        let windowEnd = window.timeOffset + Double(window.samples.count) / Double(rate)
+        XCTAssertEqual(windowEnd, LiveSampleWindow.maxSeconds, accuracy: 0.001)
+
+        let incoming = [
+            TimedWord(text: "early", start: 40.0, end: 40.5),
+            TimedWord(text: "edge", start: 44.2, end: 44.8),
+        ]
+        let bufferEnd = 90.0
+        let wronglyUsingBuffer = incoming.filter { $0.end <= bufferEnd - LiveWordBuffer.holdback }
+        XCTAssertEqual(wronglyUsingBuffer.map(\.text), ["early", "edge"])
+
+        let stable = incoming.filter { $0.end <= windowEnd - LiveWordBuffer.holdback }
+        XCTAssertEqual(stable.map(\.text), ["early"])
+    }
 }

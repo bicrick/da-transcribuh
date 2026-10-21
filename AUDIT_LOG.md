@@ -6,7 +6,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–9)
+## Final summary (Runs 1–10)
 
 ### What changed overall (kept)
 
@@ -17,17 +17,15 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 | UX | Busy menu icon; plain-language `UserFacingError`; shortcut copy; island a11y |
 | Onboarding | Permissions recovery; model progress; 5 s practice (skips paste) |
 | Performance | Whisper `prewarm` (+450 ms defer); live window cap; PCM soft-cap + file merge; integer absolute sample counts; Copy Last Again |
-| Live window (Run 9) | Cap truncates the **end** (advances from `confirmedEnd`), not a jump to the tail |
+| Live window (Run 9–10) | Cap truncates the **end** (from `confirmedEnd`); holdback uses **window end**, not full buffer duration |
 
-### Reverted this round (Run 9)
+### Reverted (Run 9, still gone)
 
-- **Quiet-room calibration** — removed `QuietRoomCalibration`, Configuration row, `speechGateThreshold`, mutable `SpeechGate` threshold. Gate is fixed **0.28** again (matches `main`). Too easy to break soft-speech / silence demos without a Mac build.
+- **Quiet-room calibration** — fixed SpeechGate **0.28** (matches `main`). No dangling Swift/pbxproj refs.
 
-### Fixed this round (Run 9)
+### Fixed this round (Run 10)
 
-1. **Menu/Home Start + Push-to-Talk auto-stopped** — `!PushToTalk.shared.isArmed` treated menu Start like a released chord. Now only the release latch stops; menu/practice clear any stale latch before `begin()`.
-2. **Live 45 s window jumped to the buffer tail** when nothing was confirmed yet → permanent hole in mid-take words. Cap now keeps the head of the unconfirmed remainder.
-3. **Speech-follow “off MainActor”** — was still MainActor-bound; restored explicit `@MainActor` Task (cancel/throwing sleep kept).
+1. **Live holdback vs head-cap** — after Run 9’s head-cap, `consume` still measured holdback against the full buffer end, so on takes >~45 s the entire live window (including the trailing revision second) could lock as confirmed. Holdback now uses the decode **window end**.
 
 ### Still risky (no Mac build)
 
@@ -35,6 +33,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - Prewarm CPU after cold launch; uncapped final decode CPU on very long takes; PCM trim >10 min + AAC merge.
 - Soft speech vs `noSpeechThreshold: 0.6` + NonSpeechFilter.
 - MenuBarExtra SF Symbol swaps mid-session.
+- Unused `PushToTalk.isArmed` left from Run 9 (harmless; latch-only stop path).
 
 ---
 
@@ -44,7 +43,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ### P0 — must pass before recording
 
-- [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`).
+- [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`, `SpeechModelTests` holdback).
 - [ ] **Hotkey toggle** (PTT off): start → speak → stop → transcript on clipboard / paste.
 - [ ] **Menu Start / Home Start with Push-to-Talk ON** — session must **stay recording** until Stop (must not auto-stop instantly).
 - [ ] **PTT hold**: press chord → speak → release → stops; brief press during mic prompt also stops (not stuck recording).
@@ -62,9 +61,49 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ### P2 — long take / edge
 
-- [ ] Live ~2–3 min continuous speech → stop → full words (not only last ~45 s). Optional: >10 min under PCM retain cap → file merge OK.
+- [ ] Live ~2–3 min continuous speech → stop → full words (not only last ~45 s); live island should keep advancing (holdback not freezing mid-take).
+- [ ] Optional: >10 min under PCM retain cap → file merge OK.
 - [ ] Display plug/unplug while marking; double Paste Image and Text once only.
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
+
+---
+
+## Run 10 — Consistency / regression review (no new features)
+
+### Scope
+
+Re-audit Run 9 (`e0a14af`) and branch vs `main` (~+2400 lines, never Xcode-built). Look for dangling calibration symbols, latch/live-window/speech-follow regressions, and anything that broke main behavior. Prefer minimal compile-safe fixes.
+
+### Run 9 re-check
+
+| Item | Verdict |
+| --- | --- |
+| Quiet-room deletion | **CLEAN** — no Swift/pbxproj refs; `SpeechGate` matches `main`; Configuration/AppSettings/tests restored |
+| PTT latch-only stop | **OK** — menu/Home/practice clear stale latch; `releasePushToTalk` only from armed monitors |
+| Live head-cap | **KEPT** — hole fix correct; **holdback pairing was wrong** (fixed below) |
+| Speech-follow `@MainActor` Task | **OK** — matches controller isolation; cancel + throwing sleep retained |
+| `skipNextPaste` clear paths (Run 8) | **OK** — still cleared on abandon / begin failures / missing folder / write failure |
+
+### Fixed this round
+
+1. **Live holdback used full buffer duration after head-cap** (`WhisperKitTranscriber.consume`)  
+   Run 9 capped the decode window from `confirmedEnd` forward, but stability still filtered with `bufferStart + samples/rate`. When the buffer was longer than ~45 s, every word in the window looked “stable,” including the trailing holdback second — locking tentative edge words before the next pass could revise them. `decode` now returns `windowEnd`; holdback is `windowEnd - 1 s`. Added `testHoldbackUsesCappedWindowEndNotFullBuffer`.
+
+### Confirmed still OK vs main (static)
+
+- Hotkey toggle / PTT arm-release / menu Start stop titles / paste-on-stop + Copy Last Again wiring / onboarding practice skip-paste / settings persistence keys (minus removed speech-gate key) / volume restore / capture cancel / Accessibility prompt / overlay rebuild.
+- No new features. No `promo-video` touches.
+
+### Suspected but not verified on a Mac
+
+- Full `xcodebuild` Debug + unit tests.
+- Live follow still advances `lastSpeechCount` before `consume` returns (pre-existing); nil pipe skips until next +1 s — final path covers stop.
+- Long-take CPU (uncapped final), prewarm, soft speech vs NonSpeechFilter.
+
+### What’s next
+
+- Hardware-confirm P0 on a real Mac before the launch video.
+- Do not touch `promo-video`. No new features on this branch.
 
 ---
 
