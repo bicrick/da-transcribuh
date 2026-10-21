@@ -2,6 +2,111 @@
 
 Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes kept compile-safe and small.
 
+## Run 2 — stability & correctness
+
+### Re-audit of Run 1 diff
+
+| Change | Verdict |
+| --- | --- |
+| Cancel vs in-flight capture | Sound; kept. Extended with `captureTail.cancel` + `Task.isCancelled` after await. |
+| Mic volume restore | Bug in restore path: `previousVolume = raise…` cleared the saved prior when raise returned `nil` (already ≥ 0.85). Fixed. |
+| Accessibility prompt | Compiles; standard `AXIsProcessTrustedWithOptions`. |
+| Overlay screen rebuild | Compiles; `queue: .main` + `assumeIsolated` OK. Now also re-syncs session marks via `onScreensChanged`. |
+| NonSpeechFilter + decoder options | Compiles against WhisperKit 1.1.1. Tuned: final decode uses `windowClipTime: 1.0`; live stays `0`; `noSpeechThreshold` back to `0.6` (less quiet-speech clipping). |
+| Dead hotkey `return` | Fine. |
+
+### Fixed this round
+
+1. **Tap buffer use-after-return** (`AudioRecorder`)  
+   AVAudioEngine tap buffers are only valid inside the callback. We now `memcpy` into an owned `AVAudioPCMBuffer` before `captureQueue.async`.
+
+2. **Live speech task could resurrect after cancel** (`SessionController.startSpeechFollow`)  
+   Prior task used `try?` sleep (swallows cancel) and was never cancelled before a new follow started. Now cancel the previous task, loop on `!Task.isCancelled`, and use throwing sleep.
+
+3. **Push-to-talk release during `begin()` was dropped**  
+   Key-up while awaiting mic permission left the session stuck recording. Latch `pushToTalkReleasedWhileStarting`; auto-`finish()` once recording starts if already released. Disarm on begin failure / finish / cancel / abandon.
+
+4. **Mic volume restore wiped when raise skipped** (`AudioInputs`)  
+   Only assign `previousVolume` when `raiseInputVolume` returns a prior value.
+
+5. **PTT monitors leaked for process life** (`PushToTalk.disarm`)  
+   `disarm()` now removes global/local keyUp monitors.
+
+6. **Cancel / quit left capture + meters running**  
+   `cancel` and `abandonIfRecording` cancel `captureTail`, nil `speechTask`, and `abandon` uses `stopTimer()` (levels + clock).
+
+7. **Live decode error retry storm** (`Transcriber.consume`)  
+   On failure, advance `lastCount` so the same failing window is not re-decoded every second.
+
+8. **Tail decode failure dropped holdback second** (`Transcriber.transcribe`)  
+   Fall back to full-file VAD decode before giving up on confirmed-only words.
+
+9. **Final decode used live `windowClipTime: 0`**  
+   Final/file path now uses `1.0`; live decode keeps `0`. `noSpeechThreshold` restored to `0.6` with `suppressBlank` + filter still on.
+
+10. **Overlay rebuild after display change lost marks on new IDs**  
+    `onScreensChanged` → `syncOverlay()`.
+
+11. **Overlapping `pasteBoth`** (`PasteFollowUp`)  
+    Early-return when already delivering.
+
+12. **Launch cue: empty transcript after stop** (ranked #1)  
+    Menu shows `No speech detected` when paste text is empty and there was no transcription error (quiet-room demos no longer look “broken”).
+
+13. **Meter path wrote `currentLevel` outside the lock** (`AudioRecorder.sampleLevels`).
+
+### Suspected but not verified on a Mac
+
+- Unbounded `speechSamples` + full-array live redecode on very long sessions (mitigated if max-session minutes is set).
+- Quartz↔AppKit mapping for unusual multi-monitor arrangements.
+- Dual mic path (`AVAudioRecorder` + engine tap) on some devices — tap may be silent; meters fall back.
+- Quit mid-`.finishing` can still leave a partial session folder (abandon stops IO; in-flight write may not complete).
+- Soft speech vs `noSpeechThreshold: 0.6` — confirm quiet speakers still land on clipboard.
+
+### Test this tomorrow on a Mac
+
+**Carry over from Run 1**
+
+- [ ] Fresh permissions: deny all → Turn On → app appears on Accessibility + Screen Recording lists; grant → session starts.
+- [ ] Start session with “raise input volume” on → stop → confirm system mic level restored (also when volume was already ≥ 85%).
+- [ ] Drag-capture, then immediately cancel → no resurrected session folder under `~/Documents/PromptAnnotator/Sessions/`.
+- [ ] Plug/unplug a display while recording with marks → marks still draw on the active screen.
+- [ ] **Silence P0:** record 10–20s of nobody speaking (fan/keyboard ok) → transcript and clipboard text empty (no `[BLANK_AUDIO]` / `(silence)` / `[Music]`); menu shows **No speech detected**.
+- [ ] Speak normally including the word “silence” and a real aside like “I said (yesterday)” → those stay.
+- [ ] Speech-only session (no tiles) → transcript on clipboard, no sheet.
+- [ ] Multi-tile session → numbered paste text matches sheet badges.
+- [ ] Very short tap start/stop and a long session near max minutes.
+
+**New for Run 2**
+
+- [ ] **PTT:** enable push-to-talk; press chord briefly (release during any mic prompt or immediately) → session must stop, not stay recording.
+- [ ] Cancel mid-drag-capture → next session’s first capture still works (no stuck capture queue).
+- [ ] Quit while recording → system mic volume restored; no orphaned PTT monitors (press/release chord after relaunch once).
+- [ ] Soft / quiet speech still transcribes after silence filter (speak softly for ~5s).
+- [ ] Double-trigger “Paste Image and Text” quickly → only one paste sequence.
+- [ ] Live transcription: speak continuously ~30s, stop → last words present (holdback / tail fallback).
+
+### Proposed polish / features (ranked)
+
+1. ~~Launch-ready silence confidence~~ — **done** (menu cue).
+2. **First-run “try a 5-second session”** inside onboarding with a canned success path. *(onboarding / UX — later)*
+3. **Faster first transcript** — stronger model prewarm after onboarding download; show pill progress more clearly. *(performance — later)*
+4. **Cap / slice live `speechSamples`** — avoid unbounded memory and full-buffer redecode on long sessions. *(performance / stability — later)*
+5. **One-click “Copy again”** in the menu when clipboard was overwritten. *(launch-worthy — later)*
+6. **Quiet-room calibration** — one-time noise floor sample to tune `SpeechGate` / silence stop. *(stability — later)*
+7. **Session history scrubber** — replay tiles + transcript side by side. *(feature — later)*
+8. **Export share sheet** — save sheet PNG + markdown in one drag. *(feature — later)*
+9. **Per-display chrome placement lock** — keep the island on the recording display. *(UX polish — later)*
+
+### What’s next (later runs)
+
+- Hardware-confirm silence P0 + soft speech with `noSpeechThreshold: 0.6`.
+- Onboarding / first-run try-session (ranked #2) once stability checklist is green.
+- Live sample capping if long-session memory shows up in Instruments.
+- Do not touch `promo-video`.
+
+---
+
 ## Run 1 — audit + solidify before launch
 
 ### Checked
@@ -40,42 +145,6 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 7. **Whisper non-speech captions on silence (owner P0)**  
    Quiet rooms were producing `[BLANK_AUDIO]`, `(silence)`, `[Music]`, `(typing)`, `[keyboard clacking]`, etc. on the clipboard.  
-   - **Decoder:** `suppressBlank: true`, `noSpeechThreshold: 0.5`, explicit compression/log-prob thresholds, shared `decodingOptions` for live + final.  
+   - **Decoder:** `suppressBlank: true`, shared `decodingOptions` for live + final.  
    - **Post-filter:** `NonSpeechFilter` strips bracketed/parenthesized sound labels and `BLANK_AUDIO`-style tags; keeps real spoken parentheticals like `(yesterday)`; does **not** drop the spoken word “silence”. Applied in `Transcriber.words(from:)` and again in `Aligner.spokenText`.  
    - **Tests:** `NonSpeechFilterTests` (pure logic, no WhisperKit).
-
-### Suspected but not verified on a Mac
-
-- Unbounded `speechSamples` + retained `CGImage`s per tile on very long sessions (mitigated if max-session minutes is set).
-- Push-to-talk global monitors stay installed for app lifetime (harmless but never torn down except quit).
-- Quit during `.finishing`/transcription leaves a partial session folder on disk.
-- Quartz↔AppKit mapping for unusual multi-monitor arrangements (standard primary-height formula; needs real hardware).
-- Whether `noSpeechThreshold: 0.5` is aggressive enough on every mic without clipping quiet speech — needs a quiet-room + soft-speech pass tomorrow.
-
-### Test this tomorrow on a Mac
-
-- [ ] Fresh permissions: deny all → Turn On → app appears on Accessibility + Screen Recording lists; grant → session starts.
-- [ ] Start session with “raise input volume” on → stop → confirm system mic level restored.
-- [ ] Drag-capture, then immediately cancel → no resurrected session folder under `~/Documents/PromptAnnotator/Sessions/`.
-- [ ] Plug/unplug a display while recording → marks still draw on the active screen.
-- [ ] **Silence P0:** record 10–20s of nobody speaking (fan/keyboard ok) → transcript and clipboard must be empty (no `[BLANK_AUDIO]` / `(silence)` / `[Music]`).
-- [ ] Speak normally including the word “silence” and a real aside like “I said (yesterday)” → those stay.
-- [ ] Speech-only session (no tiles) → transcript on clipboard, no sheet.
-- [ ] Multi-tile session → numbered paste text matches sheet badges.
-- [ ] Very short tap start/stop and a long session near max minutes.
-
-### Proposed polish / features (ranked, do not build yet)
-
-1. **Launch-ready silence confidence** — optional UI cue when stop yields empty transcript (“No speech detected”) so demos don’t look broken.
-2. **First-run “try a 5-second session”** inside onboarding with a canned success path.
-3. **Faster first transcript** — stronger model prewarm after onboarding download; show pill progress more clearly.
-4. **One-click “Copy again”** in the menu when clipboard was overwritten.
-5. **Session history scrubber** — replay tiles + transcript side by side for the X demo follow-up.
-6. **Export share sheet** — save sheet PNG + markdown in one drag to Finder/Desktop.
-7. **Per-display chrome placement lock** — keep the island on the recording display instead of following the mouse every tick.
-8. **Quiet-room calibration** — one-time noise floor sample to tune `SpeechGate` / silence stop.
-
-### What’s next (later runs)
-
-- Re-check any CI/test feedback; tighten `NonSpeechFilter` label list from real Mac silence captures.
-- Pick the highest polish item from the list above once silence P0 is confirmed on hardware.
