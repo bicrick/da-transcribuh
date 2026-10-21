@@ -86,8 +86,12 @@ final class OverlayPanel: NSPanel {
 final class OverlayController {
     private var panels: [CGDirectDisplayID: OverlayPanel] = [:]
     private var canvases: [CGDirectDisplayID: AnnotationCanvasView] = [:]
+    private var screenObserver: NSObjectProtocol?
+    private var isShowing = false
 
     func show() {
+        isShowing = true
+        watchScreens()
         rebuild(keepingContent: true)
         for panel in panels.values {
             panel.orderFrontRegardless()
@@ -95,8 +99,26 @@ final class OverlayController {
     }
 
     func hide() {
+        isShowing = false
         for panel in panels.values {
             panel.orderOut(nil)
+        }
+    }
+
+    private func watchScreens() {
+        guard screenObserver == nil else { return }
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isShowing else { return }
+                self.rebuild(keepingContent: true)
+                for panel in self.panels.values {
+                    panel.orderFrontRegardless()
+                }
+            }
         }
     }
 
