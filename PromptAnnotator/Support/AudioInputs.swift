@@ -35,7 +35,10 @@ enum AudioInputs {
             }
         }
         if raiseVolume, let active = defaultInputID() {
-            previousVolume = raiseInputVolume(active, target: 0.85)
+            // Only store when we actually raised — a nil result must not clear a prior restore.
+            if let raised = raiseInputVolume(active, target: 0.85) {
+                previousVolume = raised
+            }
         }
     }
 

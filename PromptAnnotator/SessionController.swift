@@ -82,6 +82,8 @@ final class SessionController: ObservableObject {
     private var silenceWatch = SilenceWatch()
     private var stopQueued = false
     private var clockSpan: CGFloat = 0
+    /// Push-to-talk key-up arrived while `begin()` was still awaiting permissions / setup.
+    private var pushToTalkReleasedWhileStarting = false
 
     var isBusy: Bool {
         switch phase {
@@ -125,6 +127,9 @@ final class SessionController: ObservableObject {
         islandChrome.onFrame = { [weak self] in
             self?.placeIsland(animated: false)
         }
+        overlay.onScreensChanged = { [weak self] in
+            self?.syncOverlay()
+        }
         let settings = AppSettings.shared
         tool = settings.defaultTool
         color = settings.defaultColor
@@ -147,6 +152,7 @@ final class SessionController: ObservableObject {
                 PushToTalk.shared.disarm()
                 Task { await finish() }
             } else if !isBusy {
+                pushToTalkReleasedWhileStarting = false
                 PushToTalk.shared.arm(keyCode: UInt16(AppSettings.shared.chord.keyCode))
                 Task { await begin() }
             }
@@ -156,16 +162,24 @@ final class SessionController: ObservableObject {
     }
 
     func releasePushToTalk() {
-        guard AppSettings.shared.pushToTalk, phase == .recording else { return }
-        Task { await finish() }
+        guard AppSettings.shared.pushToTalk else { return }
+        if phase == .recording {
+            Task { await finish() }
+        } else if isStarting {
+            // Key-up beat mic permission / setup — stop as soon as recording starts.
+            pushToTalkReleasedWhileStarting = true
+        }
     }
 
     func cancel() {
         guard phase == .recording else { return }
         PushToTalk.shared.disarm()
+        pushToTalkReleasedWhileStarting = false
         keepTranscribing = false
         speechTask?.cancel()
         speechTask = nil
+        captureTail.cancel()
+        captureTail = Task {}
         monitor.stop()
         audio.stop()
         AudioInputs.endSession()
@@ -317,11 +331,16 @@ final class SessionController: ObservableObject {
     }
 
     private func startSpeechFollow() {
+        speechTask?.cancel()
         keepTranscribing = true
         speechTask = Task { @MainActor in
-            while self.keepTranscribing {
-                try? await Task.sleep(nanoseconds: 250_000_000)
-                guard self.keepTranscribing else { return }
+            while self.keepTranscribing, !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: 250_000_000)
+                } catch {
+                    return
+                }
+                guard self.keepTranscribing, !Task.isCancelled else { return }
                 let count = self.audio.sampleCount()
                 guard count >= self.lastSpeechCount + 16_000 else { continue }
                 let samples = self.audio.copySamples()
@@ -333,13 +352,17 @@ final class SessionController: ObservableObject {
 
     func abandonIfRecording() {
         guard phase == .recording || phase == .finishing else { return }
+        PushToTalk.shared.disarm()
+        pushToTalkReleasedWhileStarting = false
         keepTranscribing = false
         speechTask?.cancel()
+        speechTask = nil
+        captureTail.cancel()
+        captureTail = Task {}
         monitor.stop()
         audio.stop()
         AudioInputs.endSession()
-        timer?.invalidate()
-        timer = nil
+        stopTimer()
         stopProcessingMotion()
     }
 
@@ -569,10 +592,14 @@ final class SessionController: ObservableObject {
             access.microphone = await Permissions.requestMicrophone()
         }
         guard access.isReady else {
+            PushToTalk.shared.disarm()
+            pushToTalkReleasedWhileStarting = false
             offerPermissions(access)
             return
         }
         guard monitor.install() else {
+            PushToTalk.shared.disarm()
+            pushToTalkReleasedWhileStarting = false
             if !AXIsProcessTrusted() {
                 offerPermissions(Permissions.Status(accessibility: false, microphone: true, screen: true))
             } else {
@@ -618,7 +645,18 @@ final class SessionController: ObservableObject {
             prepareModel()
             AppSounds.sessionStarted()
             log.info("Session started at \(folder.path, privacy: .public)")
+
+            // Push-to-talk release during permission wait would otherwise leave the session running.
+            let stopForPushToTalk = preferences.pushToTalk
+                && (pushToTalkReleasedWhileStarting || !PushToTalk.shared.isArmed)
+            pushToTalkReleasedWhileStarting = false
+            if stopForPushToTalk {
+                PushToTalk.shared.disarm()
+                Task { await self.finish() }
+            }
         } catch {
+            PushToTalk.shared.disarm()
+            pushToTalkReleasedWhileStarting = false
             monitor.stop()
             audio.stop()
             AudioInputs.endSession()
@@ -634,6 +672,8 @@ final class SessionController: ObservableObject {
 
     private func finish() async {
         guard phase == .recording else { return }
+        PushToTalk.shared.disarm()
+        pushToTalkReleasedWhileStarting = false
         let heardSpeech = audio.heardSpeech()
         AppSounds.sessionStopped(heardSpeech: heardSpeech)
         setPhase(.finishing)
@@ -757,6 +797,11 @@ final class SessionController: ObservableObject {
             pasteText = saved.pasteText
             sheetURL = saved.sheetURL
             lastSessionURL = directory
+            // Empty clipboard text after silence looks like a broken stop — surface a calm cue.
+            if saved.pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               transcriptionError == nil {
+                lastError = "No speech detected"
+            }
             copyToClipboard()
             deliverIfRequested()
             NotificationCenter.default.post(name: .promptAnnotatorSessionsChanged, object: nil)
@@ -845,6 +890,7 @@ final class SessionController: ObservableObject {
         let significant = shapes.filter { $0.isSignificant() }
         if significant.isEmpty, !allowEmpty { return }
         guard let directory else { return }
+        guard !Task.isCancelled else { return }
 
         let screen: NSScreen?
         if let displayID {
@@ -868,7 +914,7 @@ final class SessionController: ObservableObject {
                 shapes: significant,
                 excludedWindowIDs: overlay.windowIDs() + chrome.windowIDs()
             )
-            guard self.directory == sessionDirectory else { return }
+            guard !Task.isCancelled, self.directory == sessionDirectory else { return }
             let image: CGImage
             if let crop {
                 guard let cropped = RegionCrop.crop(captured, selection: crop, pointSize: screen.frame.size) else {

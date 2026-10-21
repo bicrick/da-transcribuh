@@ -1,4 +1,5 @@
 import AVFoundation
+import Darwin
 import Foundation
 import os
 
@@ -85,9 +86,9 @@ final class AudioRecorder {
             let decibels = recorder.averagePower(forChannel: 0)
             let clamped = min(0, max(-50, decibels))
             let level = CGFloat((clamped + 50) / 50)
-            currentLevel = level
             meterTarget = FrequencyBands.shaped(level: level, count: WaveformSamples.count)
             sampleLock.lock()
+            currentLevel = level
             SpeechGate.note(level: level, voicedBuffers: &voicedBuffers, heard: &speechHeard)
             sampleLock.unlock()
         }
@@ -137,8 +138,10 @@ final class AudioRecorder {
         self.speechFormat = speechFormat
         input.installTap(onBus: 0, bufferSize: 1024, format: tapFormat) { [weak self] buffer, _ in
             guard let self, buffer.frameLength > 0 else { return }
+            // Tap buffers are only valid inside this callback — copy before leaving.
+            guard let owned = Self.copyPCMBuffer(buffer) else { return }
             self.captureQueue.async {
-                self.capture(buffer)
+                self.capture(owned)
             }
         }
         tapInstalled = true
@@ -217,6 +220,22 @@ final class AudioRecorder {
         }
         guard error == nil, status != .error, output.frameLength > 0 else { return nil }
         return output
+    }
+
+    /// Owns a PCM copy so async capture never reads the engine's recycled tap buffer.
+    private static func copyPCMBuffer(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        guard let copy = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: buffer.frameLength) else {
+            return nil
+        }
+        copy.frameLength = buffer.frameLength
+        let source = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
+        let destination = UnsafeMutableAudioBufferListPointer(copy.mutableAudioBufferList)
+        for (src, dst) in zip(source, destination) {
+            guard let srcData = src.mData, let dstData = dst.mData else { continue }
+            memcpy(dstData, srcData, Int(src.mDataByteSize))
+            dst.mDataByteSize = src.mDataByteSize
+        }
+        return copy
     }
 
     private static func floats(from buffer: AVAudioPCMBuffer) -> [Float] {

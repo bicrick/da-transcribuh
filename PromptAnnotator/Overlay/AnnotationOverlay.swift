@@ -88,6 +88,8 @@ final class OverlayController {
     private var canvases: [CGDirectDisplayID: AnnotationCanvasView] = [:]
     private var screenObserver: NSObjectProtocol?
     private var isShowing = false
+    /// Called after panels are rebuilt for a display change so the session can re-push marks.
+    var onScreensChanged: (() -> Void)?
 
     func show() {
         isShowing = true
@@ -118,6 +120,7 @@ final class OverlayController {
                 for panel in self.panels.values {
                     panel.orderFrontRegardless()
                 }
+                self.onScreensChanged?()
             }
         }
     }

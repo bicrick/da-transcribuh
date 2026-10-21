@@ -84,6 +84,13 @@ actor WhisperKitTranscriber: Transcribing {
             )
             didLogConsumeError = false
         } catch {
+            // Advance lastCount so a stuck decode doesn't retry the same window every second.
+            _ = live.save(
+                generation: shot.generation,
+                confirmed: shot.confirmed,
+                confirmedEnd: shot.confirmedEnd,
+                lastCount: samples.count
+            )
             if !didLogConsumeError {
                 didLogConsumeError = true
                 log.error("Live transcription failed: \(error.localizedDescription, privacy: .public)")
@@ -97,6 +104,7 @@ actor WhisperKitTranscriber: Transcribing {
         onProgress: @escaping @Sendable (SpeechProgress) -> Void
     ) async throws -> Transcript {
         while decodeInFlight {
+            try Task.checkCancellation()
             try await Task.sleep(nanoseconds: 20_000_000)
         }
 
@@ -122,17 +130,30 @@ actor WhisperKitTranscriber: Transcribing {
             do {
                 tail = try await decode(samples: samples, pipe: active, clipStart: shot.confirmedEnd)
             } catch {
-                live.reset()
-                if shot.confirmed.isEmpty { throw error }
                 log.error("Tail transcription failed: \(error.localizedDescription, privacy: .public)")
-                return Transcript(words: shot.confirmed, model: resolved.variant)
+                // Fall back to full-file decode so the live holdback second isn't dropped.
+                do {
+                    let results = try await active.transcribe(
+                        audioPath: audioURL.path,
+                        decodeOptions: Self.decodingOptions(chunking: .vad, windowClipTime: 1.0)
+                    )
+                    live.reset()
+                    return Transcript(words: Self.words(from: results), model: resolved.variant)
+                } catch {
+                    live.reset()
+                    if shot.confirmed.isEmpty { throw error }
+                    return Transcript(words: shot.confirmed, model: resolved.variant)
+                }
             }
             let merged = LiveWordBuffer.appending(shot.confirmed, tail, confirmedEnd: shot.confirmedEnd)
             live.reset()
             return Transcript(words: merged.words, model: resolved.variant)
         }
 
-        let results = try await active.transcribe(audioPath: audioURL.path, decodeOptions: Self.decodingOptions(chunking: .vad))
+        let results = try await active.transcribe(
+            audioPath: audioURL.path,
+            decodeOptions: Self.decodingOptions(chunking: .vad, windowClipTime: 1.0)
+        )
         live.reset()
         return Transcript(words: Self.words(from: results), model: resolved.variant)
     }
@@ -302,7 +323,8 @@ actor WhisperKitTranscriber: Transcribing {
     }
 
     private func decode(samples: [Float], pipe: WhisperKit, clipStart: TimeInterval) async throws -> [TimedWord] {
-        var options = Self.decodingOptions(chunking: nil)
+        // Live tails stay unclipped (`windowClipTime: 0`) so a sub-second remainder still decodes.
+        var options = Self.decodingOptions(chunking: nil, windowClipTime: 0)
         if clipStart > 0.05 {
             options.clipTimestamps = [Float(clipStart)]
         } else if samples.count > WhisperKit.sampleRate * 30 {
@@ -312,9 +334,10 @@ actor WhisperKitTranscriber: Transcribing {
         return Self.words(from: results)
     }
 
-    /// Shared decode settings. `suppressBlank` and a slightly stricter no-speech gate
-    /// cut silent-window hallucinations; `NonSpeechFilter` still scrubs any that slip through.
-    private static func decodingOptions(chunking: ChunkingStrategy?) -> DecodingOptions {
+    /// Shared decode settings. `suppressBlank` cuts silent-window hallucinations;
+    /// `NonSpeechFilter` still scrubs any that slip through. Final/VAD uses WhisperKit's
+    /// default `windowClipTime` (1.0); live decode passes 0 so short tails aren't padded away.
+    private static func decodingOptions(chunking: ChunkingStrategy?, windowClipTime: Float) -> DecodingOptions {
         DecodingOptions(
             language: "en",
             temperatureFallbackCount: 1,
@@ -322,11 +345,11 @@ actor WhisperKitTranscriber: Transcribing {
             detectLanguage: false,
             skipSpecialTokens: true,
             wordTimestamps: true,
-            windowClipTime: 0,
+            windowClipTime: windowClipTime,
             suppressBlank: true,
             compressionRatioThreshold: 2.4,
             logProbThreshold: -1.0,
-            noSpeechThreshold: 0.5,
+            noSpeechThreshold: 0.6,
             concurrentWorkerCount: 4,
             chunkingStrategy: chunking
         )

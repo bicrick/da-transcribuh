@@ -74,6 +74,7 @@ final class PasteFollowUp {
     func pasteBoth() {
         let image = png
         let words = transcript
+        guard !delivering else { return }
         guard image != nil || !words.isEmpty else { return }
         followUp?.cancel()
         followUp = nil

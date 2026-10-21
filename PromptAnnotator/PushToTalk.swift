@@ -10,6 +10,8 @@ final class PushToTalk {
     private var armed = false
     private var keyCode: UInt16 = 0
 
+    var isArmed: Bool { armed }
+
     func arm(keyCode: UInt16) {
         self.keyCode = keyCode
         armed = true
@@ -18,11 +20,20 @@ final class PushToTalk {
 
     func disarm() {
         armed = false
+        if let globalMonitor {
+            NSEvent.removeMonitor(globalMonitor)
+            self.globalMonitor = nil
+        }
+        if let localMonitor {
+            NSEvent.removeMonitor(localMonitor)
+            self.localMonitor = nil
+        }
     }
 
     private func install() {
         guard globalMonitor == nil else { return }
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            // Global monitors are delivered on the main thread.
             MainActor.assumeIsolated {
                 self?.released(event)
             }
