@@ -71,6 +71,21 @@ final class PasteFollowUp {
         armedChangeCount = (png != nil && !transcript.isEmpty) ? changeCount : nil
     }
 
+    /// Restores the last staged image / transcript after another app overwrote the pasteboard.
+    @discardableResult
+    func restoreClipboard() -> Bool {
+        guard canReplay else { return false }
+        if let png {
+            guard SessionClipboard.writeImage(png: png, tiff: tiff, to: .general) else { return false }
+            let changeCount = NSPasteboard.general.changeCount
+            arm(png: png, tiff: tiff, transcript: transcript, changeCount: changeCount)
+            return true
+        }
+        guard SessionClipboard.writeTranscript(transcript, to: .general) else { return false }
+        arm(png: nil, tiff: nil, transcript: transcript, changeCount: NSPasteboard.general.changeCount)
+        return true
+    }
+
     func pasteBoth() {
         let image = png
         let words = transcript

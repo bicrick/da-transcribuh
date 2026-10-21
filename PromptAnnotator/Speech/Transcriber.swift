@@ -17,7 +17,8 @@ struct Transcript: Sendable, Equatable {
 protocol Transcribing: Sendable {
     func resetLive()
     func prepare() async
-    func consume(samples: [Float]) async
+    /// Live decode of PCM whose index 0 is `bufferStart` seconds into the session.
+    func consume(samples: [Float], bufferStart: TimeInterval) async
     func transcribe(
         audioURL: URL,
         samples: [Float],
@@ -64,23 +65,30 @@ actor WhisperKitTranscriber: Transcribing {
         }
     }
 
-    func consume(samples: [Float]) async {
+    func consume(samples: [Float], bufferStart: TimeInterval) async {
         let shot = live.snapshot()
-        guard samples.count >= WhisperKit.sampleRate, samples.count - shot.lastCount >= WhisperKit.sampleRate else { return }
+        let absoluteCount = Int((bufferStart * Double(WhisperKit.sampleRate)).rounded(.down)) + samples.count
+        guard samples.count >= WhisperKit.sampleRate, absoluteCount - shot.lastCount >= WhisperKit.sampleRate else { return }
         guard !decodeInFlight, let pipe else { return }
         decodeInFlight = true
         defer { decodeInFlight = false }
 
         do {
-            let words = try await decode(samples: samples, pipe: pipe, clipStart: shot.confirmedEnd)
-            let duration = Double(samples.count) / Double(WhisperKit.sampleRate)
+            let words = try await decode(
+                samples: samples,
+                bufferStart: bufferStart,
+                pipe: pipe,
+                clipStart: shot.confirmedEnd,
+                workers: 2
+            )
+            let duration = bufferStart + Double(samples.count) / Double(WhisperKit.sampleRate)
             let stable = words.filter { $0.end <= duration - LiveWordBuffer.holdback }
             let merged = LiveWordBuffer.appending(shot.confirmed, stable, confirmedEnd: shot.confirmedEnd)
             _ = live.save(
                 generation: shot.generation,
                 confirmed: merged.words,
                 confirmedEnd: merged.end,
-                lastCount: samples.count
+                lastCount: absoluteCount
             )
             didLogConsumeError = false
         } catch {
@@ -89,7 +97,7 @@ actor WhisperKitTranscriber: Transcribing {
                 generation: shot.generation,
                 confirmed: shot.confirmed,
                 confirmedEnd: shot.confirmedEnd,
-                lastCount: samples.count
+                lastCount: absoluteCount
             )
             if !didLogConsumeError {
                 didLogConsumeError = true
@@ -128,17 +136,22 @@ actor WhisperKitTranscriber: Transcribing {
             let shot = live.snapshot()
             let tail: [TimedWord]
             do {
-                tail = try await decode(samples: samples, pipe: active, clipStart: shot.confirmedEnd)
+                tail = try await decode(
+                    samples: samples,
+                    bufferStart: 0,
+                    pipe: active,
+                    clipStart: shot.confirmedEnd,
+                    workers: 4
+                )
             } catch {
                 log.error("Tail transcription failed: \(error.localizedDescription, privacy: .public)")
                 // Fall back to full-file decode so the live holdback second isn't dropped.
                 do {
-                    let results = try await active.transcribe(
-                        audioPath: audioURL.path,
-                        decodeOptions: Self.decodingOptions(chunking: .vad, windowClipTime: 1.0)
+                    return try await decodeFileMergingLive(
+                        audioURL: audioURL,
+                        pipe: active,
+                        variant: resolved.variant
                     )
-                    live.reset()
-                    return Transcript(words: Self.words(from: results), model: resolved.variant)
                 } catch {
                     live.reset()
                     if shot.confirmed.isEmpty { throw error }
@@ -150,12 +163,32 @@ actor WhisperKitTranscriber: Transcribing {
             return Transcript(words: merged.words, model: resolved.variant)
         }
 
-        let results = try await active.transcribe(
-            audioPath: audioURL.path,
-            decodeOptions: Self.decodingOptions(chunking: .vad, windowClipTime: 1.0)
+        // Empty / capped PCM: decode the AAC file and merge any live-confirmed words.
+        return try await decodeFileMergingLive(
+            audioURL: audioURL,
+            pipe: active,
+            variant: resolved.variant
         )
+    }
+
+    private func decodeFileMergingLive(
+        audioURL: URL,
+        pipe: WhisperKit,
+        variant: String
+    ) async throws -> Transcript {
+        let shot = live.snapshot()
+        var options = Self.decodingOptions(chunking: .vad, windowClipTime: 1.0, workers: 4)
+        if shot.confirmedEnd > 0.05 {
+            options.clipTimestamps = [Float(shot.confirmedEnd)]
+        }
+        let results = try await pipe.transcribe(
+            audioPath: audioURL.path,
+            decodeOptions: options
+        )
+        let tail = Self.words(from: results)
+        let merged = LiveWordBuffer.appending(shot.confirmed, tail, confirmedEnd: shot.confirmedEnd)
         live.reset()
-        return Transcript(words: Self.words(from: results), model: resolved.variant)
+        return Transcript(words: merged.words, model: variant)
     }
 
     nonisolated static func selectedVariant() -> String {
@@ -315,29 +348,54 @@ actor WhisperKitTranscriber: Transcribing {
             ),
             verbose: false,
             logLevel: .error,
-            prewarm: false,
+            // Prefill Core ML special tokens so the first real decode is not cold.
+            prewarm: true,
             load: true,
             download: false
         )
         return try await WhisperKit(config)
     }
 
-    private func decode(samples: [Float], pipe: WhisperKit, clipStart: TimeInterval) async throws -> [TimedWord] {
+    private func decode(
+        samples: [Float],
+        bufferStart: TimeInterval,
+        pipe: WhisperKit,
+        clipStart: TimeInterval,
+        workers: Int
+    ) async throws -> [TimedWord] {
+        let window = LiveSampleWindow.slice(
+            samples: samples,
+            bufferStart: bufferStart,
+            clipStart: clipStart,
+            sampleRate: WhisperKit.sampleRate
+        )
+        guard !window.samples.isEmpty else { return [] }
+
         // Live tails stay unclipped (`windowClipTime: 0`) so a sub-second remainder still decodes.
-        var options = Self.decodingOptions(chunking: nil, windowClipTime: 0)
-        if clipStart > 0.05 {
-            options.clipTimestamps = [Float(clipStart)]
-        } else if samples.count > WhisperKit.sampleRate * 30 {
+        var options = Self.decodingOptions(chunking: nil, windowClipTime: 0, workers: workers)
+        let relativeClip = clipStart - window.timeOffset
+        if relativeClip > 0.05 {
+            options.clipTimestamps = [Float(relativeClip)]
+        } else if window.samples.count > WhisperKit.sampleRate * 30 {
             options.chunkingStrategy = .vad
         }
-        let results = try await pipe.transcribe(audioArray: samples, decodeOptions: options)
-        return Self.words(from: results)
+        let results = try await pipe.transcribe(audioArray: window.samples, decodeOptions: options)
+        let words = Self.words(from: results)
+        guard window.timeOffset > 0.000_5 else { return words }
+        return words.map {
+            TimedWord(text: $0.text, start: $0.start + window.timeOffset, end: $0.end + window.timeOffset)
+        }
     }
 
     /// Shared decode settings. `suppressBlank` cuts silent-window hallucinations;
     /// `NonSpeechFilter` still scrubs any that slip through. Final/VAD uses WhisperKit's
     /// default `windowClipTime` (1.0); live decode passes 0 so short tails aren't padded away.
-    private static func decodingOptions(chunking: ChunkingStrategy?, windowClipTime: Float) -> DecodingOptions {
+    /// Live paths use fewer workers to keep recording responsive on battery.
+    private static func decodingOptions(
+        chunking: ChunkingStrategy?,
+        windowClipTime: Float,
+        workers: Int
+    ) -> DecodingOptions {
         DecodingOptions(
             language: "en",
             temperatureFallbackCount: 1,
@@ -350,7 +408,7 @@ actor WhisperKitTranscriber: Transcribing {
             compressionRatioThreshold: 2.4,
             logProbThreshold: -1.0,
             noSpeechThreshold: 0.6,
-            concurrentWorkerCount: 4,
+            concurrentWorkerCount: max(1, workers),
             chunkingStrategy: chunking
         )
     }

@@ -371,6 +371,19 @@ final class SessionController: ObservableObject {
         SessionClipboard.copy(image: image, transcript: text)
     }
 
+    /// Puts the last session back on the clipboard after something else overwrote it.
+    func copyLastAgain() {
+        guard !isBusy, phase != .recording else { return }
+        if PasteFollowUp.shared.restoreClipboard() { return }
+        guard lastSessionURL != nil else { return }
+        copyToClipboard()
+    }
+
+    var canCopyLastAgain: Bool {
+        PasteFollowUp.shared.canReplay
+            || (lastSessionURL != nil && (!pasteText.isEmpty || sheetURL != nil))
+    }
+
     private func deliverIfRequested() {
         if skipNextPaste {
             skipNextPaste = false
@@ -392,19 +405,27 @@ final class SessionController: ObservableObject {
     private func startSpeechFollow() {
         speechTask?.cancel()
         keepTranscribing = true
-        speechTask = Task { @MainActor in
-            while self.keepTranscribing, !Task.isCancelled {
+        // PCM copy + Whisper consume stay off the main actor so long buffers do not hitch the island.
+        let audio = self.audio
+        let transcriber = self.transcriber
+        speechTask = Task {
+            while !Task.isCancelled {
                 do {
                     try await Task.sleep(nanoseconds: 250_000_000)
                 } catch {
                     return
                 }
-                guard self.keepTranscribing, !Task.isCancelled else { return }
-                let count = self.audio.sampleCount()
-                guard count >= self.lastSpeechCount + 16_000 else { continue }
-                let samples = self.audio.copySamples()
-                self.lastSpeechCount = samples.count
-                await self.transcriber.consume(samples: samples)
+                let last = await MainActor.run { () -> Int? in
+                    guard self.keepTranscribing else { return nil }
+                    return self.lastSpeechCount
+                }
+                guard let last, !Task.isCancelled else { return }
+                let count = audio.sampleCount()
+                guard count >= last + 16_000 else { continue }
+                let buffer = audio.copySpeechBuffer()
+                let absoluteCount = Int((buffer.timeOffset * 16_000).rounded(.down)) + buffer.samples.count
+                await MainActor.run { self.lastSpeechCount = absoluteCount }
+                await transcriber.consume(samples: buffer.samples, bufferStart: buffer.timeOffset)
             }
         }
     }
@@ -794,10 +815,17 @@ final class SessionController: ObservableObject {
         speechTask = nil
         audio.stop()
         AudioInputs.endSession()
-        let spokenSamples = SampleNormalize.apply(
-            audio.copySamples(),
-            enabled: AppSettings.shared.normalizeSpeech
-        )
+        // When the live PCM buffer was trimmed, prefer the AAC file so the dropped prefix is not lost.
+        let speechBuffer = audio.copySpeechBuffer()
+        let spokenSamples: [Float]
+        if speechBuffer.isComplete {
+            spokenSamples = SampleNormalize.apply(
+                speechBuffer.samples,
+                enabled: AppSettings.shared.normalizeSpeech
+            )
+        } else {
+            spokenSamples = []
+        }
         overlay.hide()
         let ended = Date()
         guard let directory else {

@@ -2,6 +2,93 @@
 
 Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes kept compile-safe and small.
 
+## Run 5 — Performance
+
+### Re-audit of Run 4 (onboarding)
+
+| Change | Verdict |
+| --- | --- |
+| Model download → `UserFacingError.modelDownload` | Sound; kept. |
+| Permissions recovery + mic dialog on Home Turn On | Sound; kept. |
+| Onboarding model progress / Continue disabled | Sound; kept. |
+| Practice session (`startOnboardingPractice`, skip paste) | Sound; kept. PTT auto-stop still gated by `ignorePushToTalkAutoStop`. |
+| Empty Home / History copy | Sound; kept. |
+| Live `consume` still re-decoded the full PCM array | Fixed this round (window slice). |
+| `speechSamples` unbounded for long sessions | Fixed this round (retain cap + file fallback). |
+| `prepare` used `prewarm: false` | Fixed this round. |
+| Speech-follow Task was `@MainActor` for PCM copy | Fixed this round (copy off main). |
+
+### Fixed / added this round
+
+1. **Whisper prewarm** (`WhisperKitTranscriber.makePipe`)  
+   `prewarm: true` so Core ML special-token prefill runs when the model loads. First transcript after download / launch prepare is warmer. Launch `prepareModel()` waits ~450 ms so the menu bar / welcome window can paint first.
+
+2. **Live decode window** (`LiveSampleWindow`, `Transcriber.decode`)  
+   Live (and tail) decode now slices to ~45 s with a short overlap before `clipStart`, instead of shipping the entire growing buffer into Whisper every second. Timestamps are shifted back to session-absolute time. Live path uses 2 concurrent workers; final uses 4.
+
+3. **PCM retain cap** (`AudioRecorder`)  
+   In-memory float samples soft-cap at ~10 minutes (~38 MB) with slack so `removeFirst` is rare on the audio queue. Absolute sample count / `SpeechBufferSnapshot.timeOffset` stay correct after trim. When the buffer was trimmed, stop passes empty samples so the AAC file is decoded and merged with live-confirmed words (`decodeFileMergingLive`).
+
+4. **Speech-follow off the main actor** (`SessionController.startSpeechFollow`)  
+   PCM snapshot + `consume` no longer run as a MainActor-bound loop; only `keepTranscribing` / `lastSpeechCount` hop to main. Avoids island hitches when copying multi-minute buffers.
+
+5. **File path keeps live words** (`decodeFileMergingLive`)  
+   Final file decode now merges with live-confirmed words (and can clip from `confirmedEnd`), including the capped-buffer fallback and the old tail-failure fallback.
+
+6. **Performance settings energy** (`PerformancePage`, `MachineLoad`)  
+   Model-folder byte walk runs at most every ~30 s (or on Refresh); RSS still updates every 2 s while the page is open.
+
+7. **Copy Last Again** (ranked #6) (`PasteFollowUp.restoreClipboard`, menu)  
+   Menu item re-stages the last image / transcript on the pasteboard after another app overwrote it, without pasting. Falls back to `SessionController.copyToClipboard` when paste-follow state is empty but the last session payload is still in memory.
+
+### Suspected but not verified on a Mac
+
+- Prewarm adds a bit of CPU/memory right after launch / download; confirm the 450 ms defer keeps the welcome window snappy.
+- Live window + clipTimestamps timestamp alignment on a multi-minute take (words near the holdback boundary).
+- Trimmed-buffer stop: AAC file merge still matches a short take’s live words.
+- MenuBarExtra SF Symbol swaps (carry-over).
+- Soft speech vs `noSpeechThreshold: 0.6` (carry-over).
+
+### Test this tomorrow on a Mac
+
+**Carry over from Runs 1–4** (abbreviated)
+
+- [ ] Silence P0 + soft speech + menu bar busy icon + plain-language errors.
+- [ ] PTT release-during-begin; cancel mid-capture; volume restore; paste-once.
+- [ ] Fresh onboarding + practice 5 s take; model download progress + plain errors.
+
+**New for Run 5**
+
+- [ ] **Cold launch:** quit app, relaunch with model already on disk → welcome/settings appear promptly; within a few seconds Performance shows model Loaded; first spoken session’s stop feels faster than a never-prewarmed build.
+- [ ] **After onboarding download:** finish model step → wait for prepare → practice or Home Start → first transcript should not sit long on Preparing.
+- [ ] **Live long take:** speak continuously ~2–3 minutes → stop → last words present; Activity Monitor: app memory should not climb without bound during a much longer take (beyond ~10 min PCM retain, RSS growth should flatten while recording).
+- [ ] **Very long session (optional):** record >10 minutes with speech → stop → full transcript (file path) still OK; menu shows words / No speech detected as appropriate.
+- [ ] **Island during record:** waveform stays smooth (no multi-second freezes) while live transcription runs.
+- [ ] **Idle:** sit in menu bar with Settings closed for a minute → CPU near idle (no spin from speech timers).
+- [ ] **Copy Last Again:** finish a session → copy something else in another app → menu **Copy Last Again** → Mutter image/transcript restored; Paste Image and Text still works.
+- [ ] Performance page: open it, watch Refresh; leaving it open should not peg CPU from folder walks.
+
+### Proposed polish / features (ranked)
+
+1. ~~Menu bar phase icon + status / error cues~~ — **done** (Run 3).
+2. ~~Clearer settings / shortcut copy + a11y labels~~ — **done** (Run 3).
+3. ~~First-run “try a 5-second session”~~ — **done** (Run 4).
+4. ~~Faster first transcript (prewarm + deferred prepare)~~ — **done** (Run 5).
+5. ~~Cap / slice live `speechSamples`~~ — **done** (Run 5).
+6. ~~One-click “Copy again” in the menu~~ — **done** (Run 5).
+7. **Quiet-room calibration** — one-time noise floor sample to tune `SpeechGate` / silence stop. *(stability)*
+8. **Processing island status label** — optional “Transcribing” text in the capsule (today: wave-only by design; menu bar carries the cue). *(UX — later if demos still confuse)*
+9. **Per-display chrome placement lock** — keep the island on the recording display. *(UX — later)*
+10. **Session history scrubber** / **export share sheet** — *(features — later)*
+
+### What’s next (later runs)
+
+- Hardware-confirm silence P0, soft speech, prewarm, long-take memory, Copy Last Again on a real Mac.
+- Quiet-room calibration (ranked #7) if demos still need silence tuning.
+- Do not touch `promo-video`.
+
+---
+
 ## Run 4 — Onboarding / first-run
 
 ### Re-audit of Run 3 (UX polish)

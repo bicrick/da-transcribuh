@@ -5,6 +5,9 @@ struct PerformancePage: View {
         modelReady: WhisperKitTranscriber.isModelReady,
         modelFolder: WhisperKitTranscriber.modelsFolder()
     )
+    /// Disk walk of the model folder is relatively expensive — refresh it less often than RSS.
+    @State private var modelBytes: UInt64 = 0
+    @State private var modelBytesAt: Date = .distantPast
 
     var body: some View {
         SettingsPageStack(title: "Performance") {
@@ -30,12 +33,12 @@ struct PerformancePage: View {
             }
             HStack {
                 Spacer()
-                Button("Refresh") { refresh() }
+                Button("Refresh") { refresh(forceModelBytes: true) }
             }
         }
         .task {
             while !Task.isCancelled {
-                refresh()
+                refresh(forceModelBytes: false)
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
         }
@@ -66,10 +69,12 @@ struct PerformancePage: View {
         }
     }
 
-    private func refresh() {
-        snapshot = MachineLoad.capture(
-            modelReady: WhisperKitTranscriber.isModelReady,
-            modelFolder: WhisperKitTranscriber.modelsFolder()
-        )
+    private func refresh(forceModelBytes: Bool) {
+        let ready = WhisperKitTranscriber.isModelReady
+        if forceModelBytes || modelBytesAt.timeIntervalSinceNow < -30 {
+            modelBytes = MachineLoad.modelFolderBytes(WhisperKitTranscriber.modelsFolder())
+            modelBytesAt = Date()
+        }
+        snapshot = MachineLoad.capture(modelReady: ready, modelBytes: modelBytes)
     }
 }

@@ -52,15 +52,23 @@ private struct SessionMenu: View {
 
         Divider()
 
-        if session.lastSessionURL != nil {
-            Button("Paste Image and Text (\(PasteFollowUp.shortcut))") {
-                PasteFollowUp.shared.pasteBoth()
+        if session.lastSessionURL != nil || session.canCopyLastAgain {
+            if session.canCopyLastAgain {
+                Button("Copy Last Again") {
+                    session.copyLastAgain()
+                }
+                .disabled(session.isBusy || session.phase == .recording)
             }
-            .disabled(session.isBusy || session.phase == .recording)
-            Button("Show Last Session in Finder") {
-                session.revealSession()
+            if session.lastSessionURL != nil {
+                Button("Paste Image and Text (\(PasteFollowUp.shortcut))") {
+                    PasteFollowUp.shared.pasteBoth()
+                }
+                .disabled(session.isBusy || session.phase == .recording)
+                Button("Show Last Session in Finder") {
+                    session.revealSession()
+                }
+                .disabled(session.isBusy)
             }
-            .disabled(session.isBusy)
         }
 
         Text(AppVersion.label)
@@ -105,7 +113,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             OnboardingPresenter.shared.show()
         }
+        // Let the menu bar / welcome window paint before Core ML prewarm competes for CPU.
         Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 450_000_000)
             SessionController.shared.prepareModel()
         }
     }
