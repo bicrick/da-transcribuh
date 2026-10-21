@@ -20,11 +20,14 @@ enum LiveSampleWindow {
     ///   - bufferStart: Absolute time of `samples[0]`.
     ///   - clipStart: Absolute time already confirmed; decode may start just before this.
     ///   - sampleRate: Whisper PCM rate (16 kHz).
+    ///   - maxSeconds: Live paths pass `maxSeconds`; final/tail pass `nil` so a lagged live
+    ///     buffer cannot drop the middle of a multi-minute take.
     static func slice(
         samples: [Float],
         bufferStart: TimeInterval,
         clipStart: TimeInterval,
-        sampleRate: Int
+        sampleRate: Int,
+        maxSeconds: TimeInterval? = Self.maxSeconds
     ) -> Slice {
         guard !samples.isEmpty, sampleRate > 0 else {
             return Slice(samples: [], timeOffset: bufferStart)
@@ -36,7 +39,7 @@ enum LiveSampleWindow {
         if clipStart > 0.05 {
             absStart = max(bufferStart, clipStart - overlap)
         }
-        if bufferEnd - absStart > maxSeconds {
+        if let maxSeconds, bufferEnd - absStart > maxSeconds {
             absStart = max(absStart, bufferEnd - maxSeconds)
         }
 

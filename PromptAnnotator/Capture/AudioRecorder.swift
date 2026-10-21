@@ -7,6 +7,8 @@ struct SpeechBufferSnapshot: Sendable {
     /// PCM whose index 0 is `timeOffset` seconds into the session.
     var samples: [Float]
     var timeOffset: TimeInterval
+    /// Session-absolute sample count through the end of `samples` (integer; no float round-trip).
+    var absoluteCount: Int
     /// `true` when the in-memory buffer still covers the whole take (no trim).
     var isComplete: Bool
 }
@@ -87,10 +89,12 @@ final class AudioRecorder: @unchecked Sendable {
     func copySpeechBuffer() -> SpeechBufferSnapshot {
         sampleLock.lock()
         defer { sampleLock.unlock() }
+        let absolute = droppedSpeechSamples + speechSamples.count
         let offset = Double(droppedSpeechSamples) / 16_000.0
         return SpeechBufferSnapshot(
             samples: speechSamples,
             timeOffset: offset,
+            absoluteCount: absolute,
             isComplete: droppedSpeechSamples == 0
         )
     }

@@ -423,9 +423,12 @@ final class SessionController: ObservableObject {
                 let count = audio.sampleCount()
                 guard count >= last + 16_000 else { continue }
                 let buffer = audio.copySpeechBuffer()
-                let absoluteCount = Int((buffer.timeOffset * 16_000).rounded(.down)) + buffer.samples.count
-                await MainActor.run { self.lastSpeechCount = absoluteCount }
-                await transcriber.consume(samples: buffer.samples, bufferStart: buffer.timeOffset)
+                await MainActor.run { self.lastSpeechCount = buffer.absoluteCount }
+                await transcriber.consume(
+                    samples: buffer.samples,
+                    bufferStart: buffer.timeOffset,
+                    absoluteEndCount: buffer.absoluteCount
+                )
             }
         }
     }

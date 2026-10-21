@@ -65,4 +65,22 @@ final class LiveSampleWindowTests: XCTestCase {
         XCTAssertTrue(slice.samples.isEmpty)
         XCTAssertEqual(slice.timeOffset, 12)
     }
+
+    /// Final/tail decode must keep everything after clipStart, not a live-sized tail.
+    func testUncappedSliceKeepsFullRemainderAfterClip() {
+        let seconds = 180
+        let samples = Array(repeating: Float(0.1), count: rate * seconds)
+        let clip: TimeInterval = 30
+        let slice = LiveSampleWindow.slice(
+            samples: samples,
+            bufferStart: 0,
+            clipStart: clip,
+            sampleRate: rate,
+            maxSeconds: nil
+        )
+        XCTAssertEqual(slice.timeOffset, clip - LiveSampleWindow.overlap, accuracy: 0.001)
+        let expected = Int((Double(seconds) - (clip - LiveSampleWindow.overlap)) * Double(rate))
+        XCTAssertEqual(slice.samples.count, expected)
+        XCTAssertGreaterThan(slice.samples.count, Int(LiveSampleWindow.maxSeconds * Double(rate)))
+    }
 }

@@ -18,7 +18,8 @@ protocol Transcribing: Sendable {
     func resetLive()
     func prepare() async
     /// Live decode of PCM whose index 0 is `bufferStart` seconds into the session.
-    func consume(samples: [Float], bufferStart: TimeInterval) async
+    /// `absoluteEndCount` is the session-absolute sample index after `samples` (avoids float drift).
+    func consume(samples: [Float], bufferStart: TimeInterval, absoluteEndCount: Int) async
     func transcribe(
         audioURL: URL,
         samples: [Float],
@@ -65,9 +66,9 @@ actor WhisperKitTranscriber: Transcribing {
         }
     }
 
-    func consume(samples: [Float], bufferStart: TimeInterval) async {
+    func consume(samples: [Float], bufferStart: TimeInterval, absoluteEndCount: Int) async {
         let shot = live.snapshot()
-        let absoluteCount = Int((bufferStart * Double(WhisperKit.sampleRate)).rounded(.down)) + samples.count
+        let absoluteCount = max(absoluteEndCount, samples.count)
         guard samples.count >= WhisperKit.sampleRate, absoluteCount - shot.lastCount >= WhisperKit.sampleRate else { return }
         guard !decodeInFlight, let pipe else { return }
         decodeInFlight = true
@@ -79,7 +80,8 @@ actor WhisperKitTranscriber: Transcribing {
                 bufferStart: bufferStart,
                 pipe: pipe,
                 clipStart: shot.confirmedEnd,
-                workers: 2
+                workers: 2,
+                capWindow: true
             )
             let duration = bufferStart + Double(samples.count) / Double(WhisperKit.sampleRate)
             let stable = words.filter { $0.end <= duration - LiveWordBuffer.holdback }
@@ -136,12 +138,14 @@ actor WhisperKitTranscriber: Transcribing {
             let shot = live.snapshot()
             let tail: [TimedWord]
             do {
+                // Final path must not apply the live ~45 s cap — only clip from confirmedEnd.
                 tail = try await decode(
                     samples: samples,
                     bufferStart: 0,
                     pipe: active,
                     clipStart: shot.confirmedEnd,
-                    workers: 4
+                    workers: 4,
+                    capWindow: false
                 )
             } catch {
                 log.error("Tail transcription failed: \(error.localizedDescription, privacy: .public)")
@@ -361,13 +365,15 @@ actor WhisperKitTranscriber: Transcribing {
         bufferStart: TimeInterval,
         pipe: WhisperKit,
         clipStart: TimeInterval,
-        workers: Int
+        workers: Int,
+        capWindow: Bool
     ) async throws -> [TimedWord] {
         let window = LiveSampleWindow.slice(
             samples: samples,
             bufferStart: bufferStart,
             clipStart: clipStart,
-            sampleRate: WhisperKit.sampleRate
+            sampleRate: WhisperKit.sampleRate,
+            maxSeconds: capWindow ? LiveSampleWindow.maxSeconds : nil
         )
         guard !window.samples.isEmpty else { return [] }
 
