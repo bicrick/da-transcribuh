@@ -30,7 +30,7 @@ struct ConfigurationPage: View {
                 .font(.system(size: 13, weight: .semibold))
             advancedCard
 
-            Text("Prompt Annotator \(AppVersion.label) is free and open source.")
+            Text("Mutter \(AppVersion.label) is free and open source.")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             HStack {
@@ -113,7 +113,7 @@ struct ConfigurationPage: View {
     private var applicationCard: some View {
         SettingsCard {
             VStack(alignment: .leading, spacing: 0) {
-                toggleRow("Launch at login", "Opens Prompt Annotator when you sign in.") {
+                toggleRow("Launch at login", "Opens Mutter when you sign in.") {
                     settings.launchAtLogin
                 } set: {
                     settings.setLaunchAtLogin($0)
@@ -149,7 +149,7 @@ struct ConfigurationPage: View {
                     settings.setKeepWindowOnTop($0)
                 }
                 SettingsDivider()
-                toggleRow("Show in the Dock", "Turn this off to keep Prompt Annotator in the menu bar only.") {
+                toggleRow("Show in the Dock", "Turn this off to keep Mutter in the menu bar only.") {
                     settings.showInDock
                 } set: {
                     settings.setShowInDock($0)

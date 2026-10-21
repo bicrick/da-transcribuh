@@ -40,7 +40,7 @@ struct OnboardingFlow: View {
             HStack(spacing: 14) {
                 AppLogo(side: 56)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Prompt Annotator")
+                    Text("Mutter")
                         .font(.system(size: 20, weight: .semibold))
                     Text(AppVersion.label)
                         .font(.system(size: 12, weight: .medium))
@@ -186,7 +186,7 @@ struct OnboardingFlow: View {
 
     private var primaryTitle: String {
         guard step == .model, !modelIsReady else {
-            return step == .ready ? "Open Prompt Annotator" : "Continue"
+            return step == .ready ? "Open Mutter" : "Continue"
         }
         if transfer.isWorking, let fraction = transfer.fraction {
             return "Downloading \(Int((fraction * 100).rounded()))%"
@@ -286,7 +286,7 @@ final class OnboardingPresenter {
             backing: .buffered,
             defer: false
         )
-        window.title = "Welcome to Prompt Annotator"
+        window.title = "Welcome to Mutter"
         window.isReleasedWhenClosed = false
         window.contentView = host
         window.center()

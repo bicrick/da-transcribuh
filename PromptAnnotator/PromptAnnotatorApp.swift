@@ -18,7 +18,7 @@ struct PromptAnnotatorApp: App {
         } label: {
             // A system image. A custom drawing in this label does not show up in the menu bar.
             Image(systemName: session.phase == .recording ? "record.circle.fill" : "pencil.tip.crop.circle")
-                .accessibilityLabel(session.phase == .recording ? "Prompt Annotator, recording" : "Prompt Annotator")
+                .accessibilityLabel(session.phase == .recording ? "Mutter, recording" : "Mutter")
         }
     }
 }
@@ -28,7 +28,7 @@ private struct SessionMenu: View {
     @ObservedObject var settings: AppSettings
 
     var body: some View {
-        Button("Open Prompt Annotator") {
+        Button("Open Mutter") {
             SettingsPresenter.shared.show()
         }
 
@@ -64,7 +64,7 @@ private struct SessionMenu: View {
             }
         }
 
-        Button("Quit Prompt Annotator") {
+        Button("Quit Mutter") {
             NSApp.terminate(nil)
         }
     }

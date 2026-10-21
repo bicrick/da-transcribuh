@@ -577,7 +577,7 @@ final class SessionController: ObservableObject {
                 offerPermissions(Permissions.Status(accessibility: false, microphone: true, screen: true))
             } else {
                 lastError = "Couldn't watch the pointer."
-                presentError("Couldn't watch the pointer", "Accessibility is on, but the event tap did not install. Quit and reopen Prompt Annotator.")
+                presentError("Couldn't watch the pointer", "Accessibility is on, but the event tap did not install. Quit and reopen Mutter.")
             }
             return
         }

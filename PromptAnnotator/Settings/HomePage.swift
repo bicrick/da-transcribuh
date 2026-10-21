@@ -36,7 +36,7 @@ struct HomePage: View {
         HStack(spacing: 16) {
             AppLogo(side: 64)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Prompt Annotator")
+                Text("Mutter")
                     .font(.system(size: 22, weight: .semibold))
                 Text(AppVersion.label)
                     .font(.system(size: 12, weight: .medium))

@@ -1,7 +1,7 @@
 import Foundation
 
 enum ReleaseCheck {
-    static let repo = URL(string: "https://github.com/bicrick/prompt-annotator/releases")!
+    static let repo = URL(string: "https://github.com/bicrick/mutter/releases")!
 
     static func currentVersion() -> String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.9.0"
@@ -9,12 +9,12 @@ enum ReleaseCheck {
 
     static func lookUp() async -> String {
         let current = currentVersion()
-        guard let url = URL(string: "https://api.github.com/repos/bicrick/prompt-annotator/releases/latest") else {
+        guard let url = URL(string: "https://api.github.com/repos/bicrick/mutter/releases/latest") else {
             return "This build is \(AppVersion.label)."
         }
         var request = URLRequest(url: url)
         request.timeoutInterval = 12
-        request.setValue("PromptAnnotator", forHTTPHeaderField: "User-Agent")
+        request.setValue("Mutter", forHTTPHeaderField: "User-Agent")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         do {
             let (data, response) = try await URLSession.shared.data(for: request)

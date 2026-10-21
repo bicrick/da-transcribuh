@@ -59,7 +59,7 @@ struct SettingsRoot: View {
         HStack(spacing: 8) {
             AppLogo(side: 22)
             VStack(alignment: .leading, spacing: 0) {
-                Text("Prompt Annotator")
+                Text("Mutter")
                     .font(.system(size: 11, weight: .semibold))
                 Text(AppVersion.label)
                     .font(.system(size: 10))
@@ -109,7 +109,7 @@ final class SettingsPresenter {
             backing: .buffered,
             defer: false
         )
-        window.title = "Prompt Annotator"
+        window.title = "Mutter"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none

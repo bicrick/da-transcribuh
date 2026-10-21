@@ -44,9 +44,9 @@ struct PerformancePage: View {
     private var shareSentence: String {
         let percent = Int((snapshot.appShare * 100).rounded())
         if snapshot.modelReady {
-            return "Prompt Annotator is using about \(percent)% of the memory in this Mac, with the model loaded."
+            return "Mutter is using about \(percent)% of the memory in this Mac, with the model loaded."
         }
-        return "Prompt Annotator is using about \(percent)% of the memory in this Mac. The model is not loaded yet."
+        return "Mutter is using about \(percent)% of the memory in this Mac. The model is not loaded yet."
     }
 
     private func meter(_ title: String, _ value: String, _ detail: String) -> some View {

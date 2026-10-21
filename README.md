@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/mark.png" width="96" alt="Prompt Annotator">
+  <img src="assets/mark.png" width="96" alt="Mutter">
 </p>
 
-<h1 align="center">Prompt Annotator</h1>
+<h1 align="center">Mutter</h1>
 
 <p align="center">Talk, and capture the screen when you want the picture with the words.</p>
 
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/settings.png" width="680" alt="Prompt Annotator window">
+  <img src="assets/settings.png" width="680" alt="Mutter window">
 </p>
 
 ## Install
@@ -25,8 +25,8 @@
 There is no download yet. Clone the repo, open the project, and run.
 
 ```sh
-git clone https://github.com/bicrick/prompt-annotator.git
-cd prompt-annotator
+git clone https://github.com/bicrick/mutter.git
+cd mutter
 open PromptAnnotator.xcodeproj
 ```
 

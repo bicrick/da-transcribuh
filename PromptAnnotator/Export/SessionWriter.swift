@@ -29,7 +29,7 @@ struct SessionMarkdown {
         transcriptionError: String?
     ) -> String {
         var lines: [String] = []
-        lines.append("# Prompt Annotator")
+        lines.append("# Mutter")
         lines.append("")
         lines.append("Started: \(started)")
         lines.append("Ended: \(ended)")
