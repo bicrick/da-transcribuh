@@ -6,7 +6,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–10)
+## Final summary (Runs 1–11)
 
 ### What changed overall (kept)
 
@@ -23,9 +23,9 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 - **Quiet-room calibration** — fixed SpeechGate **0.28** (matches `main`). No dangling Swift/pbxproj refs.
 
-### Fixed this round (Run 10)
+### Run 11 (final regression)
 
-1. **Live holdback vs head-cap** — after Run 9’s head-cap, `consume` still measured holdback against the full buffer end, so on takes >~45 s the entire live window (including the trailing revision second) could lock as confirmed. Holdback now uses the decode **window end**.
+- **No code changes.** Re-audited Run 10 holdback + core flows vs `main`. Ship as-is pending Mac P0.
 
 ### Still risky (no Mac build)
 
@@ -39,7 +39,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ## Mac test checklist (do in order)
 
-**If anything fails: fall back to `main` for the launch video.**
+**If anything fails: fall back to `main` for the launch video.** Do not ship `promo-video`.
 
 ### P0 — must pass before recording
 
@@ -65,6 +65,56 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Optional: >10 min under PCM retain cap → file merge OK.
 - [ ] Display plug/unplug while marking; double Paste Image and Text once only.
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
+
+---
+
+## Run 11 — Final regression re-check (no new features)
+
+### Scope
+
+Re-audit Run 10 (`db8b0fc`: live holdback vs capped `windowEnd` + unit test). Brief consistency pass vs `main` (~+2465/−158, 31 files, never Xcode-built). Fix only real bugs; prefer no churn.
+
+### Run 10 re-check
+
+| Item | Verdict |
+| --- | --- |
+| Holdback uses `decoded.windowEnd` | **OK** — matches actual PCM sent to Whisper after head-cap |
+| Short takes (<~45 s) | **OK** — `windowEnd == bufferEnd`; same as pre-Run-10 |
+| Exact ~45 s / +1 sample | **OK** — cap equality / first capped frame; edge word held |
+| Long take first pass (e.g. 90 s, `confirmedEnd` 0) | **OK** — edge of 45 s window held; old full-buffer holdback would wrongly confirm |
+| Mid-session after `confirmedEnd` advances | **OK** — holdback from capped forward window end |
+| Empty / sub-second buffers | **OK** — empty stable set; `consume` still requires ≥1 s new samples; final path uncapped |
+| Off-by-one (index `rounded(.down)`) | **OK** — `windowEnd` derived from sliced sample count, not conceptual `absEnd` |
+| Compile safety | **OK** — private `decode` → `(words, windowEnd)`; live uses both; final uses `.words`; protocol `consume` unchanged |
+| Test membership | **OK** — `PBXFileSystemSynchronizedRootGroup`; `testHoldbackUsesCappedWindowEndNotFullBuffer` auto-included |
+
+### Core flows vs `main` (static)
+
+| Flow | Verdict |
+| --- | --- |
+| Hotkey toggle (PTT off) | **OK** |
+| PTT hold / release + release-during-begin latch | **OK** |
+| Menu / Home Start with PTT on | **OK** — latch-only stop (never `!isArmed`) |
+| Paste / clipboard / Copy Last Again | **OK** |
+| Cancel / abandon / capture discard | **OK** |
+| Volume restore | **OK** |
+| Silence + empty menu cue | **OK** (soft speech still Mac-risk) |
+| Quiet-room symbols | **CLEAN** — none left |
+
+### Fixed this round
+
+**None.** No code changes. Run 10 holdback and prior stability fixes stand.
+
+### Suspected but not verified on a Mac
+
+- Full `xcodebuild` Debug + unit tests.
+- Soft speech vs `noSpeechThreshold: 0.6` + NonSpeechFilter.
+- Prewarm / long-take CPU / PCM trim merge.
+
+### What’s next
+
+- Hardware-confirm **P0** on a real Mac before the launch video.
+- **Fallback: `main`.** Do not touch `promo-video`. No new features on this branch.
 
 ---
 
