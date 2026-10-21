@@ -35,7 +35,7 @@ final class ModelTransfer: ObservableObject {
                 self?.workingVariant = nil
             } catch {
                 guard self?.generation == generation else { return }
-                self?.message = error.localizedDescription
+                self?.message = UserFacingError.modelDownload(error)
                 self?.fraction = nil
                 self?.workingVariant = nil
             }

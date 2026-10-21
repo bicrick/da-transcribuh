@@ -18,6 +18,10 @@ struct HomePage: View {
                     startRow
                     SettingsDivider()
                     permissionRow
+                    if sessions.isEmpty {
+                        SettingsDivider()
+                        firstSessionRow
+                    }
                     SettingsDivider()
                     drawRow
                     SettingsDivider()
@@ -120,6 +124,9 @@ struct HomePage: View {
         if settings.pushToTalk {
             return "Hold \(settings.chord.display) to talk. Release to stop. The Start button stays a tap."
         }
+        if sessions.isEmpty {
+            return "First take: \(settings.chord.display) starts and stops. Words land on the clipboard."
+        }
         return "\(settings.chord.display) starts. The same shortcut stops."
     }
 
@@ -136,7 +143,11 @@ struct HomePage: View {
             Spacer(minLength: 8)
             if !permissions.status.isReady {
                 Button("Turn On") {
-                    Permissions.revealSettings(for: permissions.status)
+                    Task {
+                        _ = await Permissions.requestMicrophone()
+                        Permissions.revealSettings(for: Permissions.current())
+                        permissions.refresh()
+                    }
                 }
                 .accessibilityHint("Opens System Settings for the permissions Mutter still needs")
                 Button("Reopen") {
@@ -146,6 +157,33 @@ struct HomePage: View {
             }
         }
         .padding(12)
+    }
+
+    private var firstSessionRow: some View {
+        HStack(spacing: 12) {
+            rowIcon("mic")
+            VStack(alignment: .leading, spacing: 2) {
+                Text("No sessions yet")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(firstSessionDetail)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+    }
+
+    private var firstSessionDetail: String {
+        if !permissions.status.isReady {
+            return "Turn on permissions above, then press Start or \(settings.chord.display)."
+        }
+        if WhisperModelLocator.locate(
+            in: WhisperKitTranscriber.modelsFolder(),
+            variant: settings.speechModel
+        ) == nil {
+            return "Download a speech model on the Model page, then press Start or \(settings.chord.display)."
+        }
+        return "Press Start or \(settings.chord.display), speak, then stop. History fills in after your first take."
     }
 
     private var permissionDetail: String {

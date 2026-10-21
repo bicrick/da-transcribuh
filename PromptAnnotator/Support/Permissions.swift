@@ -44,6 +44,16 @@ enum Permissions {
         }
     }
 
+    /// True when the user already denied (or restricted) mic access — Settings is the only recovery.
+    static func microphoneNeedsSettings() -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .denied, .restricted:
+            return true
+        default:
+            return false
+        }
+    }
+
     static func requestScreenRecording() -> Bool {
         if CGPreflightScreenCaptureAccess() { return true }
         return CGRequestScreenCaptureAccess()

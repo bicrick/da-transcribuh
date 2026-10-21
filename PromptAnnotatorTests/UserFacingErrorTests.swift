@@ -28,6 +28,25 @@ final class UserFacingErrorTests: XCTestCase {
         )
     }
 
+    func testModelDownloadMapsTechnicalFailures() {
+        XCTAssertEqual(
+            UserFacingError.modelDownload(ExportError("The network request timed out.")),
+            "Couldn't download the speech model. Check the network and try again."
+        )
+        XCTAssertEqual(
+            UserFacingError.modelDownload(ExportError("Error Domain=NSURLErrorDomain Code=-1009")),
+            "Couldn't download the speech model. Check the network and try again."
+        )
+        XCTAssertEqual(
+            UserFacingError.modelDownload(ExportError("Cancelled by user")),
+            "Download was cancelled."
+        )
+        XCTAssertEqual(
+            UserFacingError.modelDownload(ExportError("No space left on device")),
+            "Couldn't save the speech model. Free some disk space and try again."
+        )
+    }
+
     @MainActor
     func testMenuIconTracksRecordingAndBusyPhases() {
         let session = SessionController.shared

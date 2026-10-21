@@ -2,6 +2,86 @@
 
 Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes kept compile-safe and small.
 
+## Run 4 — Onboarding / first-run
+
+### Re-audit of Run 3 (UX polish)
+
+| Change | Verdict |
+| --- | --- |
+| Busy-phase menu icon + a11y label | Sound; kept. |
+| Transcription → `lastError` | Sound; kept. |
+| `UserFacingError` for session/transcription | Sound; kept. Extended: model picker still dumped raw `localizedDescription` — fixed. |
+| Menu / Home / Configuration shortcut copy | Sound; kept. |
+| Island / RecordingPage a11y | Sound; kept. |
+| Onboarding ready-line only | Incomplete for first-run; this round redesigns onboarding. |
+
+### Fixed / added this round
+
+1. **Model download errors were still technical** (`ModelTransfer` / `UserFacingError.modelDownload`)  
+   Picker and onboarding download failures now map through calm copy (network, disk, cancel, `Error Domain=…`).
+
+2. **Permission recovery on first run** (`OnboardingFlow`, `Permissions`, `HomePage`)  
+   Each permission row explains why it is needed and how to recover when Off / denied. Entering the permissions step prompts mic, screen, **and** Accessibility (Run 1 only covered Accessibility from Settings reveal). Home “Turn On” also requests the mic dialog before opening Settings. `microphoneNeedsSettings()` detects denied/restricted mic.
+
+3. **Model step clarity** (`OnboardingFlow`)  
+   Progress bar + percent while downloading; success line when the selected model is on disk; Continue stays disabled during transfer.
+
+4. **Hotkey discoverability** (`OnboardingFlow` shortcut step)  
+   Notes that the menu bar repeats the chord; mentions push-to-talk as a later Configuration option.
+
+5. **First-run empty states** (`HomePage`, `HistoryPage`)  
+   Home shows a “No sessions yet” row with permission / model / shortcut guidance. History empty copy points at the live shortcut and Home Start.
+
+6. **Try a 5-second session** (ranked #3) (`OnboardingFlow.practice`, `SessionController.startOnboardingPractice`)  
+   Flow is now Welcome → Permissions → Shortcut → Model → **Try a session** → Ready (removed the text-only “A session” step). Practice awaits a real begin, auto-stops after ~5s, skips paste-on-stop so the welcome window is not disrupted, ignores PTT auto-stop (practice does not arm the chord), and always ends on a canned success path (including the quiet-room “No speech detected” explanation). Cancel / Back / Skip / window close tear down cleanly.
+
+### Suspected but not verified on a Mac
+
+- Accessibility prompt + Screen Recording dialog stacking order on first Continue into Permissions.
+- Practice take while the welcome window is key — island should still appear; clipboard should update without paste-into-window.
+- MenuBarExtra SF Symbol swaps (carry-over).
+- Soft speech vs `noSpeechThreshold: 0.6` (carry-over).
+
+### Test this tomorrow on a Mac
+
+**Carry over from Runs 1–3** (abbreviated — full lists remain under those runs)
+
+- [ ] Silence P0 + soft speech + menu bar busy icon + plain-language transcription errors.
+- [ ] PTT release-during-begin; cancel mid-capture; volume restore; paste-once.
+
+**New for Run 4**
+
+- [ ] **Fresh install / reset onboarding:** delete `onboarding.finished` (or new user defaults) → welcome window opens instead of Settings.
+- [ ] Permissions step: Continue from Welcome → mic dialog and Accessibility prompt appear; Turn On opens the right Settings pane; deny mic → recovery copy; grant all → Reopen → rows show On.
+- [ ] Shortcut step: Change chord → menu and Ready copy show the new chord; “Use ⌃⌥Space” resets.
+- [ ] Model step: Download Balanced → linear progress + percent on Continue; kill network mid-download → plain-language error (not `Error Domain=…`); after success, Continue advances.
+- [ ] **Practice:** with permissions + model ready → “Try a 5-second session” → island appears → auto-stop → canned success (spoken or quiet). Clipboard updated; welcome window not pasted into.
+- [ ] Practice Cancel mid-take → session discarded; Continue works afterward.
+- [ ] Skip setup from any step → Settings opens; onboarding does not return on relaunch.
+- [ ] Home with zero sessions → “No sessions yet” tip; History empty copy mentions the live shortcut.
+- [ ] Home Turn On with mic notDetermined → system mic dialog, then Settings.
+
+### Proposed polish / features (ranked)
+
+1. ~~Menu bar phase icon + status / error cues~~ — **done** (Run 3).
+2. ~~Clearer settings / shortcut copy + a11y labels~~ — **done** (Run 3).
+3. ~~First-run “try a 5-second session”~~ — **done** (Run 4).
+4. **Faster first transcript** — stronger model prewarm after onboarding download; show pill progress more clearly. *(performance — next)*
+5. **Cap / slice live `speechSamples`** — avoid unbounded memory and full-buffer redecode on long sessions. *(performance / stability)*
+6. **One-click “Copy again”** in the menu when clipboard was overwritten. *(launch-worthy)*
+7. **Quiet-room calibration** — one-time noise floor sample to tune `SpeechGate` / silence stop. *(stability)*
+8. **Processing island status label** — optional “Transcribing” text in the capsule (today: wave-only by design; menu bar carries the cue). *(UX — later if demos still confuse)*
+9. **Per-display chrome placement lock** — keep the island on the recording display. *(UX — later)*
+10. **Session history scrubber** / **export share sheet** — *(features — later)*
+
+### What’s next (later runs)
+
+- Hardware-confirm silence P0 + soft speech + onboarding practice on a real Mac.
+- Performance: model prewarm after onboarding download + live sample capping.
+- Do not touch `promo-video`.
+
+---
+
 ## Run 3 — UX polish
 
 ### Re-audit of Run 2 (stability)

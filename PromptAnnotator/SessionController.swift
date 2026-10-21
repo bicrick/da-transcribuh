@@ -84,6 +84,10 @@ final class SessionController: ObservableObject {
     private var clockSpan: CGFloat = 0
     /// Push-to-talk key-up arrived while `begin()` was still awaiting permissions / setup.
     private var pushToTalkReleasedWhileStarting = false
+    /// Onboarding practice skips paste-on-stop so the welcome window is not disrupted.
+    private var skipNextPaste = false
+    /// Practice starts via `begin()` without arming PTT monitors — do not treat that as an instant release.
+    private var ignorePushToTalkAutoStop = false
 
     var isBusy: Bool {
         switch phase {
@@ -207,10 +211,25 @@ final class SessionController: ObservableObject {
         }
     }
 
+    /// Starts a short first-run take from onboarding without pasting into the welcome window.
+    /// Returns `true` when recording actually began.
+    @discardableResult
+    func startOnboardingPractice() async -> Bool {
+        guard !isBusy, phase != .recording, !isStarting else { return false }
+        skipNextPaste = true
+        ignorePushToTalkAutoStop = true
+        await begin()
+        ignorePushToTalkAutoStop = false
+        if phase == .recording { return true }
+        skipNextPaste = false
+        return false
+    }
+
     func cancel() {
         guard phase == .recording else { return }
         PushToTalk.shared.disarm()
         pushToTalkReleasedWhileStarting = false
+        skipNextPaste = false
         keepTranscribing = false
         speechTask?.cancel()
         speechTask = nil
@@ -353,6 +372,10 @@ final class SessionController: ObservableObject {
     }
 
     private func deliverIfRequested() {
+        if skipNextPaste {
+            skipNextPaste = false
+            return
+        }
         let settings = AppSettings.shared
         guard settings.pasteOnStop else { return }
         guard !SettingsPresenter.shared.isKey else { return }
@@ -630,12 +653,14 @@ final class SessionController: ObservableObject {
         guard access.isReady else {
             PushToTalk.shared.disarm()
             pushToTalkReleasedWhileStarting = false
+            skipNextPaste = false
             offerPermissions(access)
             return
         }
         guard monitor.install() else {
             PushToTalk.shared.disarm()
             pushToTalkReleasedWhileStarting = false
+            skipNextPaste = false
             if !AXIsProcessTrusted() {
                 offerPermissions(Permissions.Status(accessibility: false, microphone: true, screen: true))
             } else {
@@ -683,7 +708,9 @@ final class SessionController: ObservableObject {
             log.info("Session started at \(folder.path, privacy: .public)")
 
             // Push-to-talk release during permission wait would otherwise leave the session running.
+            // Onboarding practice calls `begin()` without arming PTT — skip that auto-stop.
             let stopForPushToTalk = preferences.pushToTalk
+                && !ignorePushToTalkAutoStop
                 && (pushToTalkReleasedWhileStarting || !PushToTalk.shared.isArmed)
             pushToTalkReleasedWhileStarting = false
             if stopForPushToTalk {
@@ -693,6 +720,7 @@ final class SessionController: ObservableObject {
         } catch {
             PushToTalk.shared.disarm()
             pushToTalkReleasedWhileStarting = false
+            skipNextPaste = false
             monitor.stop()
             audio.stop()
             AudioInputs.endSession()

@@ -31,9 +31,10 @@ struct HistoryPage: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("No sessions yet")
                             .font(.system(size: 13, weight: .semibold))
-                        Text("Stop a recording and the transcript shows up here.")
+                        Text("Press \(AppSettings.shared.chord.display) — or Start on Home — for your first take. Transcripts land here when you stop.")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(14)
                 }
