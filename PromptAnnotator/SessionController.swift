@@ -98,6 +98,9 @@ final class SessionController: ObservableObject {
         }
     }
 
+    /// True while `begin()` is awaiting permissions / mic setup (phase may still be idle).
+    var isStartingSession: Bool { isStarting }
+
     var toggleTitle: String {
         phase == .recording ? "Stop Session" : "Start Session"
     }
@@ -667,6 +670,11 @@ final class SessionController: ObservableObject {
 
     private func begin() async {
         guard !isStarting, phase != .recording, !isBusy else { return }
+        // Quiet-room calibration owns the mic briefly — avoid a second capture stack.
+        guard !QuietRoomCalibration.isInProgress else {
+            lastError = "Finish quiet-room calibration first."
+            return
+        }
         isStarting = true
         defer { isStarting = false }
 

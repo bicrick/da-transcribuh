@@ -137,7 +137,13 @@ final class AppSettings: ObservableObject {
         showInDock = defaults.object(forKey: Keys.dock) as? Bool ?? true
         silenceStopSeconds = defaults.object(forKey: Keys.silence) as? Double ?? 0
         if defaults.object(forKey: Keys.speechGate) != nil {
-            speechGateThreshold = defaults.double(forKey: Keys.speechGate)
+            let raw = defaults.double(forKey: Keys.speechGate)
+            speechGateThreshold = Double(
+                min(
+                    QuietRoomCalibration.maximumThreshold,
+                    max(QuietRoomCalibration.minimumThreshold, CGFloat(raw))
+                )
+            )
         } else {
             speechGateThreshold = nil
         }

@@ -66,6 +66,27 @@ final class SettingsBehaviorTests: XCTestCase {
         SpeechGate.setCalibratedThreshold(nil)
     }
 
+    @MainActor
+    func testSpeechGateCalibrationClampsOnLoad() {
+        let name = "PromptAnnotatorTests.speechGateClamp"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        defaults.set(0.99, forKey: "session.speechGateThreshold")
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertEqual(
+            settings.speechGateThreshold ?? 0,
+            Double(QuietRoomCalibration.maximumThreshold),
+            accuracy: 0.001
+        )
+        XCTAssertEqual(SpeechGate.threshold, QuietRoomCalibration.maximumThreshold, accuracy: 0.001)
+        defaults.removePersistentDomain(forName: name)
+        SpeechGate.setCalibratedThreshold(nil)
+    }
+
+    func testQuietRoomCalibrationNotInProgressByDefault() {
+        XCTAssertFalse(QuietRoomCalibration.isInProgress)
+    }
+
     func testInputListDoesNotCrash() {
         _ = AudioInputs.devices()
     }

@@ -414,8 +414,16 @@ struct OnboardingFlow: View {
                 session.toggle()
             }
             while session.phase == .recording || session.isBusy {
-                if Task.isCancelled { return }
+                if Task.isCancelled {
+                    if session.phase == .recording { session.cancel() }
+                    practiceRunning = false
+                    return
+                }
                 try? await Task.sleep(nanoseconds: 200_000_000)
+            }
+            guard !Task.isCancelled else {
+                practiceRunning = false
+                return
             }
             practiceRunning = false
             practiceOutcome = cannedPracticeSuccess()

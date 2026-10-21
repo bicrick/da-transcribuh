@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreGraphics
 import Foundation
 
 /// One-shot ambient sample used to tune `SpeechGate` / silence-stop without changing
@@ -10,9 +11,19 @@ enum QuietRoomCalibration {
     static let minimumThreshold: CGFloat = 0.18
     static let maximumThreshold: CGFloat = 0.55
 
+    private static let stateLock = NSLock()
+    private static var sampling = false
+
     enum Outcome: Equatable {
         case calibrated(threshold: CGFloat, ambient: CGFloat)
         case failed(String)
+    }
+
+    /// True while Configuration is measuring the room (blocks starting a session).
+    static var isInProgress: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return sampling
     }
 
     /// Maps dBFS meters onto the same 0…1 scale `AudioRecorder` uses.
@@ -27,8 +38,10 @@ enum QuietRoomCalibration {
         min(maximumThreshold, max(minimumThreshold, ambientLevel + margin))
     }
 
-    /// Listens briefly on the default input. Safe to call from the main actor; does not
-    /// start a Mutter session. Disabled by the UI while a session is already recording.
+    /// Listens briefly through the same `AudioRecorder` level path a session uses
+    /// (engine-tap PCM when available, otherwise recorder meters). Safe to call from
+    /// the main actor; does not start a Mutter session. Disabled by the UI while a
+    /// session is already recording or starting.
     @MainActor
     static func sampleAmbient(duration: TimeInterval = sampleSeconds) async -> Outcome {
         let granted = await Permissions.requestMicrophone()
@@ -36,36 +49,57 @@ enum QuietRoomCalibration {
             return .failed("Microphone access is needed to measure the room.")
         }
 
+        stateLock.lock()
+        if sampling {
+            stateLock.unlock()
+            return .failed("Calibration is already running.")
+        }
+        sampling = true
+        stateLock.unlock()
+        defer {
+            stateLock.lock()
+            sampling = false
+            stateLock.unlock()
+        }
+
+        // Match the session input device so the gate matches the mic the user will talk into.
+        let settings = AppSettings.shared
+        AudioInputs.beginSession(uid: settings.inputDeviceUID, raiseVolume: false)
+        defer { AudioInputs.endSession() }
+
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("mutter-quiet-room-\(UUID().uuidString).m4a")
-        let settings: [String: Any] = [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 44_100,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.low.rawValue,
-        ]
-        let recorder: AVAudioRecorder
+        let audio = AudioRecorder()
         do {
-            recorder = try AVAudioRecorder(url: url, settings: settings)
+            try audio.start(url: url)
         } catch {
+            try? FileManager.default.removeItem(at: url)
             return .failed("The microphone isn't ready.")
         }
-        recorder.isMeteringEnabled = true
-        guard recorder.prepareToRecord(), recorder.record() else {
-            return .failed("The microphone didn't start.")
-        }
         defer {
-            recorder.stop()
+            audio.stop()
             try? FileManager.default.removeItem(at: url)
+        }
+
+        // Let the tap / meters produce a real floor before averaging.
+        do {
+            try await Task.sleep(nanoseconds: 120_000_000)
+        } catch {
+            return .failed("Calibration cancelled.")
         }
 
         var sum: CGFloat = 0
         var count = 0
         let deadline = Date().addingTimeInterval(duration)
         while Date() < deadline {
-            try? await Task.sleep(nanoseconds: 50_000_000)
-            recorder.updateMeters()
-            sum += unitLevel(decibels: recorder.averagePower(forChannel: 0))
+            do {
+                try await Task.sleep(nanoseconds: 50_000_000)
+            } catch {
+                return .failed("Calibration cancelled.")
+            }
+            // Drives the recorder-meter fallback when the engine tap did not start.
+            _ = audio.sampleLevels(delta: 0.05)
+            sum += audio.latestLevel()
             count += 1
         }
         guard count > 0 else {

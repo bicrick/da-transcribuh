@@ -293,6 +293,7 @@ struct ConfigurationPage: View {
                 .disabled(
                     calibratingQuietRoom
                         || session.isBusy
+                        || session.isStartingSession
                         || session.phase == .recording
                 )
                 if settings.hasSpeechGateCalibration {

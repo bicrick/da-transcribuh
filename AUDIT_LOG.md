@@ -2,6 +2,87 @@
 
 Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes kept compile-safe and small.
 
+## Run 7 — Compile-safety review (no new features)
+
+### Scope
+
+Static re-audit of Runs 5–6 (~+2300 lines vs `main`) that have never been Xcode-built on this VM. Focus: launch-features (quiet-room) first, then symbol/signature/concurrency/import/wiring checks across the branch. Project uses `PBXFileSystemSynchronizedRootGroup` — new Swift files under `PromptAnnotator/` and `PromptAnnotatorTests/` are auto-included (no pbxproj membership edits needed).
+
+### Checked
+
+| Area | Result |
+| --- | --- |
+| Quiet-room symbols (`QuietRoomCalibration`, `SpeechGate`, `AppSettings.speechGateThreshold`, Configuration wiring) | Present; labels match; settings ↔ gate ↔ silence-stop consistent. |
+| Live window / PCM trim / `absoluteEndCount` / `decode(capWindow:)` / `decodeFileMergingLive` | Call sites match; final path still uncapped. |
+| Copy Last Again / `PasteFollowUp.restoreClipboard` / menu | Wired. |
+| WhisperKit 1.1.1 (`Package.resolved`) | `WhisperKitConfig(prewarm:)`, `DecodingOptions` fields, `transcribe` overloads match. |
+| `@MainActor` / actors / `SWIFT_STRICT_CONCURRENCY = minimal` | No definite isolation compile breaks under current setting. |
+| Imports / new file membership | Synchronized groups OK. Added explicit `CoreGraphics` on calibration (was transitive-only). |
+| Onboarding practice / menu icons / UserFacingError | Symbols resolve; no stale renames. |
+
+### Fixed this round
+
+1. **Quiet-room levels used a different meter than live SpeechGate** (`QuietRoomCalibration.sampleAmbient`)  
+   Calibration sampled `AVAudioRecorder.averagePower` only. Sessions with a working engine tap feed SpeechGate from PCM RMS via `AudioRecorder`. Those scales can diverge, so a calibrated floor might not match soft speech or silence-stop. Now samples through a short-lived `AudioRecorder` (same `latestLevel` / `sampleLevels` path), on the configured input device (`AudioInputs.beginSession` without raising volume).
+
+2. **Mic contention with session start**  
+   - `QuietRoomCalibration.isInProgress` while sampling.  
+   - `SessionController.begin` refuses to start (calm `lastError`) until calibration finishes.  
+   - Configuration Calibrate disabled while `isStartingSession` (permissions/setup), not only recording/busy.
+
+3. **Calibration cancel / cleanup**  
+   Throwing `Task.sleep` aborts cleanly; temp AAC removed if `start` fails; `import CoreGraphics` for `CGFloat`.
+
+4. **Out-of-range persisted gate on load** (`AppSettings` init)  
+   Clamps `session.speechGateThreshold` to the calibration min/max when reading UserDefaults (write path already clamped).
+
+5. **Onboarding practice cancel hygiene** (`OnboardingFlow`)  
+   Cancel during the post-stop wait now clears `practiceRunning` (and cancels a still-recording session) instead of leaving the flag stuck.
+
+### Suspected but not verified on a Mac
+
+- Full `xcodebuild` Debug + tests (Linux cannot compile).
+- Quiet-room sample with non-default input UID / exclusive mic holders.
+- Calibrated soft-speech demos after the AudioRecorder-path change.
+- Carry-over: final uncapped decode CPU, prewarm, Copy Last Again, long-take memory.
+
+### Test this tomorrow on a Mac
+
+**P0 — compile & smoke (do these first)**
+
+- [ ] **Build:** Xcode Debug build of `overnight-audit` + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate` / quiet-room, `SettingsBehavior`, `UserFacingError`).
+- [ ] **Cold launch:** menu bar appears; Settings/welcome paints before model prewarm pegs CPU.
+- [ ] **Silence P0:** 10–20 s quiet → empty transcript; menu **No speech detected**.
+- [ ] Soft speech ~5 s still transcribes (default gate, no calibration).
+
+**P1 — quiet-room (Run 6–7)**
+
+- [ ] Configuration → Calibrate quiet room (stay silent) → note shows room/gate; soft speech still marks heard / transcribes; Reset restores default; relaunch keeps calibration until Reset.
+- [ ] Calibrate with silence-stop 1.25 s → speech then quiet still auto-stops.
+- [ ] Calibrate button disabled while recording **and** while a session is still starting (permissions).
+- [ ] Hotkey start during “Listening…” → refused with calm cue; after calibrate finishes, start works.
+- [ ] If a non-default mic is selected in Configuration, calibrate then speak on that mic → gate still sensible.
+
+**P2 — performance / prior runs (abbreviated)**
+
+- [ ] Final decode after live lag / long take under retain cap / Copy Last Again (Run 5–6 lists).
+- [ ] PTT release-during-begin; cancel mid-capture; volume restore; onboarding practice 5 s.
+- [ ] Menu bar busy icon + plain-language errors.
+
+### Proposed polish / features (ranked)
+
+1–7. ~~Done through Run 6~~ (icons, settings copy, practice, prewarm, live cap, Copy Last Again, quiet-room).
+8. **Processing island status label** — optional “Transcribing” text. *(UX — later)*
+9. **Per-display chrome placement lock** — *(UX — later)*
+10. **Session history scrubber** / **export share sheet** — *(features — later)*
+
+### What’s next
+
+- Hardware-confirm P0–P1 on a real Mac before the launch video.
+- Do not touch `promo-video`. No new features on this branch until build is green.
+
+---
+
 ## Run 6 — Re-audit performance + quiet-room calibration
 
 ### Re-audit of Run 5 (performance)
