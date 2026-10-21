@@ -45,7 +45,22 @@ struct RecordingIslandView: View {
                         .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
                 )
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(islandAccessibilityLabel)
         .onAppear { pulse = true }
+    }
+
+    private var islandAccessibilityLabel: String {
+        let status = session.statusText.isEmpty ? "Mutter" : session.statusText
+        if session.phase == .recording {
+            let time = TimeFormat.clock(session.elapsed)
+            let captures = session.captureCount
+            if captures > 0 {
+                return "\(status), \(time), \(captures) \(captures == 1 ? "capture" : "captures")"
+            }
+            return "\(status), \(time)"
+        }
+        return status
     }
 
     private func leading(_ layout: IslandLayout) -> some View {

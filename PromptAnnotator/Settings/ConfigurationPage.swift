@@ -54,8 +54,10 @@ struct ConfigurationPage: View {
         SettingsCard {
             VStack(alignment: .leading, spacing: 0) {
                 shortcutRow(
-                    title: "Toggle recording",
-                    detail: settings.pushToTalk ? "Hold to record. Release to stop." : "A tap starts. A second tap stops.",
+                    title: "Start and stop",
+                    detail: settings.pushToTalk
+                        ? "Hold \(settings.chord.display) to talk. Release to stop."
+                        : "\(settings.chord.display) starts a session. Press it again to stop.",
                     label: capture == .toggle ? "Press shortcut" : settings.chord.display
                 ) {
                     capture = .toggle
@@ -64,7 +66,9 @@ struct ConfigurationPage: View {
                 SettingsDivider()
                 shortcutRow(
                     title: "Cancel recording",
-                    detail: "Drops the session without a transcript or a screenshot.",
+                    detail: settings.cancelChord.map {
+                        "\($0.display) drops the session without a transcript or screenshot."
+                    } ?? "Optional. Set a shortcut to drop a take without saving.",
                     label: capture == .cancel ? "Press shortcut" : (settings.cancelChord?.display ?? "None")
                 ) {
                     capture = .cancel
@@ -92,7 +96,7 @@ struct ConfigurationPage: View {
                         .padding(.horizontal, 12)
                         .padding(.bottom, 4)
                 }
-                Text("Shift stays free for drawing. Option-Space, Command-Space, and Option-Command-Space stay with the system. Press Escape to clear Cancel.")
+                Text("The menu bar repeats this shortcut under Start Session. Shift stays free for drawing. Option-Space, Command-Space, and Option-Command-Space stay with the system. Press Escape while capturing Cancel to clear it.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 12)

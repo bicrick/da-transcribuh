@@ -17,8 +17,8 @@ struct PromptAnnotatorApp: App {
             SessionMenu(session: session, settings: AppSettings.shared)
         } label: {
             // A system image. A custom drawing in this label does not show up in the menu bar.
-            Image(systemName: session.phase == .recording ? "record.circle.fill" : "pencil.tip.crop.circle")
-                .accessibilityLabel(session.phase == .recording ? "Mutter, recording" : "Mutter")
+            Image(systemName: session.menuIcon)
+                .accessibilityLabel(session.menuAccessibilityLabel)
         }
     }
 }
@@ -39,18 +39,15 @@ private struct SessionMenu: View {
         }
         .disabled(session.isBusy)
 
-        Text("Shortcut: \(settings.chord.display)")
+        Text(shortcutHint)
+            .foregroundStyle(.secondary)
         if let cancel = settings.cancelChord {
             Text("Cancel: \(cancel.display)")
-        }
-        Text(AppVersion.label)
-
-        if session.isBusy {
-            Text(session.statusText)
+                .foregroundStyle(.secondary)
         }
 
-        if let lastError = session.lastError, session.phase != .recording {
-            Text(lastError)
+        if let status = session.menuStatusLine {
+            Text(status)
         }
 
         Divider()
@@ -59,14 +56,27 @@ private struct SessionMenu: View {
             Button("Paste Image and Text (\(PasteFollowUp.shortcut))") {
                 PasteFollowUp.shared.pasteBoth()
             }
+            .disabled(session.isBusy || session.phase == .recording)
             Button("Show Last Session in Finder") {
                 session.revealSession()
             }
+            .disabled(session.isBusy)
         }
+
+        Text(AppVersion.label)
+            .foregroundStyle(.secondary)
 
         Button("Quit Mutter") {
             NSApp.terminate(nil)
         }
+    }
+
+    private var shortcutHint: String {
+        let chord = settings.chord.display
+        if settings.pushToTalk {
+            return "Hold \(chord) to talk"
+        }
+        return "\(chord) starts and stops"
     }
 }
 

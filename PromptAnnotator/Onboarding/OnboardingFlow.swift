@@ -99,7 +99,7 @@ struct OnboardingFlow: View {
         case .model:
             modelBody
         case .ready:
-            Text("The menu bar item opens this window again. \(settings.chord.display) starts a session, and the same shortcut stops it.")
+            Text("The menu bar icon opens Mutter again. \(settings.chord.display) starts a session and stops it. While Mutter is saving or transcribing, the icon changes so you can see it working.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

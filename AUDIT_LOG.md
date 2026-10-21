@@ -2,6 +2,109 @@
 
 Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes kept compile-safe and small.
 
+## Run 3 — UX polish
+
+### Re-audit of Run 2 (stability)
+
+| Change | Verdict |
+| --- | --- |
+| Tap buffer `memcpy` before async | Sound; kept. |
+| Speech-follow cancel + throwing sleep | Sound; kept. |
+| PTT release-during-begin latch + `!isArmed` auto-finish | Sound; covers key-up before `isStarting`. |
+| Volume restore only when raise returns a prior | Sound; kept. |
+| PTT `disarm` removes monitors | Sound; `arm` reinstalls. |
+| Cancel / abandon cancel capture + speech + `stopTimer` | Sound; kept. |
+| Live decode advances `lastCount` on error | Sound; kept. |
+| Tail decode full-file fallback | Sound; kept. |
+| Final `windowClipTime: 1.0` / live `0` | Sound; kept. |
+| Overlay `onScreensChanged` → `syncOverlay` | Sound; kept. |
+| `pasteBoth` early-return while delivering | Sound; kept. |
+| Empty-speech menu cue | Sound; kept. Extended: transcription failures now also set `lastError`. |
+
+### Fixed / polished this round
+
+1. **Menu bar icon ignored busy phases** (`SessionController.menuIcon`, `PromptAnnotatorApp`)  
+   Idle and saving/transcribing/downloading all showed the pencil tip. Busy phases now use `ellipsis.circle`; recording stays `record.circle.fill`. Accessibility label names the live phase (and last error when idle).
+
+2. **Transcription failures were invisible in the menu** (`SessionController.finish`)  
+   `transcriptionError` was written to the session notes but never set `lastError`, so a failed decode looked like a silent no-op. Failures now set a calm `lastError` and still win over “No speech detected”.
+
+3. **Technical `localizedDescription` on start / write / capture / transcription** (`UserFacingError`)  
+   Maps network, missing-model, cancel, and `Error Domain=…` blobs into short user copy. Export errors still pass through.
+
+4. **Menu shortcut discoverability** (`SessionMenu`)  
+   Replaced bare `Shortcut: …` with “⌃⌥Space starts and stops” (or “Hold … to talk” for push-to-talk). Cancel line kept. Status line uses `menuStatusLine` (live phase or last cue). Paste disabled while recording/busy.
+
+5. **Home page live status + clearer copy** (`HomePage`)  
+   Start row tracks phase (icon + title), explains the shortcut, and notes the menu bar icon while busy. Capture blurb tightened for first-time viewers.
+
+6. **Configuration shortcut wording** (`ConfigurationPage`)  
+   “Start and stop” instead of “Toggle recording”; details include the live chord; cancel explains optional vs set; notes that the menu bar repeats the shortcut.
+
+7. **Accessibility** (`RecordingIsland`, `RecordingPage`, `HomePage`)  
+   Island exposes a combined VoiceOver label (phase, clock, capture count). Default tool/color buttons get labels + selected traits. Permission buttons get hints.
+
+8. **Onboarding ready line** — mentions the menu bar icon state change during save/transcribe (no onboarding flow redesign).
+
+### Suspected but not verified on a Mac
+
+- MenuBarExtra label SF Symbol swaps mid-session (should refresh; confirm on Sonoma/Sequoia).
+- Soft speech vs `noSpeechThreshold: 0.6` (carry-over).
+- Dual mic path / long-session sample growth (carry-over).
+
+### Test this tomorrow on a Mac
+
+**Carry over from Runs 1–2**
+
+- [ ] Fresh permissions: deny all → Turn On → app appears on Accessibility + Screen Recording lists; grant → session starts.
+- [ ] Start session with “raise input volume” on → stop → confirm system mic level restored (also when volume was already ≥ 85%).
+- [ ] Drag-capture, then immediately cancel → no resurrected session folder under `~/Documents/PromptAnnotator/Sessions/`.
+- [ ] Plug/unplug a display while recording with marks → marks still draw on the active screen.
+- [ ] **Silence P0:** record 10–20s of nobody speaking → empty transcript; menu shows **No speech detected**.
+- [ ] Speak normally including “silence” and “(yesterday)” → those stay.
+- [ ] Speech-only session → transcript on clipboard, no sheet.
+- [ ] Multi-tile session → numbered paste text matches sheet badges.
+- [ ] **PTT:** brief press/release during mic prompt → session must stop.
+- [ ] Cancel mid-drag-capture → next session’s first capture still works.
+- [ ] Quit while recording → mic volume restored; PTT chord works after relaunch.
+- [ ] Soft speech ~5s still transcribes.
+- [ ] Double “Paste Image and Text” → one paste sequence.
+- [ ] Live transcription ~30s → last words present.
+
+**New for Run 3**
+
+- [ ] **Menu bar icon:** idle = pencil tip; while recording = filled record; while Saving / Preparing / Transcribing / Downloading = ellipsis circle (not idle).
+- [ ] VoiceOver on the menu bar item announces “Mutter, recording” / “Mutter, transcribing” (etc.).
+- [ ] Force a transcription failure (e.g. delete model mid-session or offline download) → menu shows a plain-language error, not `Error Domain=…`.
+- [ ] Quiet stop → menu still shows **No speech detected** (unchanged).
+- [ ] Menu text reads “⌃⌥Space starts and stops” (or Hold… when push-to-talk is on); cancel chord listed when set.
+- [ ] Home → Start row title tracks Recording / Saving / Transcribing; shortcut badge matches Configuration.
+- [ ] Configuration → “Start and stop” row shows the live chord in the detail line.
+- [ ] VoiceOver on the floating island while recording announces phase + clock (+ capture count when > 0).
+- [ ] Recording settings: tool/color defaults announce name and selected state.
+
+### Proposed polish / features (ranked)
+
+1. ~~Menu bar phase icon + status / error cues~~ — **done** (Run 3).
+2. ~~Clearer settings / shortcut copy + a11y labels~~ — **done** (Run 3).
+3. **First-run “try a 5-second session”** inside onboarding with a canned success path. *(onboarding — later)*
+4. **Faster first transcript** — stronger model prewarm after onboarding download; show pill progress more clearly. *(performance — later)*
+5. **Cap / slice live `speechSamples`** — avoid unbounded memory and full-buffer redecode on long sessions. *(performance / stability — later)*
+6. **One-click “Copy again”** in the menu when clipboard was overwritten. *(launch-worthy — later)*
+7. **Quiet-room calibration** — one-time noise floor sample to tune `SpeechGate` / silence stop. *(stability — later)*
+8. **Processing island status label** — optional “Transcribing” text in the capsule (today: wave-only by design; menu bar carries the cue). *(UX — later if demos still confuse)*
+9. **Per-display chrome placement lock** — keep the island on the recording display. *(UX — later)*
+10. **Session history scrubber** / **export share sheet** — *(features — later)*
+
+### What’s next (later runs)
+
+- Hardware-confirm silence P0 + soft speech + menu bar icon swaps.
+- Onboarding try-session (ranked #3) once checklist is green.
+- Performance: model prewarm + live sample capping.
+- Do not touch `promo-video`.
+
+---
+
 ## Run 2 — stability & correctness
 
 ### Re-audit of Run 1 diff

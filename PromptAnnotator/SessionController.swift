@@ -98,8 +98,36 @@ final class SessionController: ObservableObject {
         phase == .recording ? "Stop Session" : "Start Session"
     }
 
+    /// Menu bar glyph. Busy phases must not look idle — launch demos stop on the icon.
     var menuIcon: String {
-        phase == .recording ? "record.circle.fill" : "pencil.tip.crop.circle"
+        switch phase {
+        case .recording:
+            return "record.circle.fill"
+        case .finishing, .downloading, .preparingModel, .transcribing:
+            return "ellipsis.circle"
+        case .idle:
+            return "pencil.tip.crop.circle"
+        }
+    }
+
+    var menuAccessibilityLabel: String {
+        switch phase {
+        case .recording:
+            return "Mutter, recording"
+        case .finishing:
+            return "Mutter, saving"
+        case .downloading:
+            return "Mutter, downloading model"
+        case .preparingModel:
+            return "Mutter, preparing model"
+        case .transcribing:
+            return "Mutter, transcribing"
+        case .idle:
+            if let lastError, !lastError.isEmpty {
+                return "Mutter, \(lastError)"
+            }
+            return "Mutter"
+        }
     }
 
     var statusText: String {
@@ -118,6 +146,14 @@ final class SessionController: ObservableObject {
         case .idle:
             return ""
         }
+    }
+
+    /// Menu / home status line: live phase, else the last calm cue or error.
+    var menuStatusLine: String? {
+        let live = statusText
+        if !live.isEmpty { return live }
+        if let lastError, !lastError.isEmpty { return lastError }
+        return nil
     }
 
     init(transcriber: any Transcribing = WhisperKitTranscriber()) {
@@ -664,8 +700,9 @@ final class SessionController: ObservableObject {
                 try? FileManager.default.removeItem(at: directory)
             }
             directory = nil
-            lastError = error.localizedDescription
-            presentError("Couldn't start the session", error.localizedDescription)
+            let message = UserFacingError.sessionStart(error)
+            lastError = message
+            presentError("Couldn't start the session", message)
             setPhase(.idle)
         }
     }
@@ -770,7 +807,9 @@ final class SessionController: ObservableObject {
                 spoken = transcript.words
                 model = transcript.model
             } catch {
-                transcriptionError = error.localizedDescription
+                let message = UserFacingError.transcription(error)
+                transcriptionError = message
+                lastError = message
                 ErrorLog.record("Transcription failed: \(error.localizedDescription)")
                 log.error("Transcription failed: \(error.localizedDescription, privacy: .public)")
             }
@@ -798,6 +837,7 @@ final class SessionController: ObservableObject {
             sheetURL = saved.sheetURL
             lastSessionURL = directory
             // Empty clipboard text after silence looks like a broken stop — surface a calm cue.
+            // Prefer an existing transcription failure message when both apply.
             if saved.pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                transcriptionError == nil {
                 lastError = "No speech detected"
@@ -807,9 +847,10 @@ final class SessionController: ObservableObject {
             NotificationCenter.default.post(name: .promptAnnotatorSessionsChanged, object: nil)
             setPhase(.idle)
         } catch {
-            lastError = error.localizedDescription
+            let message = UserFacingError.sessionWrite(error)
+            lastError = message
             ErrorLog.record("Couldn't write the session: \(error.localizedDescription)")
-            presentError("Couldn't write the session", error.localizedDescription)
+            presentError("Couldn't write the session", message)
             lastSessionURL = directory
             setPhase(.idle)
         }
@@ -950,7 +991,7 @@ final class SessionController: ObservableObject {
         } catch {
             guard self.directory == sessionDirectory else { return }
             log.error("Capture failed: \(error.localizedDescription, privacy: .public)")
-            lastError = error.localizedDescription
+            lastError = UserFacingError.capture(error)
             restore(significant, allowEmpty: allowEmpty)
         }
     }

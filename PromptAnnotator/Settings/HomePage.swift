@@ -41,7 +41,7 @@ struct HomePage: View {
                 Text(AppVersion.label)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
-                Text("Talk, and capture the screen when you want the picture with the words.")
+                Text("Dictation in the menu bar. Capture the screen when you want the picture with the words.")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
@@ -75,11 +75,11 @@ struct HomePage: View {
 
     private var startRow: some View {
         HStack(spacing: 12) {
-            rowIcon("record.circle")
+            rowIcon(startRowSymbol)
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.phase == .recording ? "Session in progress" : "Start a session")
+                Text(startRowTitle)
                     .font(.system(size: 13, weight: .semibold))
-                Text("A tap starts. A second tap stops.")
+                Text(startRowDetail)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -89,8 +89,38 @@ struct HomePage: View {
                 session.toggle()
             }
             .disabled(session.isBusy)
+            .accessibilityLabel(session.phase == .recording ? "Stop session" : "Start session")
+            .accessibilityHint("Shortcut \(settings.chord.display)")
         }
         .padding(12)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var startRowSymbol: String {
+        switch session.phase {
+        case .recording:
+            return "record.circle.fill"
+        case .finishing, .downloading, .preparingModel, .transcribing:
+            return "ellipsis.circle"
+        case .idle:
+            return "record.circle"
+        }
+    }
+
+    private var startRowTitle: String {
+        let live = session.statusText
+        if !live.isEmpty { return live }
+        return "Start a session"
+    }
+
+    private var startRowDetail: String {
+        if session.isBusy {
+            return "Mutter is finishing this take. The menu bar icon shows the same state."
+        }
+        if settings.pushToTalk {
+            return "Hold \(settings.chord.display) to talk. Release to stop. The Start button stays a tap."
+        }
+        return "\(settings.chord.display) starts. The same shortcut stops."
     }
 
     private var permissionRow: some View {
@@ -108,9 +138,11 @@ struct HomePage: View {
                 Button("Turn On") {
                     Permissions.revealSettings(for: permissions.status)
                 }
+                .accessibilityHint("Opens System Settings for the permissions Mutter still needs")
                 Button("Reopen") {
                     Permissions.relaunch()
                 }
+                .accessibilityHint("Quits and relaunches Mutter after you change permissions")
             }
         }
         .padding(12)
@@ -127,9 +159,9 @@ struct HomePage: View {
         HStack(spacing: 12) {
             rowIcon("viewfinder")
             VStack(alignment: .leading, spacing: 2) {
-                Text("Drag to capture, or just talk")
+                Text("Talk, or drag to capture")
                     .font(.system(size: 13, weight: .semibold))
-                Text("A capture includes the front window. Hold Shift to annotate. A quiet capture is only the picture. No capture copies the transcript only.")
+                Text("Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }

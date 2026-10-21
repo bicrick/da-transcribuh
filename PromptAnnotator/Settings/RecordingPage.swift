@@ -10,7 +10,7 @@ struct RecordingPage: View {
             Text("Recording window")
                 .font(.system(size: 13, weight: .semibold))
             styleRow
-            Text("Shortcuts, push to talk, and where sessions are saved are in Configuration.")
+            Text("Keyboard shortcuts and push to talk are in Configuration. The menu bar shows the same shortcut under Start Session.")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
@@ -128,6 +128,8 @@ struct RecordingPage: View {
         }
         .buttonStyle(.plain)
         .help(tool.title)
+        .accessibilityLabel(tool.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func colorButton(_ color: InkColor) -> some View {
@@ -143,6 +145,8 @@ struct RecordingPage: View {
         }
         .buttonStyle(.plain)
         .help(color.name)
+        .accessibilityLabel(color.name)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
