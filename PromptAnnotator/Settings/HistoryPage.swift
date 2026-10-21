@@ -23,8 +23,8 @@ struct HistoryPage: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("History")
                 .font(.system(size: 22, weight: .semibold))
-                .padding(.horizontal, 20)
-                .padding(.top, 24)
+                .padding(.horizontal, SettingsMetrics.pagePadding)
+                .padding(.top, SettingsMetrics.pagePadding)
                 .padding(.bottom, 12)
             if sessions.isEmpty {
                 SettingsCard {
@@ -36,9 +36,9 @@ struct HistoryPage: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(14)
+                    .padding(SettingsMetrics.rowPadding)
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, SettingsMetrics.pagePadding)
                 Spacer()
             } else {
                 HStack(spacing: 0) {

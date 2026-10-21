@@ -18,27 +18,25 @@ struct ConfigurationPage: View {
 
     var body: some View {
         SettingsPageStack(title: "Configuration") {
-            Text("Keyboard shortcuts")
-                .font(.system(size: 13, weight: .semibold))
-            shortcutCard
-
-            Text("Application")
-                .font(.system(size: 13, weight: .semibold))
-            applicationCard
-
-            Text("Advanced")
-                .font(.system(size: 13, weight: .semibold))
-            advancedCard
-
-            Text("Mutter \(AppVersion.label) is free and open source.")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-            HStack {
-                Button("View on GitHub") {
-                    NSWorkspace.shared.open(ReleaseCheck.repo)
-                }
-                Button("Show welcome") {
-                    OnboardingPresenter.shared.show()
+            SettingsSection(title: "Keyboard shortcuts") {
+                shortcutCard
+            }
+            SettingsSection(title: "Application") {
+                applicationCard
+            }
+            SettingsSection(title: "Advanced") {
+                advancedCard
+            }
+            SettingsSection(
+                footer: "Mutter \(AppVersion.label) is free and open source."
+            ) {
+                HStack(spacing: 10) {
+                    Button("View on GitHub") {
+                        NSWorkspace.shared.open(ReleaseCheck.repo)
+                    }
+                    Button("Show welcome") {
+                        OnboardingPresenter.shared.show()
+                    }
                 }
             }
         }

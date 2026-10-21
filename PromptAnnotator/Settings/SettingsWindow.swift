@@ -67,7 +67,7 @@ struct SettingsRoot: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, SettingsMetrics.sidebarFooterPadding)
         .padding(.vertical, 10)
     }
 

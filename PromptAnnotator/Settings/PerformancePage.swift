@@ -16,20 +16,22 @@ struct PerformancePage: View {
                 meter("Model on disk", MachineLoad.megabytes(snapshot.modelBytes), snapshot.modelReady ? "Loaded" : "Not loaded")
                 meter("This Mac", MachineLoad.megabytes(snapshot.physicalBytes), "\(snapshot.processorCount) processors")
             }
-            SettingsCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(shareSentence)
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("The number above is this app's memory, including the model after it has loaded. The model files on disk are separate. Once the model is loaded it stays in memory, so the next session does not read it from disk again.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("Recording uses the microphone and screen capture. A spoken session then spends a short burst finishing the words. A quiet session skips that burst. The recording bar closes when the work is done.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+            SettingsSection(title: "Overview") {
+                SettingsCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(shareSentence)
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("The number above is this app's memory, including the model after it has loaded. The model files on disk are separate. Once the model is loaded it stays in memory, so the next session does not read it from disk again.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("Recording uses the microphone and screen capture. A spoken session then spends a short burst finishing the words. A quiet session skips that burst. The recording bar closes when the work is done.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(SettingsMetrics.rowPadding)
                 }
-                .padding(14)
             }
             HStack {
                 Spacer()
@@ -64,7 +66,7 @@ struct PerformancePage: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
-            .padding(12)
+            .padding(SettingsMetrics.rowPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

@@ -36,22 +36,69 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// Shared metrics so Settings pages share spacing, width, and card chrome.
+enum SettingsMetrics {
+    static let pagePadding: CGFloat = 24
+    static let pageSpacing: CGFloat = 20
+    static let sectionSpacing: CGFloat = 8
+    static let rowPadding: CGFloat = 12
+    static let maxContentWidth: CGFloat = 640
+    static let cardCorner: CGFloat = 10
+    static let sidebarFooterPadding: CGFloat = 12
+}
+
 struct SettingsPageStack<Content: View>: View {
     var title: String
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: SettingsMetrics.pageSpacing) {
                 Text(title)
                     .font(.system(size: 22, weight: .semibold))
                 content()
             }
-            .padding(28)
-            .frame(maxWidth: 680, alignment: .leading)
+            .padding(SettingsMetrics.pagePadding)
+            .frame(maxWidth: SettingsMetrics.maxContentWidth, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+/// Section title + content with consistent spacing (Form-like grouping without a full Form rewrite).
+struct SettingsSection<Content: View>: View {
+    var title: String?
+    var footer: String?
+    @ViewBuilder var content: () -> Content
+
+    init(
+        title: String? = nil,
+        footer: String? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.title = title
+        self.footer = footer
+        self.content = content
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SettingsMetrics.sectionSpacing) {
+            if let title {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(0.3)
+            }
+            content()
+            if let footer {
+                Text(footer)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
 
@@ -65,11 +112,11 @@ struct SettingsCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             Color(nsColor: .controlBackgroundColor),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            in: RoundedRectangle(cornerRadius: SettingsMetrics.cardCorner, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.7), lineWidth: 1)
+            RoundedRectangle(cornerRadius: SettingsMetrics.cardCorner, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 1)
         )
     }
 }
@@ -77,7 +124,7 @@ struct SettingsCard<Content: View>: View {
 struct SettingsDivider: View {
     var body: some View {
         Rectangle()
-            .fill(Color(nsColor: .separatorColor).opacity(0.7))
+            .fill(Color(nsColor: .separatorColor).opacity(0.55))
             .frame(height: 1)
             .padding(.leading, 46)
     }

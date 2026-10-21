@@ -9,27 +9,27 @@ struct HomePage: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: SettingsMetrics.pageSpacing) {
                 header
                 stats
-                Text("Get started")
-                    .font(.system(size: 15, weight: .semibold))
-                SettingsCard {
-                    startRow
-                    SettingsDivider()
-                    permissionRow
-                    if sessions.isEmpty {
+                SettingsSection(title: "Get started") {
+                    SettingsCard {
+                        startRow
                         SettingsDivider()
-                        firstSessionRow
+                        permissionRow
+                        if sessions.isEmpty {
+                            SettingsDivider()
+                            firstSessionRow
+                        }
+                        SettingsDivider()
+                        drawRow
+                        SettingsDivider()
+                        folderRow
                     }
-                    SettingsDivider()
-                    drawRow
-                    SettingsDivider()
-                    folderRow
                 }
             }
-            .padding(28)
-            .frame(maxWidth: 720, alignment: .leading)
+            .padding(SettingsMetrics.pagePadding)
+            .frame(maxWidth: SettingsMetrics.maxContentWidth, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(nsColor: .windowBackgroundColor))

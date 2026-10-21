@@ -7,39 +7,39 @@ struct RecordingPage: View {
 
     var body: some View {
         SettingsPageStack(title: "Recording") {
-            Text("Recording window")
-                .font(.system(size: 13, weight: .semibold))
-            styleRow
-            Text("Keyboard shortcuts and push to talk are in Configuration. The menu bar shows the same shortcut under Start Session.")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+            SettingsSection(
+                title: "Recording window",
+                footer: "Keyboard shortcuts and push to talk are in Configuration. The menu bar shows the same shortcut under Start Session."
+            ) {
+                styleRow
+            }
 
-            Text("Defaults")
-                .font(.system(size: 13, weight: .semibold))
-            SettingsCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Drag captures the screen in front of you, including a window or a modal. These tools show while you hold Shift.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                    Text("Tool")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: 6) {
-                        ForEach(AnnotationTool.allCases, id: \.self) { tool in
-                            toolButton(tool)
+            SettingsSection(title: "Defaults") {
+                SettingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Drag captures the screen in front of you, including a window or a modal. These tools show while you hold Shift.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        Text("Tool")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            ForEach(AnnotationTool.allCases, id: \.self) { tool in
+                                toolButton(tool)
+                            }
+                        }
+                        Text("Color")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 4)
+                        HStack(spacing: 8) {
+                            ForEach(InkColor.palette, id: \.self) { color in
+                                colorButton(color)
+                            }
                         }
                     }
-                    Text("Color")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 4)
-                    HStack(spacing: 8) {
-                        ForEach(InkColor.palette, id: \.self) { color in
-                            colorButton(color)
-                        }
-                    }
+                    .padding(SettingsMetrics.rowPadding)
                 }
-                .padding(12)
             }
         }
     }
