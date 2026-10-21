@@ -177,11 +177,14 @@ struct HomePage: View {
         if !permissions.status.isReady {
             return "Turn on permissions above, then press Start or \(settings.chord.display)."
         }
-        if WhisperModelLocator.locate(
-            in: WhisperKitTranscriber.modelsFolder(),
-            variant: settings.speechModel
-        ) == nil {
-            return "Download a speech model on the Model page, then press Start or \(settings.chord.display)."
+        if settings.speechEngine == .openAICompatible {
+            if !OpenAICompatibleTranscriber.isConfigured() {
+                return "Add a server API key on the Models page, then press Start or \(settings.chord.display)."
+            }
+            return "Press Start or \(settings.chord.display), speak, then stop. The server writes the transcript when you stop."
+        }
+        if !WhisperKitTranscriber.modelIsInstalled() {
+            return "Download a speech model on the Models page, then press Start or \(settings.chord.display)."
         }
         return "Press Start or \(settings.chord.display), speak, then stop. History fills in after your first take."
     }

@@ -158,7 +158,7 @@ final class SessionController: ObservableObject {
         return nil
     }
 
-    init(transcriber: any Transcribing = WhisperKitTranscriber()) {
+    init(transcriber: any Transcribing = RoutingTranscriber()) {
         self.transcriber = transcriber
         monitor.session = self
         chrome.attach(self)
@@ -174,6 +174,22 @@ final class SessionController: ObservableObject {
         settings.onChromeChange = { [weak self] in
             DispatchQueue.main.async {
                 self?.refreshChrome()
+            }
+        }
+        settings.onSpeechSelectionChange = { [weak self] in
+            DispatchQueue.main.async {
+                self?.reloadSpeechEngine()
+            }
+        }
+    }
+
+    /// Unloads and re-prepares after the user switches engine or model in Settings.
+    private func reloadSpeechEngine() {
+        Task {
+            if let router = transcriber as? RoutingTranscriber {
+                await router.reloadSelection()
+            } else {
+                await transcriber.prepare()
             }
         }
     }
@@ -836,7 +852,9 @@ final class SessionController: ObservableObject {
         var spoken: [TimedWord] = []
         var model: String?
         if heardSpeech, let audioURL {
-            if WhisperKitTranscriber.isModelReady {
+            if AppSettings.shared.speechEngine == .openAICompatible {
+                setPhase(.transcribing)
+            } else if WhisperKitTranscriber.isModelReady {
                 setPhase(.transcribing)
             } else if WhisperKitTranscriber.modelIsInstalled() {
                 setPhase(.preparingModel)

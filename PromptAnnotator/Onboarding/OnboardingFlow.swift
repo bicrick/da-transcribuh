@@ -311,10 +311,7 @@ struct OnboardingFlow: View {
     }
 
     private var modelIsReady: Bool {
-        WhisperModelLocator.locate(
-            in: WhisperKitTranscriber.modelsFolder(),
-            variant: settings.speechModel
-        ) != nil
+        WhisperKitTranscriber.modelIsInstalled()
     }
 
     private var primaryTitle: String {

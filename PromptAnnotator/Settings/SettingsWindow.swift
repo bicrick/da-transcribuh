@@ -17,15 +17,19 @@ struct SettingsRoot: View {
         NavigationSplitView {
             VStack(spacing: 0) {
                 List(selection: $page) {
-                    ForEach(SettingsPage.allCases) { item in
-                        Label(item.title, systemImage: item.symbol)
-                            .tag(item)
+                    ForEach(SettingsPage.sidebarSections, id: \.title) { section in
+                        Section(section.title) {
+                            ForEach(section.pages) { item in
+                                Label(item.title, systemImage: item.symbol)
+                                    .tag(item)
+                            }
+                        }
                     }
                 }
                 .listStyle(.sidebar)
                 footer
             }
-            .navigationSplitViewColumnWidth(min: 188, ideal: 200, max: 220)
+            .navigationSplitViewColumnWidth(min: 196, ideal: 212, max: 240)
         } detail: {
             switch page ?? .home {
             case .home:

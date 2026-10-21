@@ -6,26 +6,28 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–11)
+## Final summary (Runs 1–12)
 
 ### What changed overall (kept)
 
 | Area | Change |
 | --- | --- |
-| Stability | Cancel vs in-flight capture; mic volume restore; Accessibility prompt; overlay rebuild on display change; PTT release-during-begin latch; tap buffer `memcpy`; speech-follow cancel; live decode error advance; empty-transcript menu cue |
+| Stability | Cancel vs in-flight capture; mic volume restore; Accessibility prompt; overlay rebuild on display change; PTT release-during-begin latch; tap buffer `memcpy`; speech-follow cancel; live decode error advance; empty-transcript menu cue; Shift tap deferral; **FontMetrics nil-font guard** |
 | Silence P0 | Whisper `suppressBlank` + `NonSpeechFilter` (no `[BLANK_AUDIO]` / `(silence)` captions) |
-| UX | Busy menu icon; plain-language `UserFacingError`; shortcut copy; island a11y |
+| UX | Busy menu icon; plain-language `UserFacingError`; shortcut copy; island a11y; Settings sections + Models page |
 | Onboarding | Permissions recovery; model progress; 5 s practice (skips paste) |
 | Performance | Whisper `prewarm` (+450 ms defer); live window cap; PCM soft-cap + file merge; integer absolute sample counts; Copy Last Again |
 | Live window (Run 9–10) | Cap truncates the **end** (from `confirmedEnd`); holdback uses **window end**, not full buffer duration |
+| **BYOM (Run 12)** | Custom WhisperKit Core ML folder + HF repo/variant; optional OpenAI-compatible final engine (Keychain); `RoutingTranscriber`; fallback to default Whisper on failure |
 
 ### Reverted (Run 9, still gone)
 
 - **Quiet-room calibration** — fixed SpeechGate **0.28** (matches `main`). No dangling Swift/pbxproj refs.
 
-### Run 11 (final regression)
+### Run 12 (BYOM + Settings)
 
-- **No code changes.** Re-audited Run 10 holdback + core flows vs `main`. Ship as-is pending Mac P0.
+- Implemented Phase A + optional Phase C from `docs/BRING_YOUR_OWN_MODEL.md`.
+- Crash sweep on new paths: no force-unwraps into attributes dicts; multipart filename sanitized; bookmark access scoped; Keychain for API key.
 
 ### Still risky (no Mac build)
 
@@ -33,6 +35,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - Prewarm CPU after cold launch; uncapped final decode CPU on very long takes; PCM trim >10 min + AAC merge.
 - Soft speech vs `noSpeechThreshold: 0.6` + NonSpeechFilter.
 - MenuBarExtra SF Symbol swaps mid-session.
+- BYOM: huge custom models; stale security-scoped bookmarks; OpenAI schema drift; network on stop.
 - Unused `PushToTalk.isArmed` left from Run 9 (harmless; latch-only stop path).
 
 ---
@@ -43,7 +46,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ### P0 — must pass before recording
 
-- [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`, `SpeechModelTests` holdback).
+- [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`, `SpeechModelTests` holdback, **`FontMetricsTests`**, **`BYOMTests`**).
 - [ ] **Hotkey toggle** (PTT off): start → speak → stop → transcript on clipboard / paste.
 - [ ] **Menu Start / Home Start with Push-to-Talk ON** — session must **stay recording** until Stop (must not auto-stop instantly).
 - [ ] **PTT hold**: press chord → speak → release → stops; brief press during mic prompt also stops (not stuck recording).
@@ -51,6 +54,10 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Soft speech ~5 s still transcribes.
 - [ ] Cancel mid-session → no resurrected folder; next session still works.
 - [ ] Raise-input-volume on → stop → system mic level restored.
+- [ ] **Island clock** ticks past `1:00` / `10:00` with no `NSInvalidArgumentException` font crash.
+- [ ] **BYOM built-in**: switch tiny ↔ balanced → session still transcribes.
+- [ ] **BYOM folder** (optional): add a valid WhisperKit Core ML folder → select → record → stop.
+- [ ] **OpenAI-compatible** (optional): set base URL + key → live captions off → stop yields transcript or clear fallback error.
 
 ### P1 — launch / first-run
 
@@ -65,6 +72,33 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Optional: >10 min under PCM retain cap → file merge OK.
 - [ ] Display plug/unplug while marking; double Paste Image and Text once only.
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
+
+---
+
+## Run 12 — BYOM + Models Settings
+
+### Scope
+
+Implement bring-your-own-model per `docs/BRING_YOUR_OWN_MODEL.md` (WhisperKit custom folder + HF download; optional OpenAI-compatible final engine). Polish Settings sidebar/Models UI. Keep island alone except prior font crash fix. Compile-careful on Linux VM.
+
+### Delivered
+
+| Piece | Notes |
+| --- | --- |
+| `CustomWhisperCatalog` / `WhisperModelValidator` / `WhisperSourceResolver` | Persist + validate folder/HF entries |
+| `WhisperKitTranscriber` | Custom folder (security-scoped), custom repo download, `unload()` |
+| `OpenAICompatibleTranscriber` | `/v1/audio/transcriptions`, Keychain key, verbose_json words |
+| `RoutingTranscriber` | Engine switch; live no-op for OpenAI; fallback to default Whisper |
+| Models Settings page | Engine picker, built-ins, custom list, HF form, OpenAI form, empty/error states |
+| Sidebar | Session / Speech / App sections; page titled Models |
+| Tests | `BYOMTests` (validator, catalog, resolver, OpenAI parse/URL, settings) |
+
+### Crash sweep (new code)
+
+- No `try!` / `as!` / `fatalError` in new Speech/Settings paths.
+- Multipart filename sanitized; Keychain replaces rather than stacking.
+- Folder access via security-scoped bookmark start/stop.
+- Invalid custom selection falls back to built-in balanced model.
 
 ---
 

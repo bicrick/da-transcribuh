@@ -18,7 +18,7 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         case .recording: return "Recording"
         case .configuration: return "Configuration"
         case .sound: return "Sound"
-        case .model: return "Model"
+        case .model: return "Models"
         case .performance: return "Performance"
         }
     }
@@ -33,6 +33,15 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         case .model: return "waveform"
         case .performance: return "memorychip"
         }
+    }
+
+    /// Sidebar grouping for a clearer native Settings layout.
+    static var sidebarSections: [(title: String, pages: [SettingsPage])] {
+        [
+            ("Session", [.home, .history, .recording]),
+            ("Speech", [.model]),
+            ("App", [.configuration, .sound, .performance]),
+        ]
     }
 }
 

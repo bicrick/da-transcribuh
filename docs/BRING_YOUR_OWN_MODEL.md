@@ -1,6 +1,8 @@
 # Bring Your Own Model (BYOM)
 
-Analysis only — no implementation in this document. Goal: understand how hard it would be to let Mutter users plug in their own speech-to-text engine while keeping the current WhisperKit path as the default.
+Design notes for Mutter’s speech-engine flexibility. **Implemented on `overnight-audit`:** custom WhisperKit Core ML folders, Hugging Face repo+variant downloads, and an optional OpenAI-compatible `/v1/audio/transcriptions` final engine (Keychain API key, live captions off). whisper.cpp remains deferred.
+
+Original analysis goal: understand how hard it would be to let Mutter users plug in their own speech-to-text engine while keeping the current WhisperKit path as the default.
 
 ## Current state
 

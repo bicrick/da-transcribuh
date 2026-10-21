@@ -10,16 +10,21 @@ final class ModelTransfer: ObservableObject {
 
     var isWorking: Bool { workingVariant != nil }
 
-    func download(_ variant: String) {
+    func download(_ variant: String, repo: String = WhisperKitTranscriber.modelRepo) {
+        let trimmedVariant = variant.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedVariant.isEmpty else {
+            message = "Enter a model variant to download."
+            return
+        }
         generation += 1
         let generation = generation
         task?.cancel()
         message = nil
         fraction = 0
-        workingVariant = variant
+        workingVariant = trimmedVariant
         task = Task { [weak self] in
             do {
-                _ = try await WhisperKitTranscriber.fetch(variant: variant) { value in
+                _ = try await WhisperKitTranscriber.fetch(variant: trimmedVariant, repo: repo) { value in
                     Task { @MainActor in
                         guard self?.generation == generation else { return }
                         self?.fraction = value
@@ -96,7 +101,7 @@ struct SpeechModelPicker: View {
     }
 
     private func modelCard(_ choice: SpeechModelChoice) -> some View {
-        let selected = settings.speechModel == choice.variant
+        let selected = settings.customModelID == nil && settings.speechModel == choice.variant
         return Button {
             settings.setSpeechModel(choice.variant)
             transfer.message = nil
