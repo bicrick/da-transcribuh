@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ConfigurationPage: View {
     @ObservedObject var settings: AppSettings
+    @ObservedObject private var session = SessionController.shared
     @State private var capture: CaptureTarget?
     @State private var message: String?
     @State private var updateMessage = "This build is \(AppVersion.label)."
@@ -10,6 +11,8 @@ struct ConfigurationPage: View {
     @State private var folderNote: String?
     @State private var folderPath = SessionStore.displayPath()
     @State private var customFolder = SessionStore.usesCustomFolder()
+    @State private var calibratingQuietRoom = false
+    @State private var quietRoomNote: String?
 
     private enum CaptureTarget {
         case toggle
@@ -198,6 +201,7 @@ struct ConfigurationPage: View {
                     .labelsHidden()
                     .frame(width: 110)
                 }
+                quietRoomRow
                 labeledPicker("Maximum session", "Stops a long recording even if you are still talking.") {
                     Picker("Maximum session", selection: Binding(
                         get: { settings.maxSessionMinutes },
@@ -273,6 +277,59 @@ struct ConfigurationPage: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(12)
+        }
+    }
+
+    private var quietRoomRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            settingCopy(
+                "Quiet-room calibration",
+                "Sit silently for about two seconds. Mutter samples the mic floor and tunes speech detection and silence-stop. Leave unset to keep the default."
+            )
+            HStack(spacing: 8) {
+                Button(calibratingQuietRoom ? "Listening…" : "Calibrate quiet room") {
+                    Task { await runQuietRoomCalibration() }
+                }
+                .disabled(
+                    calibratingQuietRoom
+                        || session.isBusy
+                        || session.phase == .recording
+                )
+                if settings.hasSpeechGateCalibration {
+                    Button("Reset") {
+                        settings.setSpeechGateThreshold(nil)
+                        quietRoomNote = "Using the default speech floor again."
+                    }
+                }
+            }
+            if let quietRoomNote {
+                Text(quietRoomNote)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            } else if let value = settings.speechGateThreshold {
+                Text(String(format: "Calibrated floor %.2f (default %.2f).", value, Double(SpeechGate.defaultThreshold)))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @MainActor
+    private func runQuietRoomCalibration() async {
+        calibratingQuietRoom = true
+        quietRoomNote = "Stay quiet…"
+        let outcome = await QuietRoomCalibration.sampleAmbient()
+        calibratingQuietRoom = false
+        switch outcome {
+        case .calibrated(let threshold, let ambient):
+            settings.setSpeechGateThreshold(Double(threshold))
+            quietRoomNote = String(
+                format: "Room ~%.2f → gate %.2f. Soft speech should still clear it.",
+                Double(ambient),
+                Double(threshold)
+            )
+        case .failed(let message):
+            quietRoomNote = message
         }
     }
 

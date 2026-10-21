@@ -2,6 +2,81 @@
 
 Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes kept compile-safe and small.
 
+## Run 6 — Re-audit performance + quiet-room calibration
+
+### Re-audit of Run 5 (performance)
+
+| Change | Verdict |
+| --- | --- |
+| Whisper `prewarm: true` + 450 ms deferred launch prepare | Sound; kept. |
+| Live `LiveSampleWindow` ~45 s cap | **Bug:** same cap was applied on the **final** sample decode. If live lagged (`confirmedEnd` stale), stop could drop the middle of a multi-minute take. Fixed: final/tail passes `maxSeconds: nil`. |
+| PCM retain cap + file merge | Sound; kept. |
+| Speech-follow off MainActor | Sound; kept. |
+| `absoluteCount` via `timeOffset * 16_000` | **Bug:** float round-trip can drift by a sample after trim. Fixed: `SpeechBufferSnapshot.absoluteCount` is integer `dropped + retained`; `consume` takes `absoluteEndCount`. |
+| `decodeFileMergingLive` | Sound; kept. |
+| Performance disk-walk cache | Sound; kept. |
+| Copy Last Again | Sound; kept. Menu still refreshes via `lastSessionURL` / session publishes. |
+
+### Fixed this round
+
+1. **Final decode must not use the live window cap** (`LiveSampleWindow.slice(maxSeconds:)`, `Transcriber.decode(capWindow:)`)  
+   Live consume still caps ~45 s. Final/tail sample decode only clips from `confirmedEnd` (with overlap) and keeps the full remainder.
+
+2. **Trimmed-buffer sample index drift** (`SpeechBufferSnapshot.absoluteCount`, `consume(…absoluteEndCount:)`)  
+   Live follow no longer reconstructs the absolute end index from a floating `timeOffset`.
+
+### Added this round
+
+3. **Quiet-room calibration** (ranked #7)  
+   - `QuietRoomCalibration` — ~1.6 s ambient meter sample → threshold = ambient + 0.08, clamped to 0.18…0.55.  
+   - `SpeechGate` stores an optional calibrated floor (default **0.28** when unset — unchanged behavior).  
+   - `AppSettings.speechGateThreshold` persists under `session.speechGateThreshold`.  
+   - Configuration → Advanced: **Calibrate quiet room** / **Reset**. Disabled while recording/busy.  
+   - **Revert:** remove `QuietRoomCalibration.swift`, the Configuration quiet-room row, `speechGateThreshold` on `AppSettings`, and restore `SpeechGate` to a fixed `threshold = 0.28` (or `git revert` the calibration commit).
+
+### Suspected but not verified on a Mac
+
+- Quiet-room sample while another app holds the mic exclusively.
+- Calibrated lower gate in a truly silent room vs soft-speech demos.
+- Final uncapped sample decode on a ~10 min complete buffer (CPU time at stop).
+- Prewarm / Copy Last Again / long-take memory (carry-over from Run 5).
+
+### Test this tomorrow on a Mac
+
+**Carry over from Runs 1–5** (abbreviated)
+
+- [ ] Silence P0 + soft speech + menu bar busy icon + plain-language errors.
+- [ ] PTT / cancel / volume restore / paste-once / onboarding practice.
+- [ ] Cold launch prewarm + live long take + Copy Last Again (Run 5 list).
+
+**New for Run 6**
+
+- [ ] **Final decode after live lag:** start a ~2 min take; if possible throttle CPU so live falls behind; stop → full transcript (not only the last ~45 s).
+- [ ] **Long take under retain cap:** ~3–5 min spoken session (buffer still complete) → full words on clipboard.
+- [ ] **Quiet-room calibrate:** Configuration → Calibrate quiet room (stay silent) → note shows room/gate values; soft speech still marks heard / transcribes; Reset restores default; relaunch keeps calibration until Reset.
+- [ ] Calibrate with silence-stop set to 1.25 s → speech then quiet still auto-stops.
+- [ ] Calibrate button disabled while a session is recording.
+
+### Proposed polish / features (ranked)
+
+1. ~~Menu bar phase icon + status / error cues~~ — **done** (Run 3).
+2. ~~Clearer settings / shortcut copy + a11y labels~~ — **done** (Run 3).
+3. ~~First-run “try a 5-second session”~~ — **done** (Run 4).
+4. ~~Faster first transcript (prewarm + deferred prepare)~~ — **done** (Run 5).
+5. ~~Cap / slice live `speechSamples`~~ — **done** (Run 5).
+6. ~~One-click “Copy again” in the menu~~ — **done** (Run 5).
+7. ~~Quiet-room calibration~~ — **done** (Run 6).
+8. **Processing island status label** — optional “Transcribing” text in the capsule (today: wave-only by design; menu bar carries the cue). *(UX — later if demos still confuse)*
+9. **Per-display chrome placement lock** — keep the island on the recording display. *(UX — later)*
+10. **Session history scrubber** / **export share sheet** — *(features — later)*
+
+### What’s next (later runs)
+
+- Hardware-confirm Run 5–6 items on a real Mac before the launch video.
+- Do not touch `promo-video`.
+
+---
+
 ## Run 5 — Performance
 
 ### Re-audit of Run 4 (onboarding)

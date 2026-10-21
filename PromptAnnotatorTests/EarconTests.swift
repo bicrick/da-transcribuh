@@ -66,6 +66,16 @@ final class EarconTests: XCTestCase {
 }
 
 final class SpeechGateTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        SpeechGate.setCalibratedThreshold(nil)
+    }
+
+    override func tearDown() {
+        SpeechGate.setCalibratedThreshold(nil)
+        super.tearDown()
+    }
+
     func testAClickDoesNotCountAsSpeech() {
         var voiced = 0
         var heard = false
@@ -80,6 +90,33 @@ final class SpeechGateTests: XCTestCase {
         SpeechGate.note(level: 0.4, voicedBuffers: &voiced, heard: &heard)
         SpeechGate.note(level: 0.45, voicedBuffers: &voiced, heard: &heard)
         XCTAssertTrue(heard)
+    }
+
+    func testCalibrationRaisesTheGate() {
+        SpeechGate.setCalibratedThreshold(0.5)
+        XCTAssertEqual(SpeechGate.threshold, 0.5, accuracy: 0.001)
+        var voiced = 0
+        var heard = false
+        SpeechGate.note(level: 0.4, voicedBuffers: &voiced, heard: &heard)
+        SpeechGate.note(level: 0.45, voicedBuffers: &voiced, heard: &heard)
+        XCTAssertFalse(heard)
+        SpeechGate.note(level: 0.52, voicedBuffers: &voiced, heard: &heard)
+        SpeechGate.note(level: 0.55, voicedBuffers: &voiced, heard: &heard)
+        XCTAssertTrue(heard)
+    }
+}
+
+final class QuietRoomCalibrationTests: XCTestCase {
+    func testThresholdAddsMarginAndClamps() {
+        XCTAssertEqual(QuietRoomCalibration.threshold(ambientLevel: 0.12), 0.20, accuracy: 0.001)
+        XCTAssertEqual(QuietRoomCalibration.threshold(ambientLevel: 0.01), QuietRoomCalibration.minimumThreshold, accuracy: 0.001)
+        XCTAssertEqual(QuietRoomCalibration.threshold(ambientLevel: 0.9), QuietRoomCalibration.maximumThreshold, accuracy: 0.001)
+    }
+
+    func testUnitLevelMatchesRecorderScale() {
+        XCTAssertEqual(QuietRoomCalibration.unitLevel(decibels: 0), 1, accuracy: 0.001)
+        XCTAssertEqual(QuietRoomCalibration.unitLevel(decibels: -50), 0, accuracy: 0.001)
+        XCTAssertEqual(QuietRoomCalibration.unitLevel(decibels: -25), 0.5, accuracy: 0.001)
     }
 }
 

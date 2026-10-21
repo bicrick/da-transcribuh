@@ -36,6 +36,7 @@ final class SettingsBehaviorTests: XCTestCase {
     }
 
     func testSilenceStopWaitsForSpeechThenQuiet() {
+        SpeechGate.setCalibratedThreshold(nil)
         var watch = SilenceWatch()
         XCTAssertFalse(watch.tick(level: 0.05, heardSpeech: false, limit: 1, delta: 0.5))
         XCTAssertFalse(watch.tick(level: 0.5, heardSpeech: true, limit: 1, delta: 0.5))
@@ -43,6 +44,26 @@ final class SettingsBehaviorTests: XCTestCase {
         XCTAssertTrue(watch.tick(level: 0.05, heardSpeech: true, limit: 1, delta: 0.7))
         XCTAssertFalse(SessionLimits.reachedMax(elapsed: 30, minutes: 0))
         XCTAssertTrue(SessionLimits.reachedMax(elapsed: 120, minutes: 2))
+    }
+
+    @MainActor
+    func testSpeechGateCalibrationPersistsAndResets() {
+        let name = "PromptAnnotatorTests.speechGate"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertNil(settings.speechGateThreshold)
+        XCTAssertEqual(SpeechGate.threshold, SpeechGate.defaultThreshold, accuracy: 0.001)
+        settings.setSpeechGateThreshold(0.33)
+        XCTAssertEqual(settings.speechGateThreshold ?? 0, 0.33, accuracy: 0.001)
+        XCTAssertEqual(SpeechGate.threshold, 0.33, accuracy: 0.001)
+        let reloaded = AppSettings(defaults: defaults)
+        XCTAssertEqual(reloaded.speechGateThreshold ?? 0, 0.33, accuracy: 0.001)
+        settings.setSpeechGateThreshold(nil)
+        XCTAssertNil(settings.speechGateThreshold)
+        XCTAssertEqual(SpeechGate.threshold, SpeechGate.defaultThreshold, accuracy: 0.001)
+        defaults.removePersistentDomain(forName: name)
+        SpeechGate.setCalibratedThreshold(nil)
     }
 
     func testInputListDoesNotCrash() {
