@@ -132,18 +132,7 @@ actor WhisperKitTranscriber: Transcribing {
             return Transcript(words: merged.words, model: resolved.variant)
         }
 
-        let options = DecodingOptions(
-            language: "en",
-            temperatureFallbackCount: 1,
-            usePrefillPrompt: true,
-            detectLanguage: false,
-            skipSpecialTokens: true,
-            wordTimestamps: true,
-            windowClipTime: 0,
-            concurrentWorkerCount: 4,
-            chunkingStrategy: .vad
-        )
-        let results = try await active.transcribe(audioPath: audioURL.path, decodeOptions: options)
+        let results = try await active.transcribe(audioPath: audioURL.path, decodeOptions: Self.decodingOptions(chunking: .vad))
         live.reset()
         return Transcript(words: Self.words(from: results), model: resolved.variant)
     }
@@ -313,16 +302,7 @@ actor WhisperKitTranscriber: Transcribing {
     }
 
     private func decode(samples: [Float], pipe: WhisperKit, clipStart: TimeInterval) async throws -> [TimedWord] {
-        var options = DecodingOptions(
-            language: "en",
-            temperatureFallbackCount: 1,
-            usePrefillPrompt: true,
-            detectLanguage: false,
-            skipSpecialTokens: true,
-            wordTimestamps: true,
-            windowClipTime: 0,
-            concurrentWorkerCount: 4
-        )
+        var options = Self.decodingOptions(chunking: nil)
         if clipStart > 0.05 {
             options.clipTimestamps = [Float(clipStart)]
         } else if samples.count > WhisperKit.sampleRate * 30 {
@@ -332,14 +312,35 @@ actor WhisperKitTranscriber: Transcribing {
         return Self.words(from: results)
     }
 
+    /// Shared decode settings. `suppressBlank` and a slightly stricter no-speech gate
+    /// cut silent-window hallucinations; `NonSpeechFilter` still scrubs any that slip through.
+    private static func decodingOptions(chunking: ChunkingStrategy?) -> DecodingOptions {
+        DecodingOptions(
+            language: "en",
+            temperatureFallbackCount: 1,
+            usePrefillPrompt: true,
+            detectLanguage: false,
+            skipSpecialTokens: true,
+            wordTimestamps: true,
+            windowClipTime: 0,
+            suppressBlank: true,
+            compressionRatioThreshold: 2.4,
+            logProbThreshold: -1.0,
+            noSpeechThreshold: 0.5,
+            concurrentWorkerCount: 4,
+            chunkingStrategy: chunking
+        )
+    }
+
     private static func words(from results: [TranscriptionResult]) -> [TimedWord] {
-        results
+        let timed = results
             .flatMap(\.allWords)
             .map { TimedWord(text: $0.word, start: TimeInterval($0.start), end: TimeInterval($0.end)) }
             .sorted { lhs, rhs in
                 if lhs.start == rhs.start { return lhs.end < rhs.end }
                 return lhs.start < rhs.start
             }
+        return NonSpeechFilter.filterWords(timed)
     }
 }
 
