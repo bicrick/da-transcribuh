@@ -75,7 +75,7 @@ final class SessionController: ObservableObject {
     private var isStarting = false
     private var chromeScreenID: CGDirectDisplayID?
     private var lastToggle = Date.distantPast
-    private var didOfferPermissions = false
+    private var lastOfferedPermissions: String?
     private var keepTranscribing = false
     private var speechTask: Task<Void, Never>?
     private var lastSpeechCount = 0
@@ -610,6 +610,7 @@ final class SessionController: ObservableObject {
             selectionRect = nil
             tool = AppSettings.shared.defaultTool
             color = AppSettings.shared.defaultColor
+            lastOfferedPermissions = nil
             setPhase(.recording)
             startTimer()
             transcriber.resetLive()
@@ -857,6 +858,9 @@ final class SessionController: ObservableObject {
             return
         }
 
+        // Hold the session folder across the await. Cancel clears `directory`; a new
+        // session replaces it. Either way, discard this shot instead of writing again.
+        let sessionDirectory = directory
         do {
             let captured = try await DisplayCapture.capture(
                 displayID: resolvedID,
@@ -864,6 +868,7 @@ final class SessionController: ObservableObject {
                 shapes: significant,
                 excludedWindowIDs: overlay.windowIDs() + chrome.windowIDs()
             )
+            guard self.directory == sessionDirectory else { return }
             let image: CGImage
             if let crop {
                 guard let cropped = RegionCrop.crop(captured, selection: crop, pointSize: screen.frame.size) else {
@@ -875,7 +880,7 @@ final class SessionController: ObservableObject {
                 image = captured
             }
             let index = groups.count + 1
-            let url = directory.appendingPathComponent(String(format: "frames/%02d.png", index))
+            let url = sessionDirectory.appendingPathComponent(String(format: "frames/%02d.png", index))
             try PNG.write(image, to: url)
             groups.append(
                 StoredGroup(
@@ -897,6 +902,7 @@ final class SessionController: ObservableObject {
             redoGroups.removeAll()
             refreshControls()
         } catch {
+            guard self.directory == sessionDirectory else { return }
             log.error("Capture failed: \(error.localizedDescription, privacy: .public)")
             lastError = error.localizedDescription
             restore(significant, allowEmpty: allowEmpty)
@@ -1149,8 +1155,10 @@ final class SessionController: ObservableObject {
 
     private func offerPermissions(_ status: Permissions.Status) {
         lastError = status.summary.map { "Turn on \($0), then reopen the app." }
-        guard !didOfferPermissions else { return }
-        didOfferPermissions = true
+        // Re-open Settings when the missing set changes (e.g. mic granted, screen still off).
+        let missing = status.summary ?? ""
+        guard missing != lastOfferedPermissions else { return }
+        lastOfferedPermissions = missing
         Permissions.revealSettings(for: status)
     }
 
