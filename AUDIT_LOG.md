@@ -2,6 +2,102 @@
 
 Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes kept compile-safe and small.
 
+**Fallback if anything breaks on the Mac: use `main`.** Do not ship `promo-video`. This branch never had an Xcode build on the overnight VM.
+
+---
+
+## Final summary (Runs 1–9)
+
+### What changed overall (kept)
+
+| Area | Change |
+| --- | --- |
+| Stability | Cancel vs in-flight capture; mic volume restore; Accessibility prompt; overlay rebuild on display change; PTT release-during-begin latch; tap buffer `memcpy`; speech-follow cancel; live decode error advance; empty-transcript menu cue |
+| Silence P0 | Whisper `suppressBlank` + `NonSpeechFilter` (no `[BLANK_AUDIO]` / `(silence)` captions) |
+| UX | Busy menu icon; plain-language `UserFacingError`; shortcut copy; island a11y |
+| Onboarding | Permissions recovery; model progress; 5 s practice (skips paste) |
+| Performance | Whisper `prewarm` (+450 ms defer); live window cap; PCM soft-cap + file merge; integer absolute sample counts; Copy Last Again |
+| Live window (Run 9) | Cap truncates the **end** (advances from `confirmedEnd`), not a jump to the tail |
+
+### Reverted this round (Run 9)
+
+- **Quiet-room calibration** — removed `QuietRoomCalibration`, Configuration row, `speechGateThreshold`, mutable `SpeechGate` threshold. Gate is fixed **0.28** again (matches `main`). Too easy to break soft-speech / silence demos without a Mac build.
+
+### Fixed this round (Run 9)
+
+1. **Menu/Home Start + Push-to-Talk auto-stopped** — `!PushToTalk.shared.isArmed` treated menu Start like a released chord. Now only the release latch stops; menu/practice clear any stale latch before `begin()`.
+2. **Live 45 s window jumped to the buffer tail** when nothing was confirmed yet → permanent hole in mid-take words. Cap now keeps the head of the unconfirmed remainder.
+3. **Speech-follow “off MainActor”** — was still MainActor-bound; restored explicit `@MainActor` Task (cancel/throwing sleep kept).
+
+### Still risky (no Mac build)
+
+- Full `xcodebuild` + unit tests never run on this VM.
+- Prewarm CPU after cold launch; uncapped final decode CPU on very long takes; PCM trim >10 min + AAC merge.
+- Soft speech vs `noSpeechThreshold: 0.6` + NonSpeechFilter.
+- MenuBarExtra SF Symbol swaps mid-session.
+
+---
+
+## Mac test checklist (do in order)
+
+**If anything fails: fall back to `main` for the launch video.**
+
+### P0 — must pass before recording
+
+- [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`).
+- [ ] **Hotkey toggle** (PTT off): start → speak → stop → transcript on clipboard / paste.
+- [ ] **Menu Start / Home Start with Push-to-Talk ON** — session must **stay recording** until Stop (must not auto-stop instantly).
+- [ ] **PTT hold**: press chord → speak → release → stops; brief press during mic prompt also stops (not stuck recording).
+- [ ] **Silence P0**: 10–20 s quiet → empty transcript; menu **No speech detected** (no `[BLANK_AUDIO]` / `(silence)`).
+- [ ] Soft speech ~5 s still transcribes.
+- [ ] Cancel mid-session → no resurrected folder; next session still works.
+- [ ] Raise-input-volume on → stop → system mic level restored.
+
+### P1 — launch / first-run
+
+- [ ] Cold launch: menu bar + Settings/welcome paint before prewarm pegs CPU; model shows Loaded.
+- [ ] Fresh onboarding: permissions → shortcut → model download → practice 5 s (no paste into welcome) → later real session still pastes when paste-on-stop is on.
+- [ ] Menu bar: idle pencil / recording filled / busy ellipsis; plain-language errors.
+- [ ] Copy Last Again after another app overwrites the clipboard.
+
+### P2 — long take / edge
+
+- [ ] Live ~2–3 min continuous speech → stop → full words (not only last ~45 s). Optional: >10 min under PCM retain cap → file merge OK.
+- [ ] Display plug/unplug while marking; double Paste Image and Text once only.
+- [ ] Quit while recording → volume restored; PTT works after relaunch.
+
+---
+
+## Run 9 — Consistency / regression review (no new features)
+
+### Scope
+
+Diff `overnight-audit` vs `main` (~+2600 lines, never Xcode-built). Re-audit recent quiet-room / live-window / PTT changes. Prefer revert to `main` behavior over clever unverified fixes.
+
+### Actions
+
+| Item | Verdict |
+| --- | --- |
+| Quiet-room calibration | **REVERTED** to fixed SpeechGate 0.28 |
+| PTT + menu/Home Start | **FIXED** (latch only; clear stale latch on toggle/practice) |
+| Live window cap | **FIXED** (head-cap from confirmedEnd, not tail-jump) |
+| Speech-follow off-main claim | **SIMPLIFIED** back to `@MainActor` Task |
+| Prewarm / PCM soft-cap / Copy Last Again / NonSpeechFilter / onboarding / UX | **KEPT** |
+| Volume restore / capture cancel / Accessibility prompt / overlay rebuild | **KEPT** (strictly safer than main) |
+
+### Compile-safety notes
+
+- Deleted `QuietRoomCalibration.swift`; synchronized root groups auto-drop it.
+- Restored `SpeechGate` / `AppSettings` / Configuration / tests to symbols that match the revert.
+- No new files; no pbxproj membership edits required.
+
+### What’s next
+
+- Hardware-confirm P0 on a real Mac before the launch video.
+- Do not touch `promo-video`. No new features on this branch.
+
+---
+
 ## Run 8 — Second compile-safety review (no new features)
 
 ### Scope

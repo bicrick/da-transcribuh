@@ -1,4 +1,3 @@
-import CoreGraphics
 import Foundation
 
 enum SoundTheme: String, CaseIterable, Identifiable, Codable {
@@ -90,8 +89,6 @@ final class AppSettings: ObservableObject {
     @Published var errorLogging: Bool
     @Published var showInDock: Bool
     @Published var silenceStopSeconds: Double
-    /// Optional SpeechGate floor from quiet-room calibration; `nil` keeps the default 0.28.
-    @Published var speechGateThreshold: Double?
     @Published var maxSessionMinutes: Double
     @Published var normalizeSpeech: Bool
     @Published var pasteOnStop: Bool
@@ -136,20 +133,8 @@ final class AppSettings: ObservableObject {
         errorLogging = defaults.bool(forKey: Keys.errorLog)
         showInDock = defaults.object(forKey: Keys.dock) as? Bool ?? true
         silenceStopSeconds = defaults.object(forKey: Keys.silence) as? Double ?? 0
-        if defaults.object(forKey: Keys.speechGate) != nil {
-            let raw = defaults.double(forKey: Keys.speechGate)
-            speechGateThreshold = Double(
-                min(
-                    QuietRoomCalibration.maximumThreshold,
-                    max(QuietRoomCalibration.minimumThreshold, CGFloat(raw))
-                )
-            )
-        } else {
-            speechGateThreshold = nil
-        }
         maxSessionMinutes = defaults.object(forKey: Keys.maxMinutes) as? Double ?? 0
         normalizeSpeech = defaults.bool(forKey: Keys.normalize)
-        SpeechGate.setCalibratedThreshold(speechGateThreshold.map { CGFloat($0) })
         pasteOnStop = defaults.object(forKey: Keys.pasteOnStop) as? Bool ?? true
         returnOnShift = defaults.bool(forKey: Keys.returnOnShift)
         capitalizeTranscript = defaults.bool(forKey: Keys.capitalize)
@@ -244,29 +229,6 @@ final class AppSettings: ObservableObject {
         persist(Keys.silence, seconds)
     }
 
-    func setSpeechGateThreshold(_ value: Double?) {
-        guard !isLoading else { return }
-        if let value {
-            let clamped = Double(
-                min(
-                    QuietRoomCalibration.maximumThreshold,
-                    max(QuietRoomCalibration.minimumThreshold, CGFloat(value))
-                )
-            )
-            speechGateThreshold = clamped
-            defaults.set(clamped, forKey: Keys.speechGate)
-            SpeechGate.setCalibratedThreshold(CGFloat(clamped))
-        } else {
-            speechGateThreshold = nil
-            defaults.removeObject(forKey: Keys.speechGate)
-            SpeechGate.setCalibratedThreshold(nil)
-        }
-    }
-
-    var hasSpeechGateCalibration: Bool {
-        speechGateThreshold != nil
-    }
-
     func setMaxSessionMinutes(_ minutes: Double) {
         maxSessionMinutes = minutes
         persist(Keys.maxMinutes, minutes)
@@ -359,7 +321,6 @@ final class AppSettings: ObservableObject {
         static let errorLog = "app.errorLog"
         static let dock = "app.showInDock"
         static let silence = "session.silenceStop"
-        static let speechGate = "session.speechGateThreshold"
         static let maxMinutes = "session.maxMinutes"
         static let normalize = "session.normalize"
         static let pasteOnStop = "session.pasteOnStop"

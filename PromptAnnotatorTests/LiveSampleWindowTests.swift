@@ -16,7 +16,8 @@ final class LiveSampleWindowTests: XCTestCase {
         XCTAssertEqual(slice.samples.count, samples.count)
     }
 
-    func testLongBufferWithoutClipKeepsOnlyTheTail() {
+    /// Live cap must advance from the start (or clipStart), never jump to the tail.
+    func testLongBufferWithoutClipKeepsOnlyTheHead() {
         let seconds = 90
         let samples = Array(repeating: Float(0.1), count: rate * seconds)
         let slice = LiveSampleWindow.slice(
@@ -26,7 +27,7 @@ final class LiveSampleWindowTests: XCTestCase {
             sampleRate: rate
         )
         XCTAssertEqual(slice.samples.count, Int(LiveSampleWindow.maxSeconds * Double(rate)))
-        XCTAssertEqual(slice.timeOffset, Double(seconds) - LiveSampleWindow.maxSeconds, accuracy: 0.001)
+        XCTAssertEqual(slice.timeOffset, 0, accuracy: 0.001)
     }
 
     func testClipStartSlicesWithOverlap() {
@@ -41,6 +42,21 @@ final class LiveSampleWindowTests: XCTestCase {
         XCTAssertEqual(slice.timeOffset, clip - LiveSampleWindow.overlap, accuracy: 0.001)
         let expected = Int((Double(40) - (clip - LiveSampleWindow.overlap)) * Double(rate))
         XCTAssertEqual(slice.samples.count, expected)
+    }
+
+    /// After a mid-session confirm, a long remainder is capped from clipStart forward — not the tail.
+    func testLongRemainderAfterClipKeepsHeadOfRemainder() {
+        let seconds = 180
+        let samples = Array(repeating: Float(0.1), count: rate * seconds)
+        let clip: TimeInterval = 30
+        let slice = LiveSampleWindow.slice(
+            samples: samples,
+            bufferStart: 0,
+            clipStart: clip,
+            sampleRate: rate
+        )
+        XCTAssertEqual(slice.timeOffset, clip - LiveSampleWindow.overlap, accuracy: 0.001)
+        XCTAssertEqual(slice.samples.count, Int(LiveSampleWindow.maxSeconds * Double(rate)))
     }
 
     func testBufferStartShiftsAbsoluteTime() {
@@ -66,7 +82,7 @@ final class LiveSampleWindowTests: XCTestCase {
         XCTAssertEqual(slice.timeOffset, 12)
     }
 
-    /// Final/tail decode must keep everything after clipStart, not a live-sized tail.
+    /// Final/tail decode must keep everything after clipStart, not a live-sized window.
     func testUncappedSliceKeepsFullRemainderAfterClip() {
         let seconds = 180
         let samples = Array(repeating: Float(0.1), count: rate * seconds)

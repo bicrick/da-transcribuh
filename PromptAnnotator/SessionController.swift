@@ -72,8 +72,7 @@ final class SessionController: ObservableObject {
     private var processingOrigin: [CGFloat] = []
     private var processingStartedAt: CFTimeInterval = 0
     private var captureTail: Task<Void, Never> = Task {}
-    /// Published so Configuration can disable Calibrate while begin() awaits mic/setup.
-    @Published private(set) var isStarting = false
+    private var isStarting = false
     private var chromeScreenID: CGDirectDisplayID?
     private var lastToggle = Date.distantPast
     private var lastOfferedPermissions: String?
@@ -87,8 +86,6 @@ final class SessionController: ObservableObject {
     private var pushToTalkReleasedWhileStarting = false
     /// Onboarding practice skips paste-on-stop so the welcome window is not disrupted.
     private var skipNextPaste = false
-    /// Practice starts via `begin()` without arming PTT monitors — do not treat that as an instant release.
-    private var ignorePushToTalkAutoStop = false
 
     var isBusy: Bool {
         switch phase {
@@ -98,9 +95,6 @@ final class SessionController: ObservableObject {
             return false
         }
     }
-
-    /// True while `begin()` is awaiting permissions / mic setup (phase may still be idle).
-    var isStartingSession: Bool { isStarting }
 
     var toggleTitle: String {
         phase == .recording ? "Stop Session" : "Start Session"
@@ -209,8 +203,9 @@ final class SessionController: ObservableObject {
         guard AppSettings.shared.pushToTalk else { return }
         if phase == .recording {
             Task { await finish() }
-        } else if isStarting {
-            // Key-up beat mic permission / setup — stop as soon as recording starts.
+        } else {
+            // Key-up before or during begin (including the gap after arm before isStarting).
+            // Only reached when PushToTalk was armed — menu/Home Start never arms.
             pushToTalkReleasedWhileStarting = true
         }
     }
@@ -221,9 +216,9 @@ final class SessionController: ObservableObject {
     func startOnboardingPractice() async -> Bool {
         guard !isBusy, phase != .recording, !isStarting else { return false }
         skipNextPaste = true
-        ignorePushToTalkAutoStop = true
+        // Practice does not arm PTT — clear any stale release latch so begin is not auto-stopped.
+        pushToTalkReleasedWhileStarting = false
         await begin()
-        ignorePushToTalkAutoStop = false
         if phase == .recording { return true }
         skipNextPaste = false
         return false
@@ -409,25 +404,20 @@ final class SessionController: ObservableObject {
     private func startSpeechFollow() {
         speechTask?.cancel()
         keepTranscribing = true
-        // PCM copy + Whisper consume stay off the main actor so long buffers do not hitch the island.
-        let audio = self.audio
-        let transcriber = self.transcriber
-        speechTask = Task {
+        // Stays on the main actor (SessionController is @MainActor). Cancel + throwing sleep
+        // so a new follow cannot resurrect after cancel/finish.
+        speechTask = Task { @MainActor in
             while !Task.isCancelled {
                 do {
                     try await Task.sleep(nanoseconds: 250_000_000)
                 } catch {
                     return
                 }
-                let last = await MainActor.run { () -> Int? in
-                    guard self.keepTranscribing else { return nil }
-                    return self.lastSpeechCount
-                }
-                guard let last, !Task.isCancelled else { return }
+                guard keepTranscribing, !Task.isCancelled else { return }
                 let count = audio.sampleCount()
-                guard count >= last + 16_000 else { continue }
+                guard count >= lastSpeechCount + 16_000 else { continue }
                 let buffer = audio.copySpeechBuffer()
-                await MainActor.run { self.lastSpeechCount = buffer.absoluteCount }
+                lastSpeechCount = buffer.absoluteCount
                 await transcriber.consume(
                     samples: buffer.samples,
                     bufferStart: buffer.timeOffset,
@@ -666,17 +656,14 @@ final class SessionController: ObservableObject {
         if phase == .recording {
             await finish()
         } else {
+            // Menu/Home Start never arms PTT — drop any stale release latch from an earlier chord.
+            pushToTalkReleasedWhileStarting = false
             await begin()
         }
     }
 
     private func begin() async {
         guard !isStarting, phase != .recording, !isBusy else { return }
-        // Quiet-room calibration owns the mic briefly — avoid a second capture stack.
-        guard !QuietRoomCalibration.isInProgress else {
-            lastError = "Finish quiet-room calibration first."
-            return
-        }
         isStarting = true
         defer { isStarting = false }
 
@@ -742,10 +729,8 @@ final class SessionController: ObservableObject {
             log.info("Session started at \(folder.path, privacy: .public)")
 
             // Push-to-talk release during permission wait would otherwise leave the session running.
-            // Onboarding practice calls `begin()` without arming PTT — skip that auto-stop.
-            let stopForPushToTalk = preferences.pushToTalk
-                && !ignorePushToTalkAutoStop
-                && (pushToTalkReleasedWhileStarting || !PushToTalk.shared.isArmed)
+            // Only the latch — never `!isArmed`, which would auto-stop menu/Home Start (they never arm).
+            let stopForPushToTalk = preferences.pushToTalk && pushToTalkReleasedWhileStarting
             pushToTalkReleasedWhileStarting = false
             if stopForPushToTalk {
                 PushToTalk.shared.disarm()

@@ -22,6 +22,10 @@ enum LiveSampleWindow {
     ///   - sampleRate: Whisper PCM rate (16 kHz).
     ///   - maxSeconds: Live paths pass `maxSeconds`; final/tail pass `nil` so a lagged live
     ///     buffer cannot drop the middle of a multi-minute take.
+    ///
+    /// Live caps **truncate the end** of the window (advance from `clipStart` forward).
+    /// Jumping the start to the buffer tail left a permanent hole when the first successful
+    /// decode happened after more than `maxSeconds` of audio had already been captured.
     static func slice(
         samples: [Float],
         bufferStart: TimeInterval,
@@ -39,16 +43,19 @@ enum LiveSampleWindow {
         if clipStart > 0.05 {
             absStart = max(bufferStart, clipStart - overlap)
         }
-        if let maxSeconds, bufferEnd - absStart > maxSeconds {
-            absStart = max(absStart, bufferEnd - maxSeconds)
+        var absEnd = bufferEnd
+        if let maxSeconds, absEnd - absStart > maxSeconds {
+            absEnd = absStart + maxSeconds
         }
 
-        let local = Int(((absStart - bufferStart) * rate).rounded(.down))
-        let startIndex = min(samples.count, max(0, local))
-        if startIndex == 0 {
+        let startLocal = Int(((absStart - bufferStart) * rate).rounded(.down))
+        let endLocal = Int(((absEnd - bufferStart) * rate).rounded(.down))
+        let startIndex = min(samples.count, max(0, startLocal))
+        let endIndex = min(samples.count, max(startIndex, endLocal))
+        if startIndex == 0 && endIndex == samples.count {
             return Slice(samples: samples, timeOffset: bufferStart)
         }
         let offset = bufferStart + Double(startIndex) / rate
-        return Slice(samples: Array(samples[startIndex...]), timeOffset: offset)
+        return Slice(samples: Array(samples[startIndex..<endIndex]), timeOffset: offset)
     }
 }
