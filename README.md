@@ -22,7 +22,9 @@
 
 ## Install
 
-There is no download yet. Clone the repo, open the project, and run.
+Download [Mutter.dmg](https://github.com/bicrick/mutter/releases/download/v0.9.0-beta.2/Mutter.dmg), open it, and drag Mutter to Applications.
+
+To build from source:
 
 ```sh
 git clone https://github.com/bicrick/mutter.git
