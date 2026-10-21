@@ -2,6 +2,85 @@
 
 Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes kept compile-safe and small.
 
+## Run 8 — Second compile-safety review (no new features)
+
+### Scope
+
+Re-audit of the full branch vs `main` (~+2500 lines), including Run 7 quiet-room hardening. Focus: symbol/signature matches, optionals, `@MainActor` / actor isolation under `SWIFT_STRICT_CONCURRENCY = minimal`, imports, UserDefaults/menu/settings wiring, duplicate declarations, synchronized-root file membership. No new features.
+
+### Checked
+
+| Area | Result |
+| --- | --- |
+| File membership | `PBXFileSystemSynchronizedRootGroup` for app + tests — new Swift files auto-included. |
+| Quiet-room / SpeechGate / `session.speechGateThreshold` / Configuration Calibrate+Reset | Wired; clamp on load/write; SilenceWatch reads `SpeechGate.threshold`. |
+| Live window / PCM trim / `absoluteEndCount` / `decode(capWindow:)` / `decodeFileMergingLive` | Call sites match protocol + actor witness; final uncapped. |
+| WhisperKit 1.1.1 | Unchanged pin; `prewarm`, `DecodingOptions`, `transcribe` overloads match. |
+| Copy Last Again / `PasteFollowUp.restoreClipboard` / menu | Wired. |
+| Onboarding practice / `UserFacingError` / menu icons / Performance cache | Symbols resolve; tests match APIs. |
+| Imports / duplicates | No missing imports for new symbols; no duplicate type declarations. |
+
+### Fixed this round
+
+1. **`isStarting` did not refresh SwiftUI** (`SessionController`)  
+   Configuration disabled Calibrate on `session.isStartingSession`, but `isStarting` was a plain `private var`, so the button stayed enabled during the mic/setup await. Now `@Published private(set)`.
+
+2. **Calibration `isInProgress` armed too late** (`QuietRoomCalibration.sampleAmbient`)  
+   `sampling` was set only after `requestMicrophone()`, so `begin()` could pass the guard during the permission dialog and start a second capture stack. Now arms before any await; also refuses if a session is already starting/recording/busy; drops unused `import AVFoundation`.
+
+3. **`skipNextPaste` could stick** (`SessionController`)  
+   Onboarding practice sets the flag; it cleared mainly via `deliverIfRequested` on a successful write. Missing-folder early return, write failure, and `abandonIfRecording` (quit mid-practice) left it set so the *next* real session could skip paste. Cleared on those paths.
+
+4. **Reset during Listening** (`ConfigurationPage`)  
+   Reset disabled while `calibratingQuietRoom` so a mid-sample Reset cannot fight the finishing Calibrate write.
+
+### Suspected but not verified on a Mac
+
+- Full `xcodebuild` Debug + unit tests (Linux cannot compile).
+- Live follow still advances `lastSpeechCount` before `consume` (pre-existing pattern); if the pipe is still nil, live skips until the next +1 s window — final/file path still covers stop.
+- Quiet-room + exclusive mic holders / non-default input UID.
+- Carry-over: uncapped final decode CPU, prewarm, Copy Last Again, long-take memory.
+
+### Test this tomorrow on a Mac
+
+**P0 — compile & smoke (do these first)**
+
+- [ ] **Build:** Xcode Debug build of `overnight-audit` + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate` / quiet-room, `SettingsBehavior`, `UserFacingError`).
+- [ ] **Cold launch:** menu bar appears; Settings/welcome paints before model prewarm pegs CPU.
+- [ ] **Silence P0:** 10–20 s quiet → empty transcript; menu **No speech detected**.
+- [ ] Soft speech ~5 s still transcribes (default gate, no calibration).
+
+**P1 — quiet-room (Runs 6–8)**
+
+- [ ] Configuration → Calibrate quiet room (stay silent) → note shows room/gate; soft speech still marks heard / transcribes; Reset restores default; relaunch keeps calibration until Reset.
+- [ ] Calibrate with silence-stop 1.25 s → speech then quiet still auto-stops.
+- [ ] Calibrate button disabled while recording **and** while a session is still starting (permissions) — button should grey as soon as Start begins awaiting mic.
+- [ ] Reset disabled while Listening…; after calibrate finishes, Reset works.
+- [ ] Hotkey start during “Listening…” → refused with calm cue; after calibrate finishes, start works.
+- [ ] If a non-default mic is selected in Configuration, calibrate then speak on that mic → gate still sensible.
+
+**P2 — practice paste + prior runs (abbreviated)**
+
+- [ ] Onboarding practice → success path does **not** paste into the welcome window; a later real session with paste-on-stop still pastes.
+- [ ] Quit mid-practice (or force missing session folder) → next normal session still pastes when paste-on-stop is on.
+- [ ] Final decode after live lag / long take under retain cap / Copy Last Again (Run 5–6 lists).
+- [ ] PTT release-during-begin; cancel mid-capture; volume restore; onboarding practice 5 s.
+- [ ] Menu bar busy icon + plain-language errors.
+
+### Proposed polish / features (ranked)
+
+1–7. ~~Done through Run 6~~ (icons, settings copy, practice, prewarm, live cap, Copy Last Again, quiet-room).
+8. **Processing island status label** — optional “Transcribing” text. *(UX — later)*
+9. **Per-display chrome placement lock** — *(UX — later)*
+10. **Session history scrubber** / **export share sheet** — *(features — later)*
+
+### What’s next
+
+- Hardware-confirm P0–P2 on a real Mac before the launch video.
+- Do not touch `promo-video`. No new features on this branch until build is green.
+
+---
+
 ## Run 7 — Compile-safety review (no new features)
 
 ### Scope

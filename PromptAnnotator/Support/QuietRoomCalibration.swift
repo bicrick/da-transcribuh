@@ -1,4 +1,3 @@
-import AVFoundation
 import CoreGraphics
 import Foundation
 
@@ -20,6 +19,7 @@ enum QuietRoomCalibration {
     }
 
     /// True while Configuration is measuring the room (blocks starting a session).
+    /// Armed for the whole critical section, including the mic-permission await.
     static var isInProgress: Bool {
         stateLock.lock()
         defer { stateLock.unlock() }
@@ -44,11 +44,7 @@ enum QuietRoomCalibration {
     /// session is already recording or starting.
     @MainActor
     static func sampleAmbient(duration: TimeInterval = sampleSeconds) async -> Outcome {
-        let granted = await Permissions.requestMicrophone()
-        guard granted else {
-            return .failed("Microphone access is needed to measure the room.")
-        }
-
+        // Mark in-progress before any await so SessionController.begin cannot race in.
         stateLock.lock()
         if sampling {
             stateLock.unlock()
@@ -60,6 +56,22 @@ enum QuietRoomCalibration {
             stateLock.lock()
             sampling = false
             stateLock.unlock()
+        }
+
+        let session = SessionController.shared
+        if session.isStartingSession || session.phase == .recording || session.isBusy {
+            return .failed("Finish the current session first.")
+        }
+
+        let granted = await Permissions.requestMicrophone()
+        guard granted else {
+            return .failed("Microphone access is needed to measure the room.")
+        }
+
+        // Re-check after the mic dialog — a hotkey begin could have started meanwhile
+        // only if isInProgress was ignored; still refuse if recording somehow began.
+        if session.phase == .recording || session.isBusy {
+            return .failed("Finish the current session first.")
         }
 
         // Match the session input device so the gate matches the mic the user will talk into.

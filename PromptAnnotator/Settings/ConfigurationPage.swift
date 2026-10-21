@@ -301,6 +301,7 @@ struct ConfigurationPage: View {
                         settings.setSpeechGateThreshold(nil)
                         quietRoomNote = "Using the default speech floor again."
                     }
+                    .disabled(calibratingQuietRoom)
                 }
             }
             if let quietRoomNote {

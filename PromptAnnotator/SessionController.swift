@@ -72,7 +72,8 @@ final class SessionController: ObservableObject {
     private var processingOrigin: [CGFloat] = []
     private var processingStartedAt: CFTimeInterval = 0
     private var captureTail: Task<Void, Never> = Task {}
-    private var isStarting = false
+    /// Published so Configuration can disable Calibrate while begin() awaits mic/setup.
+    @Published private(set) var isStarting = false
     private var chromeScreenID: CGDirectDisplayID?
     private var lastToggle = Date.distantPast
     private var lastOfferedPermissions: String?
@@ -440,6 +441,7 @@ final class SessionController: ObservableObject {
         guard phase == .recording || phase == .finishing else { return }
         PushToTalk.shared.disarm()
         pushToTalkReleasedWhileStarting = false
+        skipNextPaste = false
         keepTranscribing = false
         speechTask?.cancel()
         speechTask = nil
@@ -840,6 +842,7 @@ final class SessionController: ObservableObject {
         overlay.hide()
         let ended = Date()
         guard let directory else {
+            skipNextPaste = false
             lastError = "The session folder is missing."
             setPhase(.idle)
             return
@@ -914,6 +917,7 @@ final class SessionController: ObservableObject {
             NotificationCenter.default.post(name: .promptAnnotatorSessionsChanged, object: nil)
             setPhase(.idle)
         } catch {
+            skipNextPaste = false
             let message = UserFacingError.sessionWrite(error)
             lastError = message
             ErrorLog.record("Couldn't write the session: \(error.localizedDescription)")
