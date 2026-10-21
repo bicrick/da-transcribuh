@@ -49,6 +49,14 @@ enum Permissions {
         return CGRequestScreenCaptureAccess()
     }
 
+    /// Prompts so this build appears on the Accessibility list. Opening Settings alone is not enough.
+    @discardableResult
+    static func requestAccessibilityPrompt() -> Bool {
+        if AXIsProcessTrusted() { return true }
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
+
     static func relaunch() {
         guard !Runtime.isUnitTest else { return }
         let url = Bundle.main.bundleURL
@@ -66,6 +74,10 @@ enum Permissions {
         // One request puts this build on the Screen Recording list. Later calls do not stack a dialog.
         if !status.screen {
             _ = requestScreenRecording()
+        }
+        // Accessibility needs the trusted-check prompt or the app may never show in the list.
+        if !status.accessibility {
+            _ = requestAccessibilityPrompt()
         }
         if let url = settingsURL(for: status) {
             NSWorkspace.shared.open(url)
