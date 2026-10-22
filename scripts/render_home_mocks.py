@@ -33,8 +33,8 @@ BEVEL = 3 * S
 TAB_H = 30 * S
 SHELF_TOP_PAD = 8 * S
 PAGE_SIDE = 36 * S
-TAB_GROUP_GAP = 8 * S
-TAB_INNER_GAP = 2 * S
+# Ink.tabGap = 6pt → uniform spacing between every tab
+TAB_GAP = 6 * S
 # Ink.stroke = 2pt → 4px at 2× (chrome outlines + shelf)
 STROKE = int(2 * S)
 # Internal separators only (Recent rows, wordmark rule)
@@ -120,10 +120,6 @@ TABS_DARK_ACCENT = {
     "#008080": "#2AA8A8",
     "#FFAEC9": "#FFC0D6",
 }
-# Group breaks before Models (index 3) and General (index 4) — matches tabGroups.
-GROUP_BEFORE = {3, 4}
-
-
 def c(pal: dict, key: str) -> tuple[int, int, int]:
     return hex_rgb(pal[key])
 
@@ -350,18 +346,16 @@ def render(pal: dict) -> Image.Image:
     d.rectangle([0, shelf_stroke_y, W, H - status_h], fill=c(pal, "front"))
     content_top = tab_bottom
 
-    # Measure + place tabs (no bevel gutter; selection-invariant)
+    # Measure + place tabs — uniform Ink.tabGap between every tab
     tx = PAGE_SIDE
     # (x, y, face_w, h, selected, name, accent)
     tab_rects: list[tuple[float, float, float, float, bool, str, str]] = []
     for i, (name, accent) in enumerate(TABS):
-        if i in GROUP_BEFORE:
-            tx += TAB_GROUP_GAP
         selected = i == 0
         face_w = measure_tab_face_width(d, name)
         ty = tab_bottom - TAB_H
         tab_rects.append((tx, ty, face_w, TAB_H, selected, name, accent))
-        tx += face_w + TAB_INNER_GAP
+        tx += face_w + TAB_GAP
 
     # Unselected tabs first (full-weight 2pt accent outlines)
     for rect in tab_rects:

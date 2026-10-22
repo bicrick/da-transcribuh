@@ -40,7 +40,8 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.fieldRadius, 2)
         XCTAssertEqual(Ink.sidebarRowRadius, 2)
         XCTAssertEqual(Ink.folderTabHeight, 30)
-        XCTAssertEqual(Ink.tabGroupGap, 8)
+        XCTAssertEqual(Ink.tabGap, 6)
+        XCTAssertEqual(Ink.tabGroupGap, Ink.tabGap)
         XCTAssertEqual(Ink.tipIconSize, 48)
         XCTAssertEqual(Ink.tipSymbolPointSize, 22)
         XCTAssertEqual(Ink.pageTop, 28)
@@ -254,7 +255,7 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(appearance.height, Ink.folderTabHeight)
         XCTAssertGreaterThan(appearance.width, home.width)
         XCTAssertEqual(home.width, 10 + (Ink.space1 + 1) + 40 + Ink.space3 * 2)
-        XCTAssertEqual(FolderTabMetrics.intraGroupGap, 2)
+        XCTAssertEqual(FolderTabMetrics.intraGroupGap, Ink.tabGap)
         // Square open-bottom path: four corners, no curves.
         let outline = FolderTabShape(closeBottom: false).path(in: CGRect(x: 0, y: 0, width: 80, height: 30))
         XCTAssertFalse(outline.isEmpty)

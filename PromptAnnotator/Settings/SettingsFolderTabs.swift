@@ -17,19 +17,9 @@ struct SettingsFolderTabs: View {
     @State private var selectedFrame: CGRect = .null
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 0) {
-            ForEach(Array(SettingsPage.tabGroups.enumerated()), id: \.offset) { groupIndex, group in
-                if groupIndex > 0 {
-                    Color.clear
-                        .frame(width: Ink.tabGroupGap, height: 1)
-                }
-                ForEach(Array(group.enumerated()), id: \.element.id) { tabIndex, page in
-                    if tabIndex > 0 {
-                        Color.clear
-                            .frame(width: FolderTabMetrics.intraGroupGap, height: 1)
-                    }
-                    tab(page)
-                }
+        HStack(alignment: .bottom, spacing: Ink.tabGap) {
+            ForEach(SettingsPage.tabOrder) { page in
+                tab(page)
             }
             Spacer(minLength: Ink.space2)
             if let onSearch {
@@ -126,8 +116,8 @@ private enum ShelfSpace {
 }
 
 enum FolderTabMetrics {
-    /// Gap between tabs inside a group (selection-invariant).
-    static let intraGroupGap: CGFloat = 2
+    /// Uniform gap between every tab — same as `Ink.tabGap`.
+    static let intraGroupGap: CGFloat = Ink.tabGap
 }
 
 private struct SelectedTabFrameKey: PreferenceKey {
