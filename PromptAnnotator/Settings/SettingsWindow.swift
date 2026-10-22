@@ -133,26 +133,26 @@ struct SettingsSidebar: View {
     @Binding var selection: SettingsPage
 
     var body: some View {
-        DTScrollView(bottomInset: Ink.space2) {
+        DTScrollView(bottomInset: Ink.space2, railInset: Ink.sidebarScrollerInset) {
             VStack(alignment: .center, spacing: Ink.sidebarSectionGap) {
                 ForEach(SettingsPage.sidebarSections, id: \.title) { section in
                     VStack(alignment: .center, spacing: Ink.space2) {
                         Text(section.title.uppercased())
                             .font(Ink.sidebarSectionFont)
                             .foregroundStyle(Ink.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, Ink.space2)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
 
                         VStack(spacing: Ink.sidebarTileGap) {
                             ForEach(section.pages) { item in
                                 toolTile(item)
                             }
                         }
-                        .frame(maxWidth: .infinity)
                     }
                 }
             }
-            .padding(.horizontal, Ink.space3)
+            // Equal side margins so tiles sit centered; scroller lives in the right margin.
+            .padding(.horizontal, Ink.sidebarSideMargin)
             .padding(.top, Ink.space3)
             .padding(.bottom, Ink.space3)
             .frame(maxWidth: .infinity, alignment: .top)
@@ -177,7 +177,8 @@ struct SettingsSidebar: View {
                     )
                     .overlay {
                         Image(systemName: item.symbol)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: Ink.sidebarSymbolPointSize, weight: .black))
+                            .symbolRenderingMode(.monochrome)
                             .foregroundStyle(Ink.paintBlack)
                     }
                     .frame(width: Ink.sidebarIconSize, height: Ink.sidebarIconSize)
@@ -207,7 +208,6 @@ struct SettingsSidebar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
         .padding(.bottom, Ink.buttonShadow)
         .accessibilityLabel(item.title)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)

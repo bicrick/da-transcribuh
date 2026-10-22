@@ -104,12 +104,19 @@ enum Ink {
     /// Paint toolbox column — roomy tiles, big icons.
     static let sidebarWidth: CGFloat = 148
     static let sidebarTileSize: CGFloat = 72
+    /// Equal left/right margin around a 72px tile in a 148px column.
+    static let sidebarSideMargin: CGFloat = (sidebarWidth - sidebarTileSize) / 2
     static let sidebarTilePad: CGFloat = 6
     static let sidebarIconSize: CGFloat = 28
+    /// Chunky SF Symbol weight inside the colored chip.
+    static let sidebarSymbolPointSize: CGFloat = 16
     static let sidebarIconLabelGap: CGFloat = 4
     static let sidebarTileGap: CGFloat = 10
     static let sidebarSectionGap: CGFloat = 16
     static let sidebarFooterHeight: CGFloat = 80
+    /// Tip row: readable icon in a Paint color square.
+    static let tipIconSize: CGFloat = 48
+    static let tipSymbolPointSize: CGFloat = 22
 
     static let pageTop: CGFloat = 28
     static let pageSide: CGFloat = 36
@@ -129,6 +136,8 @@ enum Ink {
     static let scrollerWidth: CGFloat = 5
     static let scrollerThumbMin: CGFloat = 24
     static let scrollerInset: CGFloat = 3
+    /// Sidebar rail sits inside the right tile margin so the thumb never kisses a tile.
+    static let sidebarScrollerInset: CGFloat = 8
 
     // MARK: - Type
     //

@@ -199,7 +199,7 @@ struct HomePage: View {
             )
             tipColumn(
                 color: Ink.paintOrange,
-                glyph: "folder",
+                glyph: "folder.fill",
                 title: "Sessions folder",
                 detail: SessionStore.displayPath(),
                 trailing: AnyView(
@@ -228,10 +228,11 @@ struct HomePage: View {
                 Rectangle()
                     .strokeBorder(Ink.label, lineWidth: 1.5)
                 Image(systemName: glyph)
-                    .font(Ink.labelFont)
+                    .font(.system(size: Ink.tipSymbolPointSize, weight: .black))
+                    .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Ink.paintBlack)
             }
-            .frame(width: 28, height: 28)
+            .frame(width: Ink.tipIconSize, height: Ink.tipIconSize)
             Text(title)
                 .font(Ink.labelFont)
                 .foregroundStyle(Ink.label)
