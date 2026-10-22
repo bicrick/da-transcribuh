@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import os
 
 enum SessionPhase: Equatable {
@@ -41,6 +42,8 @@ final class SessionController: ObservableObject {
     @Published private(set) var transcriptionError: String?
     @Published private(set) var lastError: String?
     @Published private(set) var lastSessionURL: URL?
+    /// Shown in the menu when session output is staged but auto-paste was held.
+    @Published private(set) var pasteReadyHint: String?
 
     private let log = Logger(subsystem: "com.bicrick.PromptAnnotator", category: "session")
     private let chrome = ChromeHost()
@@ -86,6 +89,8 @@ final class SessionController: ObservableObject {
     private var pushToTalkReleasedWhileStarting = false
     /// Onboarding practice skips paste-on-stop so the welcome window is not disrupted.
     private var skipNextPaste = false
+    /// Injectable for tests; production uses the live Accessibility probe.
+    var focusProbe: any FocusedEditableProbing = SystemFocusedEditableProbe()
 
     var isBusy: Bool {
         switch phase {
@@ -150,10 +155,11 @@ final class SessionController: ObservableObject {
         }
     }
 
-    /// Menu / home status line: live phase, else the last calm cue or error.
+    /// Menu / home status line: live phase, else paste-ready hint, else last calm cue or error.
     var menuStatusLine: String? {
         let live = statusText
         if !live.isEmpty { return live }
+        if let pasteReadyHint, !pasteReadyHint.isEmpty { return pasteReadyHint }
         if let lastError, !lastError.isEmpty { return lastError }
         return nil
     }
@@ -179,6 +185,11 @@ final class SessionController: ObservableObject {
         settings.onSpeechSelectionChange = { [weak self] in
             DispatchQueue.main.async {
                 self?.reloadSpeechEngine()
+            }
+        }
+        PasteFollowUp.shared.onAwaitingPasteChange = { [weak self] awaiting in
+            if !awaiting {
+                self?.pasteReadyHint = nil
             }
         }
     }
@@ -267,6 +278,9 @@ final class SessionController: ObservableObject {
         draft = nil
         textEdit = nil
         stopQueued = false
+        // Cancel discards the take — no clipboard staging and no paste-ready hint.
+        pasteReadyHint = nil
+        PasteFollowUp.shared.clearAwaitingPaste()
         setPhase(.idle)
     }
 
@@ -400,20 +414,41 @@ final class SessionController: ObservableObject {
     }
 
     private func deliverIfRequested() {
+        let skipping = skipNextPaste
         if skipNextPaste {
             skipNextPaste = false
-            return
         }
         let settings = AppSettings.shared
-        guard settings.pasteOnStop else { return }
-        guard !SettingsPresenter.shared.isKey else { return }
-        let sendReturn = settings.returnOnShift && NSEvent.modifierFlags.contains(.shift)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            PasteFollowUp.shared.pasteBoth()
-            guard sendReturn else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
-                ReturnKey.post()
+        let hasOutput = PasteFollowUp.shared.canReplay
+            || !pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || sheetURL != nil
+        let target = focusProbe.classifyFocusedElement()
+        let action = FocusPasteDecision.action(
+            target: target,
+            pasteOnStop: settings.pasteOnStop,
+            settingsFocused: SettingsPresenter.shared.isKey,
+            skipPaste: skipping,
+            hasOutput: hasOutput
+        )
+        switch action {
+        case .skip:
+            pasteReadyHint = nil
+            return
+        case .autoPaste:
+            pasteReadyHint = nil
+            let sendReturn = settings.returnOnShift && NSEvent.modifierFlags.contains(.shift)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                PasteFollowUp.shared.pasteBoth()
+                guard sendReturn else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+                    ReturnKey.post()
+                }
             }
+        case .holdPending:
+            // Restage as multi-rep so ⌘V keeps images + text where the target allows it.
+            let image = sheetURL.flatMap { NSImage(contentsOf: $0) }
+            _ = SessionClipboard.stageCombined(image: image, transcript: pasteText)
+            pasteReadyHint = PasteFollowUp.readyHint
         }
     }
 
@@ -724,6 +759,8 @@ final class SessionController: ObservableObject {
             sheetURL = nil
             transcriptionError = nil
             lastError = nil
+            pasteReadyHint = nil
+            PasteFollowUp.shared.clearAwaitingPaste()
             lastSpeechCount = 0
             silenceWatch = SilenceWatch()
             stopQueued = false

@@ -6,7 +6,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–13b)
+## Final summary (Runs 1–14)
 
 ### What changed overall (kept)
 
@@ -21,10 +21,16 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 | **BYOM (Run 12)** | Custom WhisperKit Core ML folder + HF repo/variant; optional OpenAI-compatible final engine (Keychain); `RoutingTranscriber`; fallback to default Whisper on failure |
 | **Ink restyle (Run 13)** | Settings + onboarding “Ink” theme (warm paper + logo red); shared design system; continuous waveform→pen motif; Advanced copy fix. Recording island/overlay untouched. |
 | **Ink polish (Run 13b)** | Fixed stacked top padding (~90pt); custom Ink sidebar selection (no system blue List highlight). |
+| **Paste hold (Run 14)** | Skip synthetic ⌘V when no editable focus; stage multi-rep clipboard; menu “Ready to paste”; ⌃⌥V still sequential. Cancel discards. |
 
 ### Reverted (Run 9, still gone)
 
 - **Quiet-room calibration** — fixed SpeechGate **0.28** (matches `main`). No dangling Swift/pbxproj refs.
+
+### Run 14 (Paste when no text field)
+
+- **Before:** stop always staged image (or text) then fired synthetic ⌘V via `PasteFollowUp.pasteBoth()` with no AX focus check. With no field focused, Cmd-Vs went nowhere; pasteboard often ended **text-only** (second write wiped the image). Cancel already discarded (no clipboard). No pasteboard restore after auto-paste (unchanged — code never did that).
+- **After:** `FocusedEditableProbe` + `FocusPasteDecision`; hold pending when clearly not editable (or Settings focused); `SessionClipboard.stageCombined` (PNG/TIFF + plain + RTFD + HTML); menu hint; ⌃⌥V / Paste Image and Text still sequential. Unknown focus (web/Electron) still auto-pastes. Cancel still discards. Tests: `FocusPasteDecisionTests`.
 
 ### Run 13b (Ink padding + sidebar selection)
 
@@ -62,12 +68,15 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ### P0 — must pass before recording
 
-- [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`, `SpeechModelTests` holdback, **`FontMetricsTests`**, **`BYOMTests`**, **`InkThemeTests`**).
+- [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`, `SpeechModelTests` holdback, **`FontMetricsTests`**, **`BYOMTests`**, **`InkThemeTests`**, **`FocusPasteDecisionTests`**).
 - [ ] **Ink Settings**: Home / Models / History / Recording / Configuration / Sound / Performance in light + dark — accent tint, card chrome, no island restyle.
 - [ ] **Ink padding**: ~20–24pt gap below title-bar to first content on every Settings page (not ~90pt).
 - [ ] **Ink sidebar**: selected row is Ink tint + accent icon/text (not system blue).
 - [ ] **Ink Onboarding**: STEP n OF 6 eyebrow, step dots, Skip / Back / primary order; Welcome+Ready waveform→pen is one continuous line (not a smile); Ready bars inked red.
 - [ ] Configuration Advanced reads “Speech models are on the Models page.”
+- [ ] **Paste hold**: stop with tiles+words while focus is Desktop/Finder — no stray paste; menu shows Ready to paste; ⌘V or ⌃⌥V into a text field gets image+text.
+- [ ] **Paste auto**: stop with focus in TextEdit/Notes/browser — still auto-pastes as before.
+- [ ] **Cancel**: cancel mid-session — no clipboard staging / no Ready hint for that take.
 - [ ] **Hotkey toggle** (PTT off): start → speak → stop → transcript on clipboard / paste.
 - [ ] **Menu Start / Home Start with Push-to-Talk ON** — session must **stay recording** until Stop (must not auto-stop instantly).
 - [ ] **PTT hold**: press chord → speak → release → stops; brief press during mic prompt also stops (not stuck recording).
@@ -93,6 +102,33 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Optional: >10 min under PCM retain cap → file merge OK.
 - [ ] Display plug/unplug while marking; double Paste Image and Text once only.
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
+
+---
+
+## Run 14 — Hold paste when no editable focus
+
+### Prior behavior (findings)
+
+| Path | Behavior |
+| --- | --- |
+| Stop / finish | `copyToClipboard()` → image-only (or text-only) on general pasteboard; arms `PasteFollowUp`. Then `deliverIfRequested()` → delayed `pasteBoth()` = synthetic ⌘V image, then overwrite pasteboard with text + second ⌘V. **No AX focus check.** |
+| No text field focused | Synthetic ⌘Vs do nothing useful; after `pasteBoth` pasteboard is often **transcript only** (image wiped). Output not “lost” from disk (History) but easy to miss on the clipboard. |
+| ⌃⌥V / menu Paste Image and Text | `pasteBoth()` sequential image then `\n`+text (unchanged intent). |
+| Copy Last Again | `restoreClipboard()` or re-copy last session sheet+transcript. |
+| Cancel | Deletes session folder; **no** clipboard write / paste. |
+| Pasteboard restore after auto-paste | **Not implemented** historically — left as-is. |
+
+### Fix
+
+- `FocusedEditableProbe` / `FocusPasteDecision` (protocol + AX; unknown → still auto-paste).
+- `.holdPending` → `stageCombined` (multi-rep) + menu `pasteReadyHint`.
+- Cancel remains discard.
+
+### Mac test
+
+1. Focus Finder → stop session with tiles+speech → menu Ready to paste; ⌘V into Notes gets rich/plain+image; ⌃⌥V also works.
+2. Focus Notes → stop → auto-paste still works.
+3. Cancel → no Ready hint / no new clipboard payload for that take.
 
 ---
 

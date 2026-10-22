@@ -19,6 +19,7 @@ enum PasteKey {
 final class PasteFollowUp {
     static let shared = PasteFollowUp()
     static let shortcut = "⌃⌥V"
+    static let readyHint = "Ready to paste: press ⌃⌥V or ⌘V in any text field"
 
     private var png: Data?
     private var tiff: Data?
@@ -34,9 +35,15 @@ final class PasteFollowUp {
     private let signature: OSType = 0x5041_6E6E
     private let hotKeyID: UInt32 = 2
 
+    /// Session output is staged but auto-paste was held (no text field).
+    private(set) var isAwaitingPaste = false
+
     var canReplay: Bool {
         png != nil || !transcript.isEmpty
     }
+
+    /// Optional hook so SessionController can clear / refresh menu status.
+    var onAwaitingPasteChange: ((Bool) -> Void)?
 
     func install() {
         guard !Runtime.isUnitTest else { return }
@@ -69,6 +76,27 @@ final class PasteFollowUp {
         self.tiff = tiff
         self.transcript = transcript
         armedChangeCount = (png != nil && !transcript.isEmpty) ? changeCount : nil
+        // Image-then-text staging is for immediate / sequential paste — not a held pending.
+        setAwaitingPaste(false)
+    }
+
+    /// Keep payload for ⌃⌥V / Copy Last Again without arming the ⌘V image→text follow-up.
+    func armPending(png: Data?, tiff: Data?, transcript: String) {
+        self.png = png
+        self.tiff = tiff
+        self.transcript = transcript
+        armedChangeCount = nil
+        setAwaitingPaste(true)
+    }
+
+    func clearAwaitingPaste() {
+        setAwaitingPaste(false)
+    }
+
+    private func setAwaitingPaste(_ value: Bool) {
+        guard isAwaitingPaste != value else { return }
+        isAwaitingPaste = value
+        onAwaitingPasteChange?(value)
     }
 
     /// Restores the last staged image / transcript after another app overwrote the pasteboard.
@@ -76,13 +104,22 @@ final class PasteFollowUp {
     func restoreClipboard() -> Bool {
         guard canReplay else { return false }
         if let png {
+            // Prefer combined staging when both sides exist so ⌘V keeps images + text.
+            if !transcript.isEmpty,
+               let image = NSImage(data: png) ?? (tiff.flatMap { NSImage(data: $0) }) {
+                guard SessionClipboard.stageCombined(image: image, transcript: transcript) else {
+                    guard SessionClipboard.writeImage(png: png, tiff: tiff, to: .general) else { return false }
+                    armPending(png: png, tiff: tiff, transcript: transcript)
+                    return true
+                }
+                return true
+            }
             guard SessionClipboard.writeImage(png: png, tiff: tiff, to: .general) else { return false }
-            let changeCount = NSPasteboard.general.changeCount
-            arm(png: png, tiff: tiff, transcript: transcript, changeCount: changeCount)
+            armPending(png: png, tiff: tiff, transcript: transcript)
             return true
         }
         guard SessionClipboard.writeTranscript(transcript, to: .general) else { return false }
-        arm(png: nil, tiff: nil, transcript: transcript, changeCount: NSPasteboard.general.changeCount)
+        armPending(png: nil, tiff: nil, transcript: transcript)
         return true
     }
 
@@ -96,6 +133,7 @@ final class PasteFollowUp {
         commandVIsDown = false
         delivering = true
         armedChangeCount = nil
+        setAwaitingPaste(false)
 
         guard let image else {
             _ = SessionClipboard.writeTranscript(words, to: .general)
@@ -213,6 +251,7 @@ final class PasteFollowUp {
             }
             self.delivering = true
             self.armedChangeCount = nil
+            self.setAwaitingPaste(false)
             _ = SessionClipboard.writeTranscript("\n" + words, to: .general)
             self.postCommandV()
             self.scheduleIdle()
