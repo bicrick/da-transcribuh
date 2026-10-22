@@ -27,9 +27,11 @@ struct DTTitleStrip: View {
         }
         .background(Ink.window)
         .overlay(alignment: .bottom) {
+            // Full-bleed 1pt rule — pixel-centered so corners don’t fray at 1×/2×.
             Rectangle()
                 .fill(Ink.label)
-                .frame(height: 2)
+                .frame(height: 1)
+                .frame(maxWidth: .infinity)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("da transcribuh window")

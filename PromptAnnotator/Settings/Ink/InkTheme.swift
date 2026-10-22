@@ -91,6 +91,18 @@ enum Ink {
     static let success = paintGreen
     static let error = paintRed
 
+    // MARK: - Tab shelf stroke accents
+    // Classic Paint hues in light; slightly lifted in graphite so a 1pt stroke
+    // still reads on `Ink.fill` / `Ink.front`. Appearance uses purple.
+
+    static let tabStrokeRed = color(light: "#ED1C24", dark: "#FF5A5F")
+    static let tabStrokePurple = color(light: "#A349A4", dark: "#C46BC5")
+    static let tabStrokeBlue = color(light: "#3F48CC", dark: "#6B73E0")
+    static let tabStrokeOrange = color(light: "#FF7F27", dark: "#FF9A4D")
+    static let tabStrokeGreen = color(light: "#22B14C", dark: "#3FD06A")
+    static let tabStrokeTeal = color(light: "#008080", dark: "#2AA8A8")
+    static let tabStrokePink = color(light: "#FFAEC9", dark: "#FFC0D6")
+
     // MARK: - Radii / stroke
 
     static let cardRadius: CGFloat = 2

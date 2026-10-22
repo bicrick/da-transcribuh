@@ -42,9 +42,9 @@ Nothing in chrome should paint darker than `#1A1A1C` except the bevel itself. Ro
 
 ### Copy / Home
 
-Home keeps the pre-declutter structure (stats grid, Get Started checklist, tip tiles). Nits only: no yellow version badge (status bar has it), no hero tagline, no “^⌥Space starts…” caption under Start. Stat underlines are neutral (`Ink.statRule`); per-page Paint accents live on folder-tab top stripes (`SettingsPage.tabAccent`). Start / primary stays high-contrast invert (`primaryFill` / `onPrimary`: black↔`#F2F2F2`), not a flat graphite plate.
+Home keeps the pre-declutter structure (stats grid, Get Started checklist, tip tiles). Nits only: no yellow version badge (status bar has it), no hero tagline, no “^⌥Space starts…” caption under Start. Stat underlines are neutral (`Ink.statRule`). Start / primary stays high-contrast invert (`primaryFill` / `onPrimary`: black↔`#F2F2F2`), not a flat graphite plate.
 
-Selected folder tab merges into the page: fill is `Ink.front`, the shelf hairline is interrupted under it (`ShelfHairline` + preference frame), and the tab bleeds 1pt over the rule. Unselected tabs stay on `Ink.fill` with the hairline under them. README mocks: `scripts/render_home_mocks.py` (angled `FolderTabShape`, DejaVu for ⌃⌥⌘).
+Folder tabs are Chrome-style (`FolderTabShape`: 6pt top corners + 6pt concave feet, same height/baseline). The shelf rule and selected tab outline are **one continuous 1pt path** stroked in the selected tab’s accent (`SettingsPage.tabAccent` / `Ink.tabStroke*`, lifted in dark; Appearance = purple). Unselected tabs use `Ink.hairline` outlines. Selected fill is `Ink.front` and merges into the page. README mocks: `scripts/render_home_mocks.py`.
 
 ### Home after Get Started
 
@@ -68,7 +68,7 @@ Helpers: `SessionLibrary.recent`, `weeklyWordCounts`, `recentWhen`, `thumbnailUR
 
 ## Appearance
 
-Folder tabs (importance order): **Home | Appearance | History** · Models · General | Sound | Perf. Gaps: primary trio, then Models alone, then app plumbing. Appearance (`paintpalette`, orange accent) owns theme + the former Recording page (island Default/Compact/Minimal/Hidden, Shift-drag tool/color). Recording shortcuts stay in General. The separate Recording tab is gone.
+Folder tabs (importance order): **Home | Appearance | History** · Models · General | Sound | Perf. Gaps: primary trio, then Models alone, then app plumbing. Appearance (`paintpalette`, purple shelf accent) owns theme + the former Recording page (island Default/Compact/Minimal/Hidden, Shift-drag tool/color). Recording shortcuts stay in General. The separate Recording tab is gone.
 
 `AppAppearance` (System / Light / Dark) lives on the **Appearance** tab and still cycles from the menu-bar panel (`theme: …`).
 

@@ -228,10 +228,13 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(darkOnPrimary.uppercased(), "2C2C2E")
         XCTAssertEqual(lightStat.uppercased(), "000000")
         XCTAssertEqual(darkStat.uppercased(), "A8A8AD")
-        XCTAssertEqual(SettingsPage.home.tabAccent, Ink.paintRed)
-        XCTAssertEqual(SettingsPage.appearance.tabAccent, Ink.paintOrange)
-        XCTAssertEqual(SettingsPage.history.tabAccent, Ink.paintBlue)
-        XCTAssertEqual(SettingsPage.performance.tabAccent, Ink.paintPink)
+        XCTAssertEqual(SettingsPage.home.tabAccent, Ink.tabStrokeRed)
+        XCTAssertEqual(SettingsPage.appearance.tabAccent, Ink.tabStrokePurple)
+        XCTAssertEqual(SettingsPage.history.tabAccent, Ink.tabStrokeBlue)
+        XCTAssertEqual(SettingsPage.model.tabAccent, Ink.tabStrokeOrange)
+        XCTAssertEqual(SettingsPage.performance.tabAccent, Ink.tabStrokePink)
+        XCTAssertEqual(FolderTabShape.corner, 6)
+        XCTAssertEqual(FolderTabShape.foot, 6)
     }
 
     func testWordmarkUsesSeparateBlockCursorNotInvertedH() {
