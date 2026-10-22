@@ -6,7 +6,15 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–24)
+## Final summary (Runs 1–25)
+
+### Run 25 — Departure Mono fix + full MS Paint reskin
+
+- **Font bug (P0):** `InkFontRegistrar` CTFontManager-registers every bundled `.otf` at launch; logs success/failure; `Ink.mono()` tries PostScript `DepartureMono-Regular` then family names, else **system monospaced only** (never proportional). `ATSApplicationFontsPath=Fonts` kept.
+- **Direction lock:** `assets/brand/mocks/home-paint-{light,dark}.png` — airy Home + Paint toolbox sidebar + palette strip.
+- **Paint chrome:** expanded 16-swatch palette, per-page tool accents, thicker outlines, airier spacing (`pageSide` 36, `sectionGap` 32, sidebar 148 / tile 72 / icon 28), thin hover scroller (5pt), solid paint-green checks, title + status palette strips.
+- **Home:** unboxed stats with color rules; hero with yellow version badge + red Start shadow; tip columns with color chips.
+- Menu panel wordmark + swatches; markup toolbar hard shadow; island 1.5px outline. README screenshots refreshed from mocks.
 
 ### Run 24 — Layout elevation (terminal History, Paint onboarding rail, page headers)
 

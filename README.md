@@ -25,9 +25,9 @@
 
 ## look
 
-black and white chrome with a tiny bit of classic ms paint. departure mono for labels and chrome, sf mono for longer copy. custom scroll bars. system / light / dark from general (or cycle `theme: …` in the menu bar). the recording island, waveform, and annotate toolbar match the same ink — not a leftover overlay.
+ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset shadows, and a toolbox sidebar. departure mono for every “da transcribuh” wordmark and chrome label; sf mono for longer copy. custom thin scrollers. system / light / dark from general (or cycle `theme: …` in the menu bar).
 
-paint shows up only where it helps: traffic-light dots when the window is key (`#ED1C24` / `#FFF200` / `#22B14C`), the record mark, and a green check when something’s actually done.
+backgrounds stay white or black. color lives in the palette strip, tool chips, progress, meters, traffic lights, the record mark, and paint-green checks. airy margins, fewer boxed cards.
 
 <p align="center">
   <picture>
@@ -112,6 +112,7 @@ final **dt block** art lives in [`assets/brand/`](assets/brand/):
 - `readme-banner.png` — hero (paint traffic lights on the session window mock)
 - `social-preview.png` (1280×640) — repo social preview; also mirrored as `social-preview-1280x640.png` / `@2x`
 - `screenshots/settings-home-light.png` / `settings-home-dark.png` — settings home mocks for the readme
+- `mocks/home-paint-light.png` / `home-paint-dark.png` — Paint-direction lock mocks
 - `menubar-g-dt-block-16.png` / `menubar-g-dt-block-32.png` — template menu-bar glyph
 
 patrick: upload `assets/brand/social-preview.png` under the repo’s **settings → general → social preview** at launch (repo stays private until then). that part isn’t settable from here.
