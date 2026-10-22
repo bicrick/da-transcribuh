@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Regenerate Settings Home README screenshots / paint mocks (light + graphite dark).
 
-Matches the real app: Chrome-style FolderTabShape (corner=6, foot=6), continuous
-selected shelf stroke in the tab accent color, seamless Ink.front merge,
-Departure Mono chrome, and DejaVu Sans for ⌃⌥⌘ glyphs.
+Matches the real app: Chrome FolderTabShape — selected has concave cove feet
+(fillet into shelf) + continuous accent shelf stroke; unselected have plain
+rounded tops, muted accent outlines, no inner stripes. Departure Mono chrome;
+DejaVu for ⌃⌥⌘ glyphs.
 """
 
 from __future__ import annotations
@@ -129,50 +130,97 @@ def text_size(draw: ImageDraw.ImageDraw, text: str, f: ImageFont.ImageFont) -> t
     return bb[2] - bb[0], bb[3] - bb[1]
 
 
-def measure_tab_width(draw: ImageDraw.ImageDraw, title: str) -> float:
+KAPPA = 0.5522847498  # cubic quarter-circle
+
+
+def measure_tab_width(draw: ImageDraw.ImageDraw, title: str, selected: bool = False) -> float:
     f = font_departure(11 * S)
     tw, _ = text_size(draw, title, f)
-    # foot pad*2 + icon (~10pt) + gap + label + horizontal pad space3*2
-    return FOOT * 2 + 10 * S + 5 * S + tw + 12 * S * 2
+    # icon + gap + label + pad; selected adds foot overhang on each side
+    base = 10 * S + 5 * S + tw + 12 * S * 2
+    return base + (FOOT * 2 if selected else 0)
 
 
-def _arc_pts(cx: float, cy: float, r: float, a0: float, a1: float, n: int = 8) -> list[tuple[float, float]]:
-    """Arc samples; angles in radians, increasing counterclockwise (y-down screen)."""
+def _bezier(
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    p2: tuple[float, float],
+    p3: tuple[float, float],
+    n: int = 16,
+) -> list[tuple[float, float]]:
     pts = []
     for i in range(n + 1):
         t = i / n
-        a = a0 + (a1 - a0) * t
-        pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+        u = 1 - t
+        x = u**3 * p0[0] + 3 * u**2 * t * p1[0] + 3 * u * t**2 * p2[0] + t**3 * p3[0]
+        y = u**3 * p0[1] + 3 * u**2 * t * p1[1] + 3 * u * t**2 * p2[1] + t**3 * p3[1]
+        pts.append((x, y))
     return pts
 
 
-def chrome_tab_outline(x: float, y: float, w: float, h: float) -> list[tuple[float, float]]:
-    """Open Chrome-tab outline: left foot tip → top → right foot tip (no bottom)."""
+def _quad(
+    p0: tuple[float, float],
+    control: tuple[float, float],
+    p1: tuple[float, float],
+    n: int = 16,
+) -> list[tuple[float, float]]:
+    """Quadratic Bézier — matches Swift Path.addQuadCurve (concave cove feet)."""
+    pts = []
+    for i in range(n + 1):
+        t = i / n
+        u = 1 - t
+        x = u**2 * p0[0] + 2 * u * t * control[0] + t**2 * p1[0]
+        y = u**2 * p0[1] + 2 * u * t * control[1] + t**2 * p1[1]
+        pts.append((x, y))
+    return pts
+
+
+def flared_tab_outline(x: float, y: float, w: float, h: float) -> list[tuple[float, float]]:
+    """Selected open outline — concave cove feet (matches Swift appendFlaredOutline).
+
+    Left foot: tip (sideX - r, shelfY) → wall (sideX, shelfY - r) with quad control
+    (sideX, shelfY). Arc center sits outside the tab above the baseline; curve bows
+    into the tab-bottom corner (shaded fill is convex at the base). No ledge.
+    """
     f, r = FOOT, CORNER_R
-    body_l = x + f
-    body_r = x + w - f
-    top = y
-    bottom = y + h
-    safe_r = min(r, max(0.0, (body_r - body_l) / 2), max(0.0, h / 2))
-    pts: list[tuple[float, float]] = []
-    pts.append((x, bottom))  # left foot tip
-    # Left foot: west → north around (body_l, bottom)
-    pts.extend(_arc_pts(body_l, bottom, f, math.pi, math.pi * 1.5)[1:])
-    pts.append((body_l, top + safe_r))
-    # Top-left corner
-    pts.extend(_arc_pts(body_l + safe_r, top + safe_r, safe_r, math.pi, math.pi * 1.5)[1:])
-    pts.append((body_r - safe_r, top))
-    # Top-right corner
-    pts.extend(_arc_pts(body_r - safe_r, top + safe_r, safe_r, math.pi * 1.5, math.pi * 2)[1:])
-    pts.append((body_r, bottom - f))
-    # Right foot: north → east
-    pts.extend(_arc_pts(body_r, bottom, f, math.pi * 1.5, math.pi * 2)[1:])
+    side_l, side_r = x + f, x + w - f
+    top, shelf = y, y + h
+    safe_r = min(r, max(0.0, (side_r - side_l) / 2), max(0.0, h / 2))
+    kr = KAPPA * safe_r
+    pts: list[tuple[float, float]] = [(x, shelf)]
+    # Left concave fillet (cove): control at (side_l, shelf)
+    pts += _quad((x, shelf), (side_l, shelf), (side_l, shelf - f))[1:]
+    pts.append((side_l, top + safe_r))
+    pts += _bezier(
+        (side_l, top + safe_r),
+        (side_l, top + safe_r - kr),
+        (side_l + safe_r - kr, top),
+        (side_l + safe_r, top),
+    )[1:]
+    pts.append((side_r - safe_r, top))
+    pts += _bezier(
+        (side_r - safe_r, top),
+        (side_r - safe_r + kr, top),
+        (side_r, top + safe_r - kr),
+        (side_r, top + safe_r),
+    )[1:]
+    pts.append((side_r, shelf - f))
+    # Right concave fillet (mirrored)
+    pts += _quad((side_r, shelf - f), (side_r, shelf), (x + w, shelf))[1:]
     return pts
 
 
-def chrome_tab_closed(x: float, y: float, w: float, h: float) -> list[tuple[float, float]]:
-    open_pts = chrome_tab_outline(x, y, w, h)
-    return open_pts + [(x, y + h)]
+def plain_tab_outline(x: float, y: float, w: float, h: float) -> list[tuple[float, float]]:
+    """Unselected — rounded top, straight sides to baseline (no feet)."""
+    r = min(CORNER_R, w / 2, h / 2)
+    kr = KAPPA * r
+    top, shelf = y, y + h
+    pts: list[tuple[float, float]] = [(x, shelf), (x, top + r)]
+    pts += _bezier((x, top + r), (x, top + r - kr), (x + r - kr, top), (x + r, top))[1:]
+    pts.append((x + w - r, top))
+    pts += _bezier((x + w - r, top), (x + w - r + kr, top), (x + w, top + r - kr), (x + w, top + r))[1:]
+    pts.append((x + w, shelf))
+    return pts
 
 
 def stroke_polyline(draw: ImageDraw.ImageDraw, pts: list[tuple[float, float]], fill, width: int) -> None:
@@ -191,30 +239,26 @@ def draw_folder_tab(
     accent: str,
     selected: bool,
     pal: dict,
-    stroke_color: tuple[int, int, int] | None = None,
 ) -> None:
     face = c(pal, "front") if selected else c(pal, "fill")
-    closed = chrome_tab_closed(x, y, w, h)
-    draw.polygon(closed, fill=face)
     if selected:
-        # Outline drawn as part of the continuous shelf stroke (caller).
-        pass
+        outline = flared_tab_outline(x, y, w, h)
+        draw.polygon(outline + [(outline[0][0], y + h)], fill=face)
+        # Outline via continuous shelf stroke (caller).
+        label_left, label_right = x + FOOT, x + w - FOOT
     else:
-        stroke_polyline(draw, closed + [closed[0]], c(pal, "hairline"), STROKE)
-        # Quiet accent tick (unselected only)
-        inset = FOOT + CORNER_R
-        ay = y + 3 * S
-        fill_rgb = c(pal, "fill")
-        accent_rgb = tuple(int(a * 0.45 + f * 0.55) for a, f in zip(hex_rgb(accent), fill_rgb))
-        draw.rectangle([x + inset, ay, x + w - inset, ay + 1 * S], fill=accent_rgb)
+        outline = plain_tab_outline(x, y, w, h)
+        draw.polygon(outline + [outline[0]], fill=face)
+        # Muted accent outline — no inner stripe.
+        muted = tuple(int(a * 0.55 + f * 0.45) for a, f in zip(hex_rgb(accent), c(pal, "fill")))
+        stroke_polyline(draw, outline + [outline[0]], muted, STROKE)
+        label_left, label_right = x, x + w
 
     fnt = font_departure(11 * S)
     tw, th = text_size(draw, title, fnt)
-    # Label centered in the body (between feet).
-    body_l, body_r = x + FOOT, x + w - FOOT
     ty = y + (h - th) / 2
     draw.text(
-        (body_l + (body_r - body_l - tw) / 2, ty),
+        (label_left + (label_right - label_left - tw) / 2, ty),
         title,
         font=fnt,
         fill=c(pal, "label" if selected else "secondary"),
@@ -230,9 +274,8 @@ def draw_continuous_shelf_stroke(
     tab_h: float,
     accent: tuple[int, int, int],
 ) -> None:
-    """Full-width rule joined to the selected Chrome-tab outline, one accent stroke."""
-    outline = chrome_tab_outline(tab_x, tab_y, tab_w, tab_h)
-    # Left rule → tab outline → right rule
+    """Full-width rule (window edge → edge) joined to selected flared outline."""
+    outline = flared_tab_outline(tab_x, tab_y, tab_w, tab_h)
     left = [(0, shelf_bottom), outline[0]]
     right = [outline[-1], (W, shelf_bottom)]
     stroke_polyline(draw, left + outline + right, accent, STROKE)
@@ -353,15 +396,15 @@ def render(pal: dict) -> Image.Image:
     shelf_h = SHELF_TOP_PAD + TAB_H
     d.rectangle([0, shelf_y, W, shelf_y + shelf_h], fill=c(pal, "fill"))
 
-    # Measure + place tabs (same height / baseline for every tab)
-    widths = [measure_tab_width(d, name) for name, _ in TABS]
+    # Measure + place tabs (same height / baseline; selected wider by foot pad)
     tx = PAGE_SIDE
     tab_rects: list[tuple[float, float, float, float, bool, str, str]] = []
     tab_bottom = shelf_y + shelf_h
-    for i, ((name, accent), twid) in enumerate(zip(TABS, widths)):
+    for i, (name, accent) in enumerate(TABS):
         if i in GROUP_BEFORE:
             tx += TAB_GROUP_GAP
         selected = i == 0
+        twid = measure_tab_width(d, name, selected=selected)
         ty = tab_bottom - TAB_H
         tab_rects.append((tx, ty, twid, TAB_H, selected, name, accent))
         tx += twid + TAB_INNER_GAP
