@@ -17,7 +17,10 @@ struct ConfigurationPage: View {
     }
 
     var body: some View {
-        SettingsPageStack(title: "General") {
+        SettingsPageStack(
+            title: "General",
+            subtitle: "Appearance, shortcuts, launch behavior, and paste rules."
+        ) {
             SettingsSection(
                 title: "Appearance",
                 footer: "Also cycles from the menu bar as theme: …"

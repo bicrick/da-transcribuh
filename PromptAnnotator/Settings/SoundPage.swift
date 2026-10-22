@@ -5,10 +5,13 @@ struct SoundPage: View {
     @State private var devices: [AudioInputDevice] = []
 
     var body: some View {
-        SettingsPageStack(title: "Sound") {
+        SettingsPageStack(
+            title: "Sound",
+            subtitle: "Microphone input and the tones that mark a session."
+        ) {
             SettingsSection(
                 title: "Microphone",
-                footer: "Chosen mic is used for the session, then the previous input is restored."
+                footer: "A chosen mic is used for the session, then the previous system input is restored."
             ) {
                 InkCard {
                     VStack(alignment: .leading, spacing: 0) {

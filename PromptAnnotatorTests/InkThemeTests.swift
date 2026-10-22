@@ -193,8 +193,9 @@ final class InkThemeTests: XCTestCase {
             darkPrimary = hexRGB(resolved: NSColor(Ink.primaryFill))
             darkMark = hexRGB(resolved: NSColor(Ink.markFace))
         }
+        // Start / primary stays high-contrast invert (not flat graphite).
         XCTAssertEqual(lightPrimary.uppercased(), "000000")
-        XCTAssertEqual(darkPrimary.uppercased(), "3A3A3D")
+        XCTAssertEqual(darkPrimary.uppercased(), "F2F2F2")
         XCTAssertEqual(lightMark.uppercased(), "FFFFFF")
         XCTAssertEqual(darkMark.uppercased(), "3A3A3D")
         XCTAssertEqual(Ink.keycap, Ink.front)
@@ -203,14 +204,29 @@ final class InkThemeTests: XCTestCase {
         // Control border inverts: black in light, light hairline in dark.
         var lightBorder = ""
         var darkBorder = ""
+        var lightOnPrimary = ""
+        var darkOnPrimary = ""
+        var lightStat = ""
+        var darkStat = ""
         aqua.performAsCurrentDrawingAppearance {
             lightBorder = hexRGB(resolved: NSColor(Ink.controlBorder))
+            lightOnPrimary = hexRGB(resolved: NSColor(Ink.onPrimary))
+            lightStat = hexRGB(resolved: NSColor(Ink.statRule))
         }
         darkAqua.performAsCurrentDrawingAppearance {
             darkBorder = hexRGB(resolved: NSColor(Ink.controlBorder))
+            darkOnPrimary = hexRGB(resolved: NSColor(Ink.onPrimary))
+            darkStat = hexRGB(resolved: NSColor(Ink.statRule))
         }
         XCTAssertEqual(lightBorder.uppercased(), "000000")
         XCTAssertEqual(darkBorder.uppercased(), "F2F2F2")
+        XCTAssertEqual(lightOnPrimary.uppercased(), "FFFFFF")
+        XCTAssertEqual(darkOnPrimary.uppercased(), "2C2C2E")
+        XCTAssertEqual(lightStat.uppercased(), "000000")
+        XCTAssertEqual(darkStat.uppercased(), "A8A8AD")
+        XCTAssertEqual(SettingsPage.home.tabAccent, Ink.paintRed)
+        XCTAssertEqual(SettingsPage.history.tabAccent, Ink.paintBlue)
+        XCTAssertEqual(SettingsPage.performance.tabAccent, Ink.paintPink)
     }
 
     func testWordmarkUsesSeparateBlockCursorNotInvertedH() {

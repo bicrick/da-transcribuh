@@ -6,14 +6,20 @@ struct RecordingPage: View {
     @ObservedObject var session: SessionController
 
     var body: some View {
-        SettingsPageStack(title: "Recording") {
-            SettingsSection(title: "Recording window") {
+        SettingsPageStack(
+            title: "Recording",
+            subtitle: "Island style and Shift-drag defaults. Shortcuts live in General."
+        ) {
+            SettingsSection(
+                title: "Recording window",
+                footer: "The menu bar shows the same shortcut under Start Session."
+            ) {
                 styleGrid
             }
 
             SettingsSection(
                 title: "Defaults",
-                footer: "Hold Shift to draw; drag captures the front window."
+                footer: "These tools show while you hold Shift. Drag captures the front window or modal."
             ) {
                 InkCard {
                     VStack(alignment: .leading, spacing: 0) {

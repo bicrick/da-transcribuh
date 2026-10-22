@@ -55,10 +55,13 @@ struct HistoryPage: View {
     }
 
     private var emptyState: some View {
-        SettingsPageStack(title: "History") {
+        SettingsPageStack(
+            title: "History",
+            subtitle: "Takes land here when you stop a session."
+        ) {
             InkDashedEmpty(
                 title: "No sessions yet",
-                detail: "Press Start on Home — or \(AppSettings.shared.chord.display) — for your first take."
+                detail: "Press \(AppSettings.shared.chord.display) — or Start on Home — for your first take. Transcripts land here when you stop."
             )
         }
     }
@@ -66,7 +69,10 @@ struct HistoryPage: View {
     private var populated: some View {
         DTScrollView {
             VStack(alignment: .leading, spacing: Ink.sectionGap) {
-                InkPageHeader(title: "History")
+                InkPageHeader(
+                    title: "History",
+                    subtitle: "\(sessions.count) session\(sessions.count == 1 ? "" : "s") on disk. Select a row to read the transcript."
+                )
                 searchField
                 logTable
                 detailPane

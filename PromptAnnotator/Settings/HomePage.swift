@@ -12,10 +12,8 @@ struct HomePage: View {
             VStack(alignment: .leading, spacing: Ink.sectionGap) {
                 hero
                 stats
-                if !checklistComplete {
-                    SettingsSection(title: "Get started") {
-                        checklist
-                    }
+                SettingsSection(title: "Get started") {
+                    checklist
                 }
                 tips
             }
@@ -29,6 +27,7 @@ struct HomePage: View {
         .onAppear { permissions.refresh() }
     }
 
+    /// Pre-#9 hero, minus yellow version badge, tagline, and shortcut caption.
     private var hero: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: Ink.space4) {
@@ -81,28 +80,29 @@ struct HomePage: View {
 
     private var stats: some View {
         let numbers = SessionLibrary.stats(from: sessions)
-        let accents = [Ink.paintBlue, Ink.paintOrange, Ink.paintMagenta, Ink.paintGreen]
-        let items: [(String, Int, String)] = [
-            ("Sessions", numbers.sessions, numbers.sessions == 1 ? "Session" : "Sessions"),
-            ("Tiles", numbers.tiles, numbers.tiles == 1 ? "Tile" : "Tiles"),
-            ("Words", numbers.words, numbers.words == 1 ? "Word" : "Words"),
-            ("Minutes", numbers.minutes, numbers.minutes == 1 ? "Minute" : "Minutes"),
+        let items: [(Int, String)] = [
+            (numbers.sessions, numbers.sessions == 1 ? "Session" : "Sessions"),
+            (numbers.tiles, numbers.tiles == 1 ? "Tile" : "Tiles"),
+            (numbers.words, numbers.words == 1 ? "Word" : "Words"),
+            (numbers.minutes, numbers.minutes == 1 ? "Minute" : "Minutes"),
         ]
         return HStack(alignment: .top, spacing: Ink.gridGap) {
-            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                 VStack(alignment: .leading, spacing: Ink.space2) {
-                    Text("\(item.1)")
+                    Text(item.0.formatted(.number.grouping(.automatic)))
                         .font(Ink.numberFont)
                         .monospacedDigit()
                         .foregroundStyle(Ink.label)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
-                    Text(item.2.uppercased())
+                    Text(item.1.uppercased())
                         .font(Ink.headingFont)
                         .foregroundStyle(Ink.secondary)
+                    // Full-column neutral rule — per-stat colors moved to folder tabs.
                     Rectangle()
-                        .fill(accents[index])
+                        .fill(Ink.statRule)
                         .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                        .frame(maxWidth: .infinity)
                         .frame(height: 4)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -143,13 +143,11 @@ struct HomePage: View {
                         Text(item.title)
                             .font(Ink.labelFont)
                             .foregroundStyle(Ink.label)
-                        if let detail = item.detail, !detail.isEmpty {
-                            Text(detail)
-                                .font(Ink.captionFont)
-                                .foregroundStyle(Ink.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
+                        Text(item.detail)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Spacer(minLength: 0)
                     if let trail = item.trail {
@@ -169,7 +167,7 @@ struct HomePage: View {
             tipColumn(
                 glyph: "viewfinder",
                 title: "Talk, or drag to capture",
-                detail: nil,
+                detail: "Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.",
                 trailing: nil
             )
             tipColumn(
@@ -191,7 +189,7 @@ struct HomePage: View {
     private func tipColumn(
         glyph: String,
         title: String,
-        detail: String?,
+        detail: String,
         trailing: AnyView?
     ) -> some View {
         VStack(alignment: .leading, spacing: Ink.space2) {
@@ -206,21 +204,14 @@ struct HomePage: View {
                     .foregroundStyle(Ink.onTile)
             }
             .frame(width: Ink.tipIconSize, height: Ink.tipIconSize)
-            .background(
-                Rectangle()
-                    .fill(Ink.bevel)
-                    .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
-            )
             Text(title)
                 .font(Ink.labelFont)
                 .foregroundStyle(Ink.label)
-            if let detail, !detail.isEmpty {
-                Text(detail)
-                    .font(Ink.captionFont)
-                    .foregroundStyle(Ink.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            Text(detail)
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             if let trailing {
                 trailing
             }
@@ -231,7 +222,7 @@ struct HomePage: View {
     private struct ChecklistItem {
         var done: Bool
         var title: String
-        var detail: String?
+        var detail: String
         var trail: AnyView?
     }
 
@@ -240,7 +231,7 @@ struct HomePage: View {
             ChecklistItem(
                 done: permissions.status.isReady,
                 title: "Permissions",
-                detail: permissions.status.isReady ? nil : permissionDetail,
+                detail: permissionDetail,
                 trail: permissions.status.isReady ? nil : AnyView(
                     HStack(spacing: Ink.space2) {
                         Button("Turn On") {
@@ -259,20 +250,18 @@ struct HomePage: View {
             ChecklistItem(
                 done: modelReady,
                 title: "Speech model",
-                detail: modelReady ? nil : modelDetail,
+                detail: modelDetail,
                 trail: nil
             ),
             ChecklistItem(
                 done: !sessions.isEmpty,
                 title: "First take",
-                detail: sessions.isEmpty ? firstSessionDetail : nil,
+                detail: sessions.isEmpty
+                    ? firstSessionDetail
+                    : "\(sessions.count) session\(sessions.count == 1 ? "" : "s") in History.",
                 trail: nil
             ),
         ]
-    }
-
-    private var checklistComplete: Bool {
-        checklistItems.allSatisfy(\.done)
     }
 
     private var modelReady: Bool {
@@ -284,7 +273,13 @@ struct HomePage: View {
 
     private var modelDetail: String {
         if settings.speechEngine == .openAICompatible {
-            return "Add a server API key on the Models page."
+            return OpenAICompatibleTranscriber.isConfigured()
+                ? "OpenAI-compatible server is configured."
+                : "Add a server API key on the Models page."
+        }
+        if WhisperKitTranscriber.modelIsInstalled() {
+            let choice = SpeechModelChoice.stored(settings.speechModel)
+            return "\(choice.title) (\(choice.variant)) is on this Mac."
         }
         return "Download a speech model on the Models page."
     }
@@ -297,18 +292,18 @@ struct HomePage: View {
 
     private var firstSessionDetail: String {
         if !permissions.status.isReady {
-            return "Turn on permissions above, then press Start."
+            return "Turn on permissions above, then press Start or \(settings.chord.display)."
         }
         if settings.speechEngine == .openAICompatible {
             if !OpenAICompatibleTranscriber.isConfigured() {
-                return "Add a server API key on the Models page, then press Start."
+                return "Add a server API key on the Models page, then press Start or \(settings.chord.display)."
             }
-            return "Press Start, speak, then stop."
+            return "Press Start or \(settings.chord.display), speak, then stop."
         }
         if !WhisperKitTranscriber.modelIsInstalled() {
-            return "Download a speech model on the Models page, then press Start."
+            return "Download a speech model on the Models page, then press Start or \(settings.chord.display)."
         }
-        return "Press Start, speak, then stop."
+        return "Press Start or \(settings.chord.display), speak, then stop. History fills in after your first take."
     }
 
     private var permissionDetail: String {

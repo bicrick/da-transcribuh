@@ -32,16 +32,17 @@ AppIcon / README brand PNGs stay the light plate (white square). In-app mark fol
 | `hairline` | `#C0C0C0` | `#4A4A4E` |
 | `label` / `onTile` | `#000000` | `#F2F2F2` |
 | `secondary` | `#666666` | `#A8A8AD` |
-| `primaryFill` (Start / selected chrome) | `#000000` | `#3A3A3D` |
-| `onPrimary` | `#FFFFFF` | `#F2F2F2` |
+| `primaryFill` (Start invert — pop) | `#000000` | `#F2F2F2` |
+| `onPrimary` | `#FFFFFF` | `#2C2C2E` |
+| `statRule` (Home stats underline) | `#000000` | `#A8A8AD` |
 | `controlBorder` | `#000000` | `#F2F2F2` |
 | `bevel` (double-pane offset) | `#000000` | `#1A1A1C` |
 
 Nothing in chrome should paint darker than `#1A1A1C` except the bevel itself. Route surfaces through `Ink.*` — no hard-coded `Color.white` / `Color.black` for chrome controls (functional Paint swatches, annotation ink, and export canvases are the exceptions).
 
-### Copy
+### Copy / Home
 
-Keep Home / page chrome airy. Version lives in the status bar only (no yellow badge next to the wordmark). Cut helper lines that restate what keycaps, stats, or controls already show. Hide the Home “Get started” checklist once all three items are done.
+Home keeps the pre-declutter structure (stats grid, Get Started checklist, tip tiles). Nits only: no yellow version badge (status bar has it), no hero tagline, no “^⌥Space starts…” caption under Start. Stat underlines are neutral (`Ink.statRule`); per-page Paint accents live on folder-tab top stripes (`SettingsPage.tabAccent`). Start / primary stays high-contrast invert (`primaryFill` / `onPrimary`: black↔`#F2F2F2`), not a flat graphite plate.
 
 ## Typography
 
