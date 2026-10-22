@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/brand/readme-banner.png" alt="da transcribuh — talk. it types. drag if u want the picture too." width="920">
+  <img src="assets/brand/readme-banner.png" alt="da transcribuh — free on-device voice to text" width="920">
 </p>
 
-<p align="center">dictation in ur menu bar. grab the screen when u want the picture with the words.</p>
+<p align="center">free, fast, on-device voice to text in ur menu bar.</p>
 
 <p align="center">
   <a href="https://github.com/bicrick/da-transcribuh/releases/latest">download</a>
@@ -17,6 +17,10 @@
 <p align="center">
   <img src="assets/brand/mocks/readme-island-demo-light.png" alt="recording island — talk. it types. grab the picture." width="920">
 </p>
+
+<p align="center">if u like that, u'd probably like grabbing screens while u talk. drop a few tiles so u can point at multiple nits in one go.</p>
+
+<p align="center">clipboard history is coming soon (⌘⇧C).</p>
 
 ## install
 

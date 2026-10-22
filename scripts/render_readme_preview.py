@@ -34,43 +34,65 @@ def main() -> None:
 
     pad = 48
     W = bw + pad * 2
+    extras_h = 22 * 2 + 28  # two extra lines + gap
     y = pad + 8
-    blocks = []
-    blocks.append(("banner", y, bh))
+    by_banner = y
     y += bh + 28
-    blocks.append(("line", y, 20))
+    by_line = y
     y += 20 + 18
-    blocks.append(("links", y, 18))
+    by_links = y
     y += 18 + 28
-    blocks.append(("demo", y, dh))
-    y += dh + 36
-    blocks.append(("install", y, 160))
+    by_demo = y
+    y += dh + 20
+    by_extras = y
+    y += extras_h + 28
+    by_install = y
     y += 160 + pad
 
     img = Image.new("RGB", (W, y), (255, 255, 255))
     d = ImageDraw.Draw(img)
     d.rectangle([0, 0, W - 1, y - 1], outline=(225, 228, 232))
 
-    img.paste(banner, ((W - bw) // 2, blocks[0][1]))
+    img.paste(banner, ((W - bw) // 2, by_banner))
 
     body = font(SANS, 15)
     link = font(SANS, 14)
     mono = font(MONO, 12)
     h2 = font(SANS, 20)
 
-    line = "dictation in ur menu bar. grab the screen when u want the picture with the words."
+    line = "free, fast, on-device voice to text in ur menu bar."
     bb = d.textbbox((0, 0), line, font=body)
-    lw = bb[2] - bb[0]
-    d.text(((W - lw) // 2, blocks[1][1]), line, font=body, fill=(36, 41, 47))
+    d.text(((W - (bb[2] - bb[0])) // 2, by_line), line, font=body, fill=(36, 41, 47))
 
     links = "download  ·  build from source  ·  MIT  ·  macOS 14+"
     bb = d.textbbox((0, 0), links, font=link)
-    lw = bb[2] - bb[0]
-    d.text(((W - lw) // 2, blocks[2][1]), links, font=link, fill=(9, 105, 218))
+    d.text(((W - (bb[2] - bb[0])) // 2, by_links), links, font=link, fill=(9, 105, 218))
 
-    img.paste(demo, ((W - dw) // 2, blocks[3][1]))
+    img.paste(demo, ((W - dw) // 2, by_demo))
 
-    iy = blocks[4][1]
+    extras = [
+        "if u like that, u'd probably like grabbing screens while u talk. drop a few tiles so u can point at multiple nits in one go.",
+        "clipboard history is coming soon (⌘⇧C).",
+    ]
+    ey = by_extras
+    for extra in extras:
+        bb = d.textbbox((0, 0), extra, font=body)
+        # wrap long first line if needed — keep single line if it fits
+        lw = bb[2] - bb[0]
+        if lw > W - pad * 2:
+            # simple two-line split at "talk. "
+            parts = extra.split(". ", 1)
+            if len(parts) == 2:
+                a, b = parts[0] + ".", parts[1]
+                for part in (a, b):
+                    bb = d.textbbox((0, 0), part, font=body)
+                    d.text(((W - (bb[2] - bb[0])) // 2, ey), part, font=body, fill=(36, 41, 47))
+                    ey += 22
+                continue
+        d.text(((W - lw) // 2, ey), extra, font=body, fill=(36, 41, 47))
+        ey += 22
+
+    iy = by_install
     d.text((pad, iy), "install", font=h2, fill=(36, 41, 47))
     d.rectangle([pad, iy + 28, pad + 80, iy + 30], fill=(36, 41, 47))
     d.text(
@@ -86,8 +108,8 @@ def main() -> None:
     ]
     cy = iy + 72
     d.rectangle([pad, cy - 8, W - pad, cy + 58], fill=(246, 248, 250), outline=(225, 228, 232))
-    for i, line in enumerate(code):
-        d.text((pad + 12, cy + i * 16), line, font=mono, fill=(36, 41, 47))
+    for i, c in enumerate(code):
+        d.text((pad + 12, cy + i * 16), c, font=mono, fill=(36, 41, 47))
     d.text(
         (pad, cy + 70),
         "macOS 14 or later. the first build fetches WhisperKit.",
