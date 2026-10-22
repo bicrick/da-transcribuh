@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The snapshot count that slides out beside the clock — Paint tile chip.
+/// The snapshot count that slides out beside the clock — flat, hairline only.
 struct CaptureCountChip: View {
     var count: Int
     var ink: Color = Ink.label
@@ -21,7 +21,7 @@ struct CaptureCountChip: View {
         .background(Ink.window, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                .strokeBorder(Ink.paintOrange, lineWidth: 1.5)
+                .strokeBorder(Ink.hairline, lineWidth: 1)
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(count) \(count == 1 ? "capture" : "captures")")

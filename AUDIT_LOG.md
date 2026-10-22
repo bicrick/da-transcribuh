@@ -6,7 +6,14 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–27)
+## Final summary (Runs 1–28)
+
+### Run 28 — Minimal recording island (Patrick feedback)
+
+- Strip island décor: no mini palette, no hard offset shadow, thin `Ink.hairline` only. Keep red record square, “Recording”, cyan waveform, Departure Mono clock, capture chip (hairline, not orange).
+- `islandPanelSize()` returns exact panel size again (no shadow padding).
+- Markup toolbar: same flat + hairline (functional ink colors stay).
+- Mocks: `assets/brand/mocks/recording-paint-{light,dark}.png` regenerated. README look copy updated.
 
 ### Run 27 — Final polish + compile-safety audit (no code changes)
 

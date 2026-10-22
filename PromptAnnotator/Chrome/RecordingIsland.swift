@@ -26,8 +26,7 @@ struct RecordingIslandView: View {
             captures: session.captureCount,
             elapsed: session.elapsed
         )
-        // Hard offset shadow is drawn inside the panel (ChromePanel masksToBounds).
-        // Content footprint stays the same; shadow room is added in islandPanelSize().
+        // Minimal: flat fill + thin hairline. No palette strip, no hard offset shadow.
         return HStack(spacing: 0) {
             leading(layout)
             LiveWaveform(
@@ -40,45 +39,17 @@ struct RecordingIslandView: View {
         }
         .padding(.horizontal, IslandMetrics.inset)
         .frame(width: layout.panel.width, height: layout.panel.height)
-        .overlay(alignment: .bottomLeading) {
-            miniPalette
-                .padding(.leading, IslandMetrics.inset)
-                .padding(.bottom, 3)
-        }
         .background {
-            RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                .fill(Ink.label)
-                .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
                 .fill(Ink.window)
                 .overlay(
                     RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                        .strokeBorder(Ink.label, lineWidth: 1.5)
+                        .strokeBorder(Ink.hairline, lineWidth: 1)
                 )
         }
-        .padding(.trailing, Ink.buttonShadow)
-        .padding(.bottom, Ink.buttonShadow)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(islandAccessibilityLabel)
         .onAppear { pulse = true }
-    }
-
-    /// Tiny Paint swatch strip — decorative, no layout cost.
-    private var miniPalette: some View {
-        HStack(spacing: 1) {
-            miniSwatch(Ink.paintRed)
-            miniSwatch(Ink.paintYellow)
-            miniSwatch(Ink.paintLime)
-            miniSwatch(Ink.paintBlue)
-        }
-        .accessibilityHidden(true)
-    }
-
-    private func miniSwatch(_ color: Color) -> some View {
-        Rectangle()
-            .fill(color)
-            .frame(width: 5, height: 5)
-            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 0.5))
     }
 
     private var islandAccessibilityLabel: String {
@@ -184,7 +155,6 @@ struct RecordingIslandView: View {
     private var recordDot: some View {
         Rectangle()
             .fill(Ink.record)
-            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
             .frame(width: 8, height: 8)
             .opacity(pulse ? 1 : 0.35)
             .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: pulse)

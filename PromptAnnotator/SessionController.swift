@@ -1169,17 +1169,12 @@ final class SessionController: ObservableObject {
     }
 
     func islandPanelSize() -> CGSize {
-        let panel = IslandMetrics.layout(
+        IslandMetrics.layout(
             style: AppSettings.shared.islandStyle,
             slots: islandChrome.slots,
             captures: captureCount,
             elapsed: elapsed
         ).panel
-        // Extra room so the hard Paint offset shadow stays inside ChromePanel's mask.
-        return CGSize(
-            width: panel.width + Ink.buttonShadow,
-            height: panel.height + Ink.buttonShadow
-        )
     }
 
     private func placeIsland(animated: Bool) {

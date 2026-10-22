@@ -31,7 +31,7 @@ appearance is system / light / dark from **general**, or mash `theme: …` in th
 
 the start/stop chord lives in **general** as paint keycaps — click, press a combo (modifier required, or a function key), it rebinds live. reset drops you back on ⌃⌥Space. home, the status bar, the menu panel, and onboarding all read the same stored shortcut.
 
-the recording island matches home: paint-red record square, cyan waveform comb, hard offset shadow drawn inside the panel, departure mono clock, tiny palette strip. same footprint and hit targets — no new timers.
+the recording island stays minimal: paint-red record square, “recording” label, cyan waveform, departure mono clock, and the screenshot-count chip. flat fill, thin hairline — no palette strip, no hard shadow. same layout and hit targets.
 
 <p align="center">
   <picture>
@@ -49,7 +49,7 @@ the recording island matches home: paint-red record square, cyan waveform comb, 
   </picture>
 </p>
 
-<p align="center"><em>recording island · paint chrome</em></p>
+<p align="center"><em>recording island · minimal</em></p>
 
 <p align="center">
   <img src="assets/brand/mocks/icon-concepts.png" alt="da transcribuh app icon concepts" width="920">
@@ -132,7 +132,7 @@ final **dt block** art lives in [`assets/brand/`](assets/brand/):
 - `social-preview.png` (1280×640) — repo social preview; also mirrored as `social-preview-1280x640.png` / `@2x`
 - `screenshots/settings-home-light.png` / `settings-home-dark.png` — settings home mocks for the readme
 - `mocks/home-paint-light.png` / `home-paint-dark.png` — Paint-direction lock mocks
-- `mocks/recording-paint-light.png` / `recording-paint-dark.png` — recording island Paint chrome
+- `mocks/recording-paint-light.png` / `recording-paint-dark.png` — recording island (minimal)
 - `mocks/icon-concepts.png` — app icon explorations (AppIcon not replaced); recommend #1 dt-block square + red shadow
 - `menubar-g-dt-block-16.png` / `menubar-g-dt-block-32.png` — template menu-bar glyph
 
