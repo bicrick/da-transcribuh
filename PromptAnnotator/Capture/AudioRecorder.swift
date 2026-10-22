@@ -269,10 +269,13 @@ final class AudioRecorder: @unchecked Sendable {
         copy.frameLength = buffer.frameLength
         let source = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
         let destination = UnsafeMutableAudioBufferListPointer(copy.mutableAudioBufferList)
-        for (src, dst) in zip(source, destination) {
-            guard let srcData = src.mData, let dstData = dst.mData else { continue }
+        for index in 0..<min(source.count, destination.count) {
+            let src = source[index]
+            guard let srcData = src.mData, let dstData = destination[index].mData else { continue }
             memcpy(dstData, srcData, Int(src.mDataByteSize))
+            var dst = destination[index]
             dst.mDataByteSize = src.mDataByteSize
+            destination[index] = dst
         }
         return copy
     }
