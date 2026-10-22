@@ -5,14 +5,17 @@ struct SoundPage: View {
     @State private var devices: [AudioInputDevice] = []
 
     var body: some View {
-        SettingsPageStack(title: "Sound") {
-            SettingsSection(title: "Microphone") {
+        SettingsPageStack(
+            title: "Sound",
+            subtitle: "Microphone input and the tones that mark a session."
+        ) {
+            SettingsSection(
+                title: "Microphone",
+                footer: "A chosen mic is used for the session, then the previous system input is restored."
+            ) {
                 InkCard {
                     VStack(alignment: .leading, spacing: 0) {
-                        InkSettingRow(
-                            title: "Input",
-                            detail: "A chosen microphone is used for the session, then the previous system input is restored."
-                        ) {
+                        InkSettingRow(title: "Input", detail: nil) {
                             InkMenuPicker(
                                 title: "Input",
                                 selection: Binding(
@@ -35,7 +38,10 @@ struct SoundPage: View {
                 }
             }
 
-            SettingsSection(title: "Sound effects") {
+            SettingsSection(
+                title: "Sound effects",
+                footer: "Selecting a set plays start, a spoken stop, and a silent stop."
+            ) {
                 InkCard {
                     VStack(alignment: .leading, spacing: 0) {
                         InkToggleRow(
@@ -70,15 +76,9 @@ struct SoundPage: View {
                         .padding(.horizontal, Ink.rowHPad)
                         .padding(.vertical, Ink.rowVPad)
                         InkDivider(leading: 0)
-                        VStack(alignment: .leading, spacing: Ink.space3) {
-                            Text("Choose a set. Selecting one plays start, a spoken stop, and a silent stop.")
-                                .font(Ink.captionFont)
-                                .foregroundStyle(Ink.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            soundChoices
-                        }
-                        .padding(.horizontal, Ink.rowHPad)
-                        .padding(.vertical, Ink.rowVPad)
+                        soundChoices
+                            .padding(.horizontal, Ink.rowHPad)
+                            .padding(.vertical, Ink.rowVPad)
                     }
                 }
             }

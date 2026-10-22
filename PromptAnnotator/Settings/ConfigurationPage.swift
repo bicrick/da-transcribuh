@@ -17,8 +17,14 @@ struct ConfigurationPage: View {
     }
 
     var body: some View {
-        SettingsPageStack(title: "General") {
-            SettingsSection(title: "Appearance") {
+        SettingsPageStack(
+            title: "General",
+            subtitle: "Appearance, shortcuts, launch behavior, and paste rules."
+        ) {
+            SettingsSection(
+                title: "Appearance",
+                footer: "Also cycles from the menu bar as theme: …"
+            ) {
                 appearanceCard
             }
             SettingsSection(title: "Keyboard shortcuts") {
@@ -55,20 +61,11 @@ struct ConfigurationPage: View {
 
     private var appearanceCard: some View {
         InkCard {
-            VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
-                    Text("Theme")
-                        .font(Ink.rowTitleFont)
-                        .foregroundStyle(Ink.label)
-                    Text("System follows macOS. Light and Dark lock Settings, the menu panel, and the recording island / annotate chrome.")
-                        .font(Ink.captionFont)
-                        .foregroundStyle(Ink.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, Ink.rowHPad)
-                .padding(.top, Ink.rowVPad)
-                .padding(.bottom, Ink.space3)
-
+            VStack(alignment: .leading, spacing: Ink.space3) {
+                Text("System follows macOS. Light and Dark lock Settings, the menu panel, and the recording island / annotate chrome.")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 InkAppearanceSegment(
                     selection: Binding(
                         get: { settings.appearance },
@@ -76,9 +73,9 @@ struct ConfigurationPage: View {
                     ),
                     onChange: { settings.setAppearance($0) }
                 )
-                .padding(.horizontal, Ink.rowHPad)
-                .padding(.bottom, Ink.rowVPad)
             }
+            .padding(.horizontal, Ink.rowHPad)
+            .padding(.vertical, Ink.rowVPad)
         }
     }
 
