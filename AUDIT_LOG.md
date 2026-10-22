@@ -6,7 +6,13 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–17)
+## Final summary (Runs 1–18)
+
+### Run 18 — Custom traffic lights + styled menu-bar panel
+
+- Settings: hide stock traffic lights; draw outlined B/W close/miniaturize/zoom (hover ×/−/+); title strip with centered wordmark + dither grip; strip drags the window via `mouseDownCanMoveWindow`; actions → `performClose` / `miniaturize` / `zoom`; ⌘W/⌘M kept via style mask.
+- Menu bar: `MenuBarExtra` + `.menuBarExtraStyle(.window)` with B/W panel (1px border, hard shadow, inverted hover rows). Same actions/shortcuts as before; `dismiss` after action; dt `MenuBarIcon` template unchanged.
+- Risky on Mac: titlebar-container alpha hide may differ by OS build (buttons still force-hidden); MenuBarExtra window chrome polish is best-effort; confirm dismiss + keyboard focus in the panel.
 
 ### Run 17 — Final dt-block brand assets
 
@@ -19,7 +25,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 - Replaced Ink red theme with strict B/W tokens (1px lines, 3px radii, hard shadows, Departure Mono for wordmark/status).
 - Settings: single-column square tool-palette sidebar (icon above label, selected inverted); 24pt mono status bar; wordmark uses **separate block cursor** (not inverted h).
-- Onboarding welcome wordmark blinks (Reduce Motion respected). Menu bar uses `MenuBarIcon` dt template; standard `MenuBarExtra` menu kept (custom styled panel deferred). System traffic lights kept.
+- Onboarding welcome wordmark blinks (Reduce Motion respected). Menu bar uses `MenuBarIcon` dt template (styled `.window` panel in Run 18). Custom traffic lights in Run 18.
 - AppIcon / AppMark regenerated from dt 1024. Island/overlay untouched.
 
 ### Run 15a — README + brand assets (da transcribuh)
@@ -44,6 +50,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 | **Brand / README (Run 15a→17)** | da transcribuh README + final **dt-block** `assets/brand/` (wordmarks, banner, social, icon); bubble assets removed. |
 | **In-app rename (Run 15b)** | User-facing strings → “da transcribuh”; CFBundleDisplayName/Name; release URLs. Bundle ID / PromptAnnotator paths / PRODUCT_NAME=Mutter.app unchanged. |
 | **B&W chrome (Run 16)** | Settings/onboarding/menu-bar B/W restyle; single-column tile sidebar; status bar; Departure Mono; dt AppIcon. Island unchanged. |
+| **Chrome finish (Run 18)** | Custom Settings traffic lights + dither title strip; styled MenuBarExtra `.window` panel. |
 
 ### Reverted (Run 9, still gone)
 
@@ -53,7 +60,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 - Tokens: light `#FFF/#000/#DADADA/#F2F2F2/#666/#A3A3A3`; dark inverted. Font: `DepartureMono-Regular.otf` + OFL under `PromptAnnotator/Fonts/`, `ATSApplicationFontsPath=Fonts`.
 - Sidebar: **one column** of square tiles (not 2-col, not compact rows); width ~108. Status bar cells: state / model / sessions / shortcut / version.
-- Deferred: custom outlined traffic lights; custom styled menu-bar panel (functional MenuBarExtra kept).
+- Deferred items **done in Run 18** (custom traffic lights + styled menu-bar panel).
 - Tests: `InkThemeTests` updated for B/W tokens + wordmark cursor rule.
 
 ### Run 15b (in-app rename)
@@ -115,6 +122,8 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] **B&W Settings**: Home / Models / History / Recording / Configuration / Sound / Performance in light + dark — 1px B/W chrome, no island restyle.
 - [ ] **Ink padding**: ~20–24pt gap below title-bar to first content on every Settings page (not ~90pt).
 - [ ] **Sidebar**: one vertical column of equal square tiles (icon above label, 1px outline; selected inverted); Session / Speech / App labels; scrolls if short; not 2-col, not compact rows.
+- [ ] **Title strip**: custom outlined traffic lights (hover ×/−/+), centered wordmark + block cursor, dither grip; window drags from strip; ⌘W / ⌘M work.
+- [ ] **Menu bar panel**: B/W `.window` panel (1px border, hard shadow, inverted hover); open / start-stop / paste / Finder / quit match prior actions and dismiss after click.
 - [ ] **Onboarding**: STEP n OF 6 eyebrow, step dots, Skip / Back / primary; wordmark + block cursor (blinks unless Reduce Motion); Welcome+Ready waveform→pen continuous.
 - [ ] Configuration Advanced reads “Speech models are on the Models page.”
 - [ ] **Paste hold**: stop with tiles+words while focus is Desktop/Finder — no stray paste; menu shows Ready to paste; ⌘V or ⌃⌥V into a text field gets image+text.
@@ -147,6 +156,14 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
 
 ---
+
+## Run 18 — Traffic lights + menu-bar panel
+
+See summary. Mac checklist:
+
+1. Settings title strip: outlined lights (hover glyphs), centered wordmark + cursor, dither grip; drag window from strip; ⌘W closes, ⌘M minimizes; zoom toggles.
+2. Menu bar: click dt icon → B/W panel with 1px border + hard shadow; hover inverts rows; Start/Stop, paste, Finder, quit all work and dismiss the panel.
+3. Ready-to-paste / busy states still surface in the panel; island unchanged.
 
 ## Run 17 — Final dt-block brand assets
 

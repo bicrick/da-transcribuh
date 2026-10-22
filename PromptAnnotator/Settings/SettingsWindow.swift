@@ -14,33 +14,43 @@ struct SettingsRoot: View {
     @State private var sessions: [SessionSummary] = []
 
     var body: some View {
-        NavigationSplitView {
-            VStack(spacing: 0) {
-                SettingsSidebar(selection: $page)
-                sidebarFooter
+        VStack(spacing: 0) {
+            DTTitleStrip()
+
+            NavigationSplitView {
+                VStack(spacing: 0) {
+                    SettingsSidebar(selection: $page)
+                    sidebarFooter
+                }
+                .background(Ink.sidebar)
+                .navigationSplitViewColumnWidth(
+                    min: Ink.sidebarWidth - 8,
+                    ideal: Ink.sidebarWidth,
+                    max: Ink.sidebarWidth + 16
+                )
+            } detail: {
+                VStack(spacing: 0) {
+                    detail
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .toolbar(.hidden, for: .automatic)
+                    DTStatusBar(cells: statusCells, trailing: AppVersion.label)
+                }
+                .background(Ink.window)
             }
-            .background(Ink.sidebar)
-            .navigationSplitViewColumnWidth(
-                min: Ink.sidebarWidth - 8,
-                ideal: Ink.sidebarWidth,
-                max: Ink.sidebarWidth + 16
-            )
-        } detail: {
-            VStack(spacing: 0) {
-                detail
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .toolbar(.hidden, for: .automatic)
-                DTStatusBar(cells: statusCells, trailing: AppVersion.label)
-            }
-            .background(Ink.window)
+            .navigationSplitViewStyle(.balanced)
         }
-        .navigationSplitViewStyle(.balanced)
         .tint(Ink.label)
         .background(Ink.window)
-        .onAppear(perform: reload)
+        // Draw under the (hidden) system titlebar so our strip owns the top edge.
+        .ignoresSafeArea(.container, edges: .top)
+        .onAppear {
+            SettingsPresenter.shared.applyChrome()
+            reload()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSettingsShown)) { _ in
             reload()
             permissions.refresh()
+            SettingsPresenter.shared.applyChrome()
         }
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSessionsChanged)) { _ in
             reload()
@@ -186,6 +196,9 @@ final class SettingsPresenter {
     private var window: NSWindow?
     private let shownKey = "home.shown"
 
+    /// Exposed for custom traffic lights (performClose / miniaturize / zoom).
+    var attachedWindow: NSWindow? { window }
+
     func showOnFirstLaunch() {
         guard !UserDefaults.standard.bool(forKey: shownKey) else { return }
         UserDefaults.standard.set(true, forKey: shownKey)
@@ -196,6 +209,7 @@ final class SettingsPresenter {
         let window = ensure()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        applyChrome()
         NotificationCenter.default.post(name: .promptAnnotatorSettingsShown, object: nil)
     }
 
@@ -219,8 +233,8 @@ final class SettingsPresenter {
         window.isReleasedWhenClosed = false
         window.backgroundColor = Ink.windowNSColor
         window.contentView = host
-        window.setContentSize(NSSize(width: 880, height: 600))
-        window.minSize = NSSize(width: 760, height: 520)
+        window.setContentSize(NSSize(width: 880, height: 640))
+        window.minSize = NSSize(width: 760, height: 560)
         window.center()
         self.window = window
         applyChrome()
@@ -232,8 +246,12 @@ final class SettingsPresenter {
     }
 
     func applyChrome() {
-        window?.level = AppSettings.shared.keepWindowOnTop ? .floating : .normal
-        window?.backgroundColor = Ink.windowNSColor
+        guard let window else { return }
+        window.level = AppSettings.shared.keepWindowOnTop ? .floating : .normal
+        window.backgroundColor = Ink.windowNSColor
+        // Keep closable / miniaturizable in the style mask so ⌘W / ⌘M still work
+        // even though the stock buttons are hidden behind our custom lights.
+        DTSystemTrafficLights.hide(on: window)
     }
 }
 

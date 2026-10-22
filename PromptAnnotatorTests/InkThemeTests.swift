@@ -28,6 +28,8 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.sectionGap, 24)
         XCTAssertEqual(Ink.gridGap, 10)
         XCTAssertEqual(Ink.statusBarHeight, 24)
+        XCTAssertEqual(Ink.titleStripHeight, 38)
+        XCTAssertEqual(Ink.menuBarShadow, 4)
         XCTAssertEqual(Ink.hardShadow, 3)
         XCTAssertEqual(Ink.selectedBorder, 2)
     }

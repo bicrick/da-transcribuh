@@ -58,6 +58,10 @@ enum Ink {
     static let gridGap: CGFloat = 10
     static let statusBarHeight: CGFloat = 24
     static let sidebarTileSize: CGFloat = 72
+    /// Custom Settings title strip (traffic lights + wordmark + dither grip).
+    static let titleStripHeight: CGFloat = 38
+    /// Hard offset shadow for the menu-bar panel mockup.
+    static let menuBarShadow: CGFloat = 4
 
     // MARK: - Type
 
