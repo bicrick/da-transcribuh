@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// How open each piece of recording chrome is. Zero is gone, one is fully in the capsule.
-/// Left slot = record square + timer. Right slot = capture chip (or download %). No text label.
+/// Left slot = record square + timer. Right slot = capture chip (or download %) — fully collapsed at 0.
 struct IslandSlots: Equatable {
     var label: CGFloat = 0
     var dot: CGFloat = 0
@@ -50,7 +50,6 @@ struct IslandSlots: Equatable {
             && abs(percent - target.percent) < epsilon
     }
 
-    /// Fades with the travel, and finishes fading just before the slot has fully closed.
     static func opacity(for open: CGFloat) -> Double {
         let amount = min(1, max(0, Double(open)))
         return min(1, amount / 0.72)
@@ -69,37 +68,125 @@ enum IslandPresence: Equatable {
     case processing
 }
 
-/// Sizes for the capsule. Left and right side slots share one fixed width so the comb stays centered.
+/// Per-style chrome scale. Default (classic) matches the former compact footprint;
+/// compact is tighter still. Hit targets stay ≥24pt.
+struct IslandChromeScale: Equatable {
+    var inset: CGFloat
+    var sideGap: CGFloat
+    var recordSize: CGFloat
+    var recordClockGap: CGFloat
+    var clockFontSize: CGFloat
+    var chipFontSize: CGFloat
+    var chipIconSize: CGFloat
+    var chipMinHeight: CGFloat
+    var barHeight: CGFloat
+    var wave: CGSize
+    var percentSpan: CGFloat
+
+    var clockSpan: CGFloat {
+        let m = IslandMetrics.textWidth("59:59", size: clockFontSize)
+        let h = IslandMetrics.textWidth("9:59:59", size: clockFontSize)
+        return max(m, h) + 2
+    }
+
+    func chipSpan(_ count: Int) -> CGFloat {
+        let digits = IslandMetrics.textWidth("\(max(count, 1))", size: chipFontSize)
+        let hPad = chipMinHeight >= 28 ? Ink.space2 : Ink.space1 + 2
+        return ceil(digits + 6 + chipIconSize + hPad * 2) + 2
+    }
+
+    var leadingNatural: CGFloat {
+        recordSize + recordClockGap + clockSpan
+    }
+}
+
+/// Sizes for the capsule. Trailing slot collapses to zero when there are no captures.
 struct IslandLayout: Equatable {
-    var panel = CGSize(width: 280, height: 54)
-    var side: CGFloat = 0
-    var wave = CGSize(width: 248, height: 32)
-    /// Gap between each side slot and the waveform (equal L/R).
-    var sideGap: CGFloat = 0
+    var panel = CGSize(width: 280, height: 48)
+    var leadingSide: CGFloat = 0
+    var trailingSide: CGFloat = 0
+    var wave = CGSize(width: 188, height: 26)
+    var sideGapLeading: CGFloat = 0
+    var sideGapTrailing: CGFloat = 0
     var record: CGFloat = 0
     var clock: CGFloat = 0
     var recordClockGap: CGFloat = 0
     var chip: CGFloat = 0
     var percent: CGFloat = 0
+    var scale = IslandMetrics.scale(for: .classic)
 }
 
 enum IslandMetrics {
-    /// Outer padding left/right — equal.
-    static let inset: CGFloat = 18
-    /// Padding between each side slot and the waveform — equal.
-    static let sideGap: CGFloat = 16
-    /// Gap between record square and timer inside the left slot.
-    static let recordClockGap: CGFloat = 8
-    static let recordSize: CGFloat = 10
-    static let clockFontSize: CGFloat = 14
-    static let chipFontSize: CGFloat = 14
-    static let chipIconSize: CGFloat = 12
-    /// Fixed monospaced timer width (covers `59:59` and `9:59:59`) — no jitter as digits change.
-    static let fixedClockSpan: CGFloat = {
-        let m = textWidth("59:59", size: clockFontSize)
-        let h = textWidth("9:59:59", size: clockFontSize)
-        return max(m, h) + 2
-    }()
+    /// Default (classic) — former compact footprint.
+    static func scale(for style: IslandStyle) -> IslandChromeScale {
+        switch style {
+        case .classic:
+            return IslandChromeScale(
+                inset: 14,
+                sideGap: 12,
+                recordSize: 8,
+                recordClockGap: 8,
+                clockFontSize: 12,
+                chipFontSize: 12,
+                chipIconSize: 10,
+                chipMinHeight: 28,
+                barHeight: 48,
+                wave: CGSize(width: 188, height: 26),
+                percentSpan: 40
+            )
+        case .compact:
+            return IslandChromeScale(
+                inset: 10,
+                sideGap: 8,
+                recordSize: 7,
+                recordClockGap: 6,
+                clockFontSize: 11,
+                chipFontSize: 11,
+                chipIconSize: 9,
+                chipMinHeight: 24,
+                barHeight: 36,
+                wave: CGSize(width: 136, height: 18),
+                percentSpan: 36
+            )
+        case .minimal:
+            return IslandChromeScale(
+                inset: 12,
+                sideGap: 0,
+                recordSize: 8,
+                recordClockGap: 8,
+                clockFontSize: 12,
+                chipFontSize: 12,
+                chipIconSize: 10,
+                chipMinHeight: 24,
+                barHeight: 40,
+                wave: CGSize(width: 200, height: 22),
+                percentSpan: 40
+            )
+        case .hidden:
+            return IslandChromeScale(
+                inset: 12,
+                sideGap: 0,
+                recordSize: 8,
+                recordClockGap: 8,
+                clockFontSize: 12,
+                chipFontSize: 12,
+                chipIconSize: 10,
+                chipMinHeight: 24,
+                barHeight: 40,
+                wave: CGSize(width: 200, height: 22),
+                percentSpan: 40
+            )
+        }
+    }
+
+    /// Convenience for tests / callers that mean the default size.
+    static var inset: CGFloat { scale(for: .classic).inset }
+    static var sideGap: CGFloat { scale(for: .classic).sideGap }
+    static var recordSize: CGFloat { scale(for: .classic).recordSize }
+    static var clockFontSize: CGFloat { scale(for: .classic).clockFontSize }
+    static var chipFontSize: CGFloat { scale(for: .classic).chipFontSize }
+    static var chipIconSize: CGFloat { scale(for: .classic).chipIconSize }
+    static var fixedClockSpan: CGFloat { scale(for: .classic).clockSpan }
 
     static func layout(
         style: IslandStyle,
@@ -107,89 +194,85 @@ enum IslandMetrics {
         captures: Int,
         elapsed: TimeInterval
     ) -> IslandLayout {
-        _ = elapsed // timer uses fixed span — elapsed no longer changes geometry
-        let leadingNatural = recordSize + recordClockGap + fixedClockSpan
-        let trailingNatural = max(chipSpan(max(captures, 1)), percentSpan)
-
+        _ = elapsed
+        let scale = scale(for: style)
         let leadingOpen = max(slots.dot, slots.clock)
         let trailingOpen = max(slots.chip, slots.percent)
-        let open = max(leadingOpen, trailingOpen)
 
-        // Side width is the max of the two natural contents, scaled by overall open amount
-        // so the comb stays centered while chrome collapses to processing/hidden.
-        let sideFull = max(leadingNatural, trailingNatural)
-        let side = sideFull * open
-        let gap = sideGap * open
+        let leadingNatural = scale.leadingNatural
+        let trailingNatural = max(scale.chipSpan(max(captures, 1)), scale.percentSpan)
+        // When a trailing slot is present, both sides share one width so the wave stays centered.
+        let sideEqual = max(leadingNatural, trailingNatural)
 
-        let wave = CGSize(width: waveformWidth(style), height: waveformHeight(style))
+        let leadingSide: CGFloat
+        let trailingSide: CGFloat
+        if trailingOpen < 0.001 {
+            // No captures / no percent — collapse trailing fully; no reserved width.
+            leadingSide = leadingNatural * leadingOpen
+            trailingSide = 0
+        } else {
+            // Interpolate left up to the equal side as the chip opens; right grows from 0.
+            leadingSide = (leadingNatural + (sideEqual - leadingNatural) * trailingOpen) * leadingOpen
+            trailingSide = sideEqual * trailingOpen
+        }
+
+        let gapL = scale.sideGap * leadingOpen
+        let gapR = scale.sideGap * trailingOpen
+
         let panel = CGSize(
-            width: inset * 2 + side + gap + wave.width + gap + side,
-            height: barHeight(style)
+            width: scale.inset * 2 + leadingSide + gapL + scale.wave.width + gapR + trailingSide,
+            height: scale.barHeight
         )
         return IslandLayout(
             panel: panel,
-            side: side,
-            wave: wave,
-            sideGap: gap,
-            record: recordSize * leadingOpen,
-            clock: fixedClockSpan * slots.clock,
-            recordClockGap: recordClockGap * slots.clock,
-            chip: chipSpan(captures) * slots.chip,
-            percent: percentSpan * slots.percent
+            leadingSide: leadingSide,
+            trailingSide: trailingSide,
+            wave: scale.wave,
+            sideGapLeading: gapL,
+            sideGapTrailing: gapR,
+            record: scale.recordSize * leadingOpen,
+            clock: scale.clockSpan * slots.clock,
+            recordClockGap: scale.recordClockGap * slots.clock,
+            chip: scale.chipSpan(captures) * slots.chip,
+            percent: scale.percentSpan * slots.percent,
+            scale: scale
         )
     }
 
     static func waveformWidth(_ style: IslandStyle) -> CGFloat {
-        switch style {
-        case .classic:
-            return 248
-        case .compact:
-            return 188
-        case .minimal, .hidden:
-            return 220
-        }
+        scale(for: style).wave.width
     }
 
     static func waveformHeight(_ style: IslandStyle) -> CGFloat {
-        switch style {
-        case .classic, .hidden:
-            return 32
-        case .compact:
-            return 26
-        case .minimal:
-            return 28
-        }
+        scale(for: style).wave.height
     }
 
     static func barHeight(_ style: IslandStyle) -> CGFloat {
-        switch style {
-        case .classic, .hidden:
-            return 54
-        case .compact, .minimal:
-            return 48
-        }
+        scale(for: style).barHeight
     }
 
-    /// Kept for SessionController tick — always fixed so the island does not reflow.
     static func clockSpan(_ elapsed: TimeInterval) -> CGFloat {
         _ = elapsed
         return fixedClockSpan
     }
 
-    static let percentSpan: CGFloat = 44
-
-    static func chipSpan(_ count: Int) -> CGFloat {
-        let digits = textWidth("\(max(count, 1))", size: chipFontSize)
-        // digit + gap + icon + horizontal pad (space2 * 2)
-        return ceil(digits + 6 + chipIconSize + Ink.space2 * 2) + 2
+    static func clockSpan(style: IslandStyle, elapsed: TimeInterval) -> CGFloat {
+        _ = elapsed
+        return scale(for: style).clockSpan
     }
 
-    private static func textWidth(_ text: String, size: CGFloat) -> CGFloat {
+    static let percentSpan: CGFloat = 40
+
+    static func chipSpan(_ count: Int) -> CGFloat {
+        scale(for: .classic).chipSpan(count)
+    }
+
+    static func textWidth(_ text: String, size: CGFloat) -> CGFloat {
         FontMetrics.width(of: text, size: size, weight: .regular, mono: true)
     }
 }
 
-/// Eases the side pieces. The view reads `slots`; each tick asks the capsule to match.
+/// Eases the side pieces. Tau ~0.07 → chip expand/collapse lands in ~0.2–0.25s.
 @MainActor
 final class IslandChromeMotion: ObservableObject {
     @Published private(set) var presence: IslandPresence = .hidden
@@ -201,6 +284,8 @@ final class IslandChromeMotion: ObservableObject {
     private var targets = IslandSlots()
     private var timer: Timer?
     private var lastTick: CFTimeInterval = 0
+    /// Chip open/close ease (~0.22s to settle).
+    private let tau: TimeInterval = 0.07
 
     func setPresence(_ presence: IslandPresence) {
         self.presence = presence
@@ -222,7 +307,6 @@ final class IslandChromeMotion: ObservableObject {
         setTargets(targets, animated: false)
     }
 
-    /// Stops the ease where it is so a fade-out does not also collapse the capsule.
     func freeze() {
         stop()
     }
@@ -245,7 +329,7 @@ final class IslandChromeMotion: ObservableObject {
         let now = CACurrentMediaTime()
         let delta = lastTick == 0 ? (1.0 / 60.0) : min(0.05, now - lastTick)
         lastTick = now
-        let next = slots.approached(toward: targets, delta: delta, tau: 0.13)
+        let next = slots.approached(toward: targets, delta: delta, tau: tau)
         if next.isClose(to: targets, epsilon: 0.004) {
             slots = targets
             stop()

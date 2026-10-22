@@ -9,8 +9,8 @@ enum WaveformSamples {
 /// Square-capped (no soft round caps) to match the Paint/terminal chrome.
 struct WaveformBars: View {
     var levels: [CGFloat]
-    var slotWidth: CGFloat = 248
-    var slotHeight: CGFloat = 32
+    var slotWidth: CGFloat = 188
+    var slotHeight: CGFloat = 26
     var ink: Color = Ink.label
 
     var body: some View {

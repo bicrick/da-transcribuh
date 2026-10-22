@@ -28,7 +28,7 @@ appearance is system / light / dark from **general**, or mash `theme: …` in th
 
 the start/stop chord lives in **general** as paint keycaps — click, press a combo (modifier required, or a function key), it rebinds live. reset drops you back on ⌃⌥Space. home, the status bar, the menu panel, and onboarding all read the same stored shortcut.
 
-the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform centered, screenshot-count chip on the right — equal side slots, equal gaps, equal outer padding. flat fill, thin hairline, no label text, no palette, no hard shadow. a touch taller so hit targets stay comfortable.
+the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform, screenshot-count chip on the right when you’ve grabbed a tile (the chip slot fully collapses when there are none). default size is the everyday footprint; compact is the same layout, tighter. flat fill, thin hairline, no label text, no palette, no hard shadow.
 
 <p align="center">
   <img src="assets/brand/screenshots/settings-home-light.png" alt="da transcribuh settings — home" width="920">
@@ -40,7 +40,7 @@ the recording island stays minimal and symmetric: paint-red record square + fixe
   <img src="assets/brand/mocks/recording-paint-light.png" alt="da transcribuh recording island" width="640">
 </p>
 
-<p align="center"><em>recording island · minimal · symmetric</em></p>
+<p align="center"><em>recording island · default size · with a capture</em></p>
 
 <p align="center">
   <img src="assets/brand/mocks/icon-concepts.png" alt="da transcribuh app icon concepts" width="920">
@@ -123,7 +123,7 @@ final **dt block** art lives in [`assets/brand/`](assets/brand/):
 - `social-preview.png` (1280×640) — repo social preview; also mirrored as `social-preview-1280x640.png` / `@2x`
 - `screenshots/settings-home-light.png` — settings home mock embedded in the readme (dark twin: `settings-home-dark.png`)
 - `mocks/home-paint-light.png` — Paint-direction lock mock (dark twin: `home-paint-dark.png`)
-- `mocks/recording-paint-light.png` — recording island, minimal/symmetric (dark twin: `recording-paint-dark.png`)
+- `mocks/recording-paint-light.png` — recording island default size with a capture (dark twin: `recording-paint-dark.png`; empty: `recording-paint-empty-{light,dark}.png`)
 - `mocks/icon-concepts.png` — app icon explorations (AppIcon not replaced); recommend #1 dt-block square + red shadow
 - `menubar-g-dt-block-16.png` / `menubar-g-dt-block-32.png` — template menu-bar glyph
 

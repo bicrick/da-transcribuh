@@ -4,6 +4,7 @@ struct RecordingIslandView: View {
     @ObservedObject var session: SessionController
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var motion: IslandChromeMotion
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulse = false
 
     init(session: SessionController) {
@@ -26,20 +27,21 @@ struct RecordingIslandView: View {
             captures: session.captureCount,
             elapsed: session.elapsed
         )
-        // Symmetric: [record + timer] — wave — [chip]. Equal side widths, equal gaps, equal insets.
+        let scale = layout.scale
+        // [record + timer] — wave — [chip?]. Trailing slot width is 0 when there are no captures.
         return HStack(spacing: 0) {
             leading(layout)
-            Color.clear.frame(width: layout.sideGap)
+            Color.clear.frame(width: layout.sideGapLeading)
             LiveWaveform(
                 display: session.waveform,
                 slotWidth: layout.wave.width,
                 slotHeight: layout.wave.height,
                 ink: Ink.paintCyan
             )
-            Color.clear.frame(width: layout.sideGap)
+            Color.clear.frame(width: layout.sideGapTrailing)
             trailing(layout)
         }
-        .padding(.horizontal, IslandMetrics.inset)
+        .padding(.horizontal, scale.inset)
         .frame(width: layout.panel.width, height: layout.panel.height)
         .background {
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
@@ -68,38 +70,49 @@ struct RecordingIslandView: View {
     }
 
     private func leading(_ layout: IslandLayout) -> some View {
-        HStack(spacing: layout.recordClockGap) {
-            recordDot
+        let scale = layout.scale
+        return HStack(spacing: layout.recordClockGap) {
+            recordDot(size: scale.recordSize)
                 .opacity(IslandSlots.opacity(for: max(motion.slots.dot, motion.slots.clock)))
             Text(TimeFormat.clock(session.elapsed))
-                .font(Ink.mono(IslandMetrics.clockFontSize))
+                .font(Ink.mono(scale.clockFontSize))
                 .monospacedDigit()
                 .foregroundStyle(Ink.secondary)
                 .lineLimit(1)
-                .frame(width: IslandMetrics.fixedClockSpan, alignment: .leading)
+                .frame(width: scale.clockSpan, alignment: .leading)
                 .opacity(IslandSlots.opacity(for: motion.slots.clock))
         }
-        .frame(width: layout.side, alignment: .center)
-        .frame(minHeight: 28)
+        .frame(width: layout.leadingSide, alignment: .center)
+        .frame(minHeight: scale.chipMinHeight)
         .clipped()
         .accessibilityHidden(max(motion.slots.dot, motion.slots.clock) < 0.05)
     }
 
     private func trailing(_ layout: IslandLayout) -> some View {
-        ZStack {
-            CaptureCountChip(count: max(session.captureCount, 1))
-                .opacity(IslandSlots.opacity(for: motion.slots.chip))
-                .accessibilityHidden(motion.slots.chip < 0.05)
+        let scale = layout.scale
+        let chipOpen = motion.slots.chip
+        let percentOpen = motion.slots.percent
+        return ZStack {
+            CaptureCountChip(
+                count: max(session.captureCount, 1),
+                fontSize: scale.chipFontSize,
+                iconSize: scale.chipIconSize,
+                minHeight: scale.chipMinHeight
+            )
+            .scaleEffect(reduceMotion ? 1 : (0.88 + 0.12 * chipOpen))
+            .opacity(IslandSlots.opacity(for: chipOpen))
+            .accessibilityHidden(chipOpen < 0.05)
+
             Text(percentText)
-                .font(Ink.mono(IslandMetrics.clockFontSize))
+                .font(Ink.mono(scale.clockFontSize))
                 .monospacedDigit()
                 .foregroundStyle(Ink.secondary)
                 .lineLimit(1)
-                .opacity(IslandSlots.opacity(for: motion.slots.percent))
-                .accessibilityHidden(motion.slots.percent < 0.05)
+                .opacity(IslandSlots.opacity(for: percentOpen))
+                .accessibilityHidden(percentOpen < 0.05)
         }
-        .frame(width: layout.side, alignment: .center)
-        .frame(minHeight: 28)
+        .frame(width: layout.trailingSide, alignment: .center)
+        .frame(minHeight: scale.chipMinHeight)
         .clipped()
     }
 
@@ -110,11 +123,10 @@ struct RecordingIslandView: View {
         return "0%"
     }
 
-    /// Pulsing record marker — flat Paint red square.
-    private var recordDot: some View {
+    private func recordDot(size: CGFloat) -> some View {
         Rectangle()
             .fill(Ink.record)
-            .frame(width: IslandMetrics.recordSize, height: IslandMetrics.recordSize)
+            .frame(width: size, height: size)
             .opacity(pulse ? 1 : 0.35)
             .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: pulse)
     }
