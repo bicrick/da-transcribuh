@@ -5,6 +5,10 @@ import SwiftUI
 /// Intrinsic height only. Do not put flexible `Color`/`Spacer` children that can grow
 /// vertically inside the shelf HStack — a bare `Color.clear.frame(width:)` greedily
 /// takes the VStack’s leftover height and the shelf fill paints a huge empty band.
+///
+/// Selected tab merges into the page: fill is `Ink.front`, the shelf hairline is
+/// interrupted under it, and the tab sits 1pt lower so side borders flow into the
+/// content edge with no seam (light + graphite).
 struct SettingsFolderTabs: View {
     @Binding var selection: SettingsPage
     var onSearch: (() -> Void)? = nil
@@ -13,6 +17,10 @@ struct SettingsFolderTabs: View {
     private let unselectedInset: CGFloat = 3
     /// Top pad + selected tab face. Keep the shelf from ever stretching.
     private var shelfHeight: CGFloat { Ink.space2 + tabHeight }
+    /// How far the selected tab bleeds over the shelf hairline into the page.
+    private let selectedBleed: CGFloat = 1
+
+    @State private var selectedFrame: CGRect = .null
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 0) {
@@ -39,15 +47,19 @@ struct SettingsFolderTabs: View {
         .padding(.horizontal, Ink.pageSide)
         .padding(.top, Ink.space2)
         .frame(maxWidth: .infinity, alignment: .bottomLeading)
-        // Ideal height only — refuse the VStack’s leftover flexible height.
         .fixedSize(horizontal: false, vertical: true)
         .frame(height: shelfHeight, alignment: .bottom)
-        .background(Ink.fill)
-        .overlay(alignment: .bottom) {
-            // Shelf hairline — selected tab covers it so it reads as the front folder.
-            Rectangle()
-                .fill(Ink.hairline)
-                .frame(height: 1)
+        .coordinateSpace(name: ShelfSpace.name)
+        // Shelf fill + hairline with a gap under the selected tab (drawn behind tabs).
+        .background {
+            ZStack(alignment: .bottom) {
+                Ink.fill
+                ShelfHairline(gap: selectedFrame)
+                    .frame(height: 1)
+            }
+        }
+        .onPreferenceChange(SelectedTabFrameKey.self) { frame in
+            selectedFrame = frame ?? .null
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Settings")
@@ -70,6 +82,7 @@ struct SettingsFolderTabs: View {
             .padding(.horizontal, Ink.space3)
             .frame(height: selected ? tabHeight : tabHeight - unselectedInset)
             .background {
+                // Selected = page face so it merges with content below.
                 FolderTabShape(selected: selected)
                     .fill(selected ? Ink.front : Ink.fill)
             }
@@ -87,8 +100,18 @@ struct SettingsFolderTabs: View {
                     .opacity(selected ? 1 : 0.45)
             }
             .padding(.bottom, selected ? 0 : unselectedInset)
-            // Cover the shelf hairline when selected.
-            .offset(y: selected ? 1 : 0)
+            // Bleed 1pt over the hairline so fill + side strokes meet the page with no seam.
+            .offset(y: selected ? selectedBleed : 0)
+            .background {
+                if selected {
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: SelectedTabFrameKey.self,
+                            value: geo.frame(in: .named(ShelfSpace.name))
+                        )
+                    }
+                }
+            }
         }
         .buttonStyle(.plain)
         .zIndex(selected ? 1 : 0)
@@ -98,11 +121,56 @@ struct SettingsFolderTabs: View {
     }
 }
 
+// MARK: - Shelf hairline (gap under selected tab)
+
+private enum ShelfSpace {
+    static let name = "settings.folderTabShelf"
+}
+
+private struct SelectedTabFrameKey: PreferenceKey {
+    static var defaultValue: CGRect? = nil
+
+    static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
+        if let next = nextValue() {
+            value = next
+        }
+    }
+}
+
+/// Continuous shelf rule with a clean gap exactly under the selected tab frame.
+private struct ShelfHairline: View {
+    var gap: CGRect
+
+    var body: some View {
+        Canvas { context, size in
+            let y = size.height - 0.5
+            var path = Path()
+            if gap.isNull || gap.isEmpty || gap.width <= 0 {
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
+            } else {
+                let left = max(0, gap.minX)
+                let right = min(size.width, gap.maxX)
+                if left > 0 {
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: left, y: y))
+                }
+                if right < size.width {
+                    path.move(to: CGPoint(x: right, y: y))
+                    path.addLine(to: CGPoint(x: size.width, y: y))
+                }
+            }
+            context.stroke(path, with: .color(Ink.hairline), lineWidth: 1)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 // MARK: - Tab silhouette
 
-/// Raised folder tab: angled shoulders, flat top. Selected omits the bottom edge visually
-/// by sitting over the shelf rule.
-private struct FolderTabShape: Shape {
+/// Raised folder tab: angled shoulders, flat top. Selected omits the bottom edge so
+/// the face merges with the page (no seam under the selected tab).
+struct FolderTabShape: Shape {
     var selected: Bool
 
     func path(in rect: CGRect) -> Path {
@@ -126,7 +194,7 @@ private struct FolderTabShape: Shape {
             path.addLine(to: CGPoint(x: 0, y: rect.maxY))
             path.closeSubpath()
         }
-        // Selected: leave bottom open so the stroke doesn’t draw under the tab.
+        // Selected: leave bottom open so the stroke doesn’t draw a seam.
         return path
     }
 }

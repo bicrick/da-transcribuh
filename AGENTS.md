@@ -44,6 +44,8 @@ Nothing in chrome should paint darker than `#1A1A1C` except the bevel itself. Ro
 
 Home keeps the pre-declutter structure (stats grid, Get Started checklist, tip tiles). Nits only: no yellow version badge (status bar has it), no hero tagline, no “^⌥Space starts…” caption under Start. Stat underlines are neutral (`Ink.statRule`); per-page Paint accents live on folder-tab top stripes (`SettingsPage.tabAccent`). Start / primary stays high-contrast invert (`primaryFill` / `onPrimary`: black↔`#F2F2F2`), not a flat graphite plate.
 
+Selected folder tab merges into the page: fill is `Ink.front`, the shelf hairline is interrupted under it (`ShelfHairline` + preference frame), and the tab bleeds 1pt over the rule. Unselected tabs stay on `Ink.fill` with the hairline under them. README mocks: `scripts/render_home_mocks.py` (angled `FolderTabShape`, DejaVu for ⌃⌥⌘).
+
 ## Typography
 
 - Chrome labels: Departure Mono (`DepartureMono-Regular`, `ATSApplicationFontsPath=Fonts`)
