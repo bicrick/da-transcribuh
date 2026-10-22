@@ -6,7 +6,14 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–26)
+## Final summary (Runs 1–27)
+
+### Run 27 — Final polish + compile-safety audit (no code changes)
+
+- Sweep `412fcd8`→`0be7413`: macOS 14 AppKit/SwiftUI only; AppKit-safe `upright()` (non-optional `withSymbolicTraits`); `onChange` two-param form; new files under `PBXFileSystemSynchronizedRootGroup`; Carbon re-register paths type-check; no `.italic()` in chrome; tests hit real symbols (charcoal window `#1E1E1E`, HotkeyChord F-keys, rail labels).
+- Brand: wordmarks lowercase + Departure Mono + block cursor after `h` only; charcoal surfaces `#1E1E1E`/`#232323` (palette `paintBlack` stays intentional); no pure-black window/sidebar.
+- README already matches (home + recording light/dark, icon concepts, shortcut recorder, appearance, charcoal). No re-render — `0be7413` recorder-label font change is not in those assets.
+- **Clean.** Tip stays on this commit after docs-only Run 27 note + PR #2 body refresh. Do not merge; social preview upload + optional `PRODUCT_NAME`/DMG rename remain open.
 
 ### Run 26 — Overnight polish (island, shortcut, charcoal dark, icons)
 
