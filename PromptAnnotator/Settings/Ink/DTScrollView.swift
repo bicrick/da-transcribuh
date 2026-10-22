@@ -26,6 +26,8 @@ struct DTScrollView<Content: View>: View {
     var showsIndicators: Bool = true
     /// Extra bottom inset so content clears a sticky footer (sidebar).
     var bottomInset: CGFloat = 0
+    /// Trailing inset for the custom rail (sidebar uses a larger gutter so tiles stay clear).
+    var railInset: CGFloat = Ink.scrollerInset
     @ViewBuilder var content: () -> Content
 
     @State private var offset: CGFloat = 0
@@ -74,8 +76,8 @@ struct DTScrollView<Content: View>: View {
                             else { flash() }
                         }
                     )
-                    .padding(.vertical, Ink.scrollerInset)
-                    .padding(.trailing, Ink.scrollerInset)
+                    .padding(.vertical, railInset)
+                    .padding(.trailing, railInset)
                     .opacity((visible || hovering || dragging) ? 0.85 : 0)
                     .animation(.easeOut(duration: 0.18), value: visible || hovering || dragging)
                 }
