@@ -42,11 +42,11 @@ struct DTWordmark: View {
 // MARK: - Double pane (recording island / selected chrome)
 
 /// Hard offset “double pane” — shared by island + selected chrome:
-/// `Ink.label` face border (1.5), `Ink.bevel` solid offset at `Ink.buttonShadow`,
+/// `Ink.label` face border (`Ink.stroke`), `Ink.bevel` solid offset at `Ink.bevelOffset`,
 /// gutter reserved so the offset never clips. Dark bevel floors at #1A1A1C.
 struct InkDoublePaneModifier: ViewModifier {
     var cornerRadius: CGFloat = Ink.sidebarRowRadius
-    var borderWidth: CGFloat = 1.5
+    var borderWidth: CGFloat = Ink.stroke
     var fill: Color = Ink.front
     /// Pressed/selected: pane sits flush and the face slides into the gutter.
     var pressed: Bool = false
@@ -65,13 +65,13 @@ struct InkDoublePaneModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(Ink.bevel)
                     .offset(
-                        x: pressed ? 0 : Ink.buttonShadow,
-                        y: pressed ? 0 : Ink.buttonShadow
+                        x: pressed ? 0 : Ink.bevelOffset,
+                        y: pressed ? 0 : Ink.bevelOffset
                     )
             )
-            .offset(x: pressed ? Ink.buttonShadow : 0, y: pressed ? Ink.buttonShadow : 0)
-            .padding(.trailing, Ink.buttonShadow)
-            .padding(.bottom, Ink.buttonShadow)
+            .offset(x: pressed ? Ink.bevelOffset : 0, y: pressed ? Ink.bevelOffset : 0)
+            .padding(.trailing, Ink.bevelOffset)
+            .padding(.bottom, Ink.bevelOffset)
     }
 }
 
@@ -79,7 +79,7 @@ extension View {
     /// Shared double-pane chrome (recording island + selected chrome).
     func inkDoublePane(
         cornerRadius: CGFloat = Ink.sidebarRowRadius,
-        borderWidth: CGFloat = 1.5,
+        borderWidth: CGFloat = Ink.stroke,
         fill: Color = Ink.front,
         pressed: Bool = false
     ) -> some View {
@@ -127,7 +127,7 @@ struct InkTile<Content: View>: View {
                     if selected {
                         RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
                             .fill(Ink.bevel)
-                            .offset(x: Ink.hardShadow, y: Ink.hardShadow)
+                            .offset(x: Ink.bevelOffset, y: Ink.bevelOffset)
                     }
                     RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
                         .fill(Ink.card)
@@ -138,8 +138,8 @@ struct InkTile<Content: View>: View {
                     .strokeBorder(Ink.label, lineWidth: selected ? Ink.selectedBorder : Ink.lineWidth)
             )
             // Reserve shadow gutter on every tile (selected or not) so tops/heights line up.
-            .padding(.trailing, Ink.hardShadow)
-            .padding(.bottom, Ink.hardShadow)
+            .padding(.trailing, Ink.bevelOffset)
+            .padding(.bottom, Ink.bevelOffset)
     }
 }
 
@@ -197,7 +197,7 @@ struct InkBadge: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .strokeBorder(Ink.controlBorder, lineWidth: 1)
+                    .strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke)
             )
     }
 }
@@ -224,7 +224,7 @@ struct InkIconChip: View {
             .frame(width: 28, height: 28)
             .overlay(
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .strokeBorder(Ink.label, lineWidth: 1)
+                    .strokeBorder(Ink.label, lineWidth: Ink.stroke)
             )
     }
 }
@@ -244,12 +244,12 @@ struct InkKeycap: View {
             .background(Ink.keycap, in: RoundedRectangle(cornerRadius: Ink.keycapRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.keycapRadius, style: .continuous)
-                    .strokeBorder(Ink.controlBorder, lineWidth: 1)
+                    .strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke)
             )
             .background(
                 RoundedRectangle(cornerRadius: Ink.keycapRadius, style: .continuous)
                     .fill(Ink.bevel)
-                    .offset(y: compact ? 1 : 2)
+                    .offset(y: Ink.bevelOffset)
             )
     }
 }
@@ -291,14 +291,14 @@ struct HomeChordEditor: View {
                             .padding(.vertical, Ink.space2)
                             .overlay(
                                 RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
-                                    .strokeBorder(Ink.label, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                                    .strokeBorder(Ink.label, style: StrokeStyle(lineWidth: Ink.stroke, dash: [4, 3]))
                             )
                     } else {
                         InkKeycapRow(keys: settings.chord.keycaps)
                             .padding(3)
                             .overlay(
                                 RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
-                                    .strokeBorder(hovering ? Ink.label : Color.clear, lineWidth: 1)
+                                    .strokeBorder(hovering ? Ink.label : Color.clear, lineWidth: Ink.stroke)
                             )
                     }
                 }
@@ -383,12 +383,12 @@ struct InkShortcutRecorder: View {
             .background(Ink.fill, in: RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
-                    .strokeBorder(listening ? Ink.paintCyan : Ink.controlBorder, lineWidth: listening ? 2 : 1.5)
+                    .strokeBorder(listening ? Ink.paintCyan : Ink.controlBorder, lineWidth: Ink.stroke)
             )
             .background(
                 RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
                     .fill(Ink.bevel)
-                    .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
+                    .offset(x: Ink.bevelOffset, y: Ink.bevelOffset)
             )
         }
         .buttonStyle(.plain)
@@ -416,7 +416,7 @@ struct InkSegmentMeter: View {
                 ForEach(0..<segments, id: \.self) { index in
                     Rectangle()
                         .fill(index < litCount ? Ink.label : Color.clear)
-                        .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                        .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
                         .frame(height: 7)
                 }
             }
@@ -448,7 +448,7 @@ struct InkProgressBar: View {
         .frame(height: 12)
         .overlay(
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .strokeBorder(Ink.label, lineWidth: 1)
+                .strokeBorder(Ink.label, lineWidth: Ink.stroke)
         )
     }
 
@@ -463,7 +463,7 @@ struct InkRadio: View {
     var body: some View {
         ZStack {
             Circle()
-                .strokeBorder(Ink.label, lineWidth: 1)
+                .strokeBorder(Ink.label, lineWidth: Ink.stroke)
             if selected {
                 Circle()
                     .fill(Ink.label)
@@ -482,7 +482,7 @@ struct InkCheck: View {
             RoundedRectangle(cornerRadius: 1, style: .continuous)
                 .fill(done ? Ink.paintGreen : Ink.window)
             RoundedRectangle(cornerRadius: 1, style: .continuous)
-                .strokeBorder(Ink.label, lineWidth: 1.5)
+                .strokeBorder(Ink.label, lineWidth: Ink.stroke)
             if done {
                 Image(systemName: "checkmark")
                     .font(.system(size: 10, weight: .bold))
@@ -520,7 +520,7 @@ struct InkSwitch: View {
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(isOn ? Ink.primaryFill : Ink.window)
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .strokeBorder(Ink.controlBorder, lineWidth: 1)
+                .strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke)
             RoundedRectangle(cornerRadius: 1, style: .continuous)
                 .fill(isOn ? Ink.onPrimary : Ink.label)
                 .frame(width: 12, height: 12)
@@ -596,13 +596,13 @@ struct InkSlider: View {
             ZStack(alignment: .leading) {
                 Rectangle()
                     .fill(Ink.fill)
-                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
                 Rectangle()
                     .fill(Ink.label)
                     .frame(width: max(2, width * thumb))
                 Rectangle()
                     .fill(Ink.window)
-                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
                     .frame(width: 10, height: 16)
                     .offset(x: max(0, min(width - 10, width * thumb - 5)))
             }
@@ -659,7 +659,7 @@ struct InkMenuPicker<Selection: Hashable>: View {
             .background(Ink.window, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                    .strokeBorder(Ink.label, lineWidth: 1)
+                    .strokeBorder(Ink.label, lineWidth: Ink.stroke)
             )
         }
         .menuStyle(.borderlessButton)
@@ -711,7 +711,7 @@ struct InkStepDots: View {
             ForEach(0..<total, id: \.self) { index in
                 Rectangle()
                     .fill(index == current ? Ink.label : Color.clear)
-                    .overlay(Rectangle().strokeBorder(index == current ? Ink.label : Ink.hairline, lineWidth: 1))
+                    .overlay(Rectangle().strokeBorder(index == current ? Ink.label : Ink.hairline, lineWidth: Ink.stroke))
                     .frame(width: 8, height: 8)
             }
         }
@@ -751,7 +751,7 @@ struct InkStepRail: View {
             ZStack {
                 Rectangle()
                     .fill(state == .current ? Ink.primaryFill : Ink.window)
-                    .overlay(Rectangle().strokeBorder(Ink.controlBorder, lineWidth: 1))
+                    .overlay(Rectangle().strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke))
                 if state == .done {
                     Image(systemName: "checkmark")
                         .font(Ink.microFont)
@@ -795,7 +795,7 @@ struct InkPrimaryButtonStyle: ButtonStyle {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                    .strokeBorder(enabled ? Ink.controlBorder : Ink.tertiary, lineWidth: 1)
+                    .strokeBorder(enabled ? Ink.controlBorder : Ink.tertiary, lineWidth: Ink.stroke)
             )
             .opacity(configuration.isPressed ? 0.88 : 1)
     }
@@ -811,12 +811,12 @@ struct InkSecondaryButtonStyle: ButtonStyle {
             .background(Ink.front, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                    .strokeBorder(Ink.controlBorder, lineWidth: 1)
+                    .strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke)
             )
             .background(
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
                     .fill(Ink.bevel)
-                    .offset(y: Ink.buttonShadow)
+                    .offset(y: Ink.bevelOffset)
             )
             .opacity(configuration.isPressed ? 0.85 : 1)
     }
@@ -830,7 +830,7 @@ struct InkFieldBackground: ViewModifier {
             .background(Ink.field, in: RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
-                    .strokeBorder(Ink.label, lineWidth: 1)
+                    .strokeBorder(Ink.label, lineWidth: Ink.stroke)
             )
     }
 }
@@ -872,7 +872,7 @@ struct InkWavePenMotif: View {
                     if inked {
                         context.fill(Path(rect), with: .color(Ink.label))
                     } else {
-                        context.stroke(Path(rect), with: .color(Ink.label), lineWidth: 1)
+                        context.stroke(Path(rect), with: .color(Ink.label), lineWidth: Ink.stroke)
                     }
                 }
             }
@@ -883,7 +883,7 @@ struct InkWavePenMotif: View {
                 .foregroundStyle(Ink.label)
 
             RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .strokeBorder(Ink.label, lineWidth: 2)
+                .strokeBorder(Ink.label, lineWidth: Ink.stroke)
                 .frame(width: 44, height: 44)
                 .overlay(
                     Rectangle()
@@ -896,7 +896,7 @@ struct InkWavePenMotif: View {
         .background(Ink.fill)
         .overlay(
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                .strokeBorder(Ink.hairline, lineWidth: 1)
+                .strokeBorder(Ink.hairline, lineWidth: Ink.stroke)
         )
         .accessibilityHidden(true)
     }
@@ -922,7 +922,7 @@ struct InkErrorBanner: View {
         .padding(.vertical, Ink.space2 + 1)
         .overlay(
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                .strokeBorder(Ink.label, lineWidth: 1)
+                .strokeBorder(Ink.label, lineWidth: Ink.stroke)
         )
     }
 }
@@ -951,7 +951,7 @@ struct InkDashedEmpty: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                .strokeBorder(Ink.label, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                .strokeBorder(Ink.label, style: StrokeStyle(lineWidth: Ink.stroke, dash: [5, 4]))
         )
     }
 }
@@ -971,7 +971,7 @@ struct DTStatusBar: View {
                     if index == 0 {
                         Rectangle()
                             .fill(recording ? Ink.record : Ink.label)
-                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
                             .frame(width: 7, height: 7)
                     }
                     Text(cell)

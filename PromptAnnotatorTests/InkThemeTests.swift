@@ -234,7 +234,28 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(SettingsPage.model.tabAccent, Ink.tabStrokeOrange)
         XCTAssertEqual(SettingsPage.performance.tabAccent, Ink.tabStrokePink)
         XCTAssertEqual(FolderTabShape.corner, 6)
-        XCTAssertEqual(FolderTabShape.foot, 6)
+        XCTAssertEqual(FolderTabShape.foot, 8)
+        XCTAssertEqual(Ink.stroke, 2)
+        XCTAssertEqual(Ink.bevelOffset, 3)
+        XCTAssertEqual(Ink.hairlineWidth, 1)
+        XCTAssertEqual(Ink.lineWidth, Ink.stroke)
+        XCTAssertEqual(Ink.selectedBorder, Ink.stroke)
+        XCTAssertEqual(Ink.hardShadow, Ink.bevelOffset)
+        XCTAssertEqual(Ink.buttonShadow, Ink.bevelOffset)
+        XCTAssertEqual(Ink.menuBarShadow, Ink.bevelOffset)
+    }
+
+    func testFolderTabLayoutSizeIgnoresSelection() {
+        // Feet are paint-only overlays — layout width is label-based and identical
+        // whether the tab is selected or not (Chrome-stable frames).
+        let home = FolderTabShape.layoutSize(titleWidth: 40)
+        let appearance = FolderTabShape.layoutSize(titleWidth: 90)
+        XCTAssertEqual(home.height, Ink.folderTabHeight)
+        XCTAssertEqual(appearance.height, Ink.folderTabHeight)
+        XCTAssertGreaterThan(appearance.width, home.width)
+        // Foot overhang is not part of layoutSize.
+        XCTAssertEqual(home.width, 10 + (Ink.space1 + 1) + 40 + Ink.space3 * 2)
+        XCTAssertEqual(FolderTabMetrics.intraGroupGap, 2)
     }
 
     func testWordmarkUsesSeparateBlockCursorNotInvertedH() {

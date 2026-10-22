@@ -9,7 +9,7 @@ struct InkDtMark: View {
     private var gap: CGFloat { max(1, side * 0.04) }
     private var fontSize: CGFloat { side * 0.46 }
     private var pad: CGFloat { side * 0.14 }
-    private var bevel: CGFloat { max(1.5, side * (Ink.buttonShadow / 28)) }
+    private var bevel: CGFloat { Ink.bevelOffset }
 
     var body: some View {
         mark
@@ -18,7 +18,7 @@ struct InkDtMark: View {
             .background(Ink.markFace)
             .overlay(
                 Rectangle()
-                    .strokeBorder(Ink.markInk, lineWidth: max(1, side * 0.04))
+                    .strokeBorder(Ink.markInk, lineWidth: Ink.stroke)
             )
             .background(
                 Rectangle()

@@ -141,7 +141,7 @@ private struct DTTrafficLight: View {
                 Circle()
                     .fill(isKey ? kind.paintFill : Ink.window)
                 Circle()
-                    .strokeBorder(Ink.label, lineWidth: 1)
+                    .strokeBorder(Ink.label, lineWidth: Ink.stroke)
                 if showGlyph {
                     Text(kind.glyph)
                         .font(.system(size: 8, weight: .bold))

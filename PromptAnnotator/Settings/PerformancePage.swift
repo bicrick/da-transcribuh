@@ -98,7 +98,7 @@ struct PerformancePage: View {
         .padding(Ink.space3)
         .overlay(
             Rectangle()
-                .strokeBorder(Ink.label, lineWidth: 1)
+                .strokeBorder(Ink.label, lineWidth: Ink.stroke)
         )
     }
 

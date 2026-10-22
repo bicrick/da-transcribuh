@@ -169,7 +169,7 @@ struct SpeechModelPicker: View {
                 .padding(.vertical, Ink.space1)
                 .overlay(
                     Rectangle()
-                        .strokeBorder(Ink.label, lineWidth: 1)
+                        .strokeBorder(Ink.label, lineWidth: Ink.stroke)
                 )
                 .contentShape(Rectangle())
                 .onTapGesture {

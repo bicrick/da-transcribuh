@@ -29,14 +29,14 @@ struct SettingsCommandPalette: View {
             }
             .frame(width: 520)
             .background(Ink.front)
-            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1.5))
+            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
             .background(
                 Rectangle()
                     .fill(Ink.bevel)
-                    .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
+                    .offset(x: Ink.bevelOffset, y: Ink.bevelOffset)
             )
-            .padding(.bottom, Ink.buttonShadow)
-            .padding(.trailing, Ink.buttonShadow)
+            .padding(.bottom, Ink.bevelOffset)
+            .padding(.trailing, Ink.bevelOffset)
             .offset(y: -36)
         }
         .onAppear {
@@ -223,7 +223,7 @@ struct SettingsSearchAffordance: View {
             .padding(.horizontal, Ink.space2)
             .padding(.vertical, 4)
             .background(Ink.fill)
-            .overlay(Rectangle().strokeBorder(Ink.controlBorder, lineWidth: 1))
+            .overlay(Rectangle().strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke))
         }
         .buttonStyle(.plain)
         .help("Search settings (⌘K)")

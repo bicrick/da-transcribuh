@@ -83,7 +83,7 @@ struct HomePage: View {
                 HStack(spacing: Ink.space2) {
                     Rectangle()
                         .fill(Ink.record)
-                        .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                        .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
                         .frame(width: 10, height: 10)
                     Text(startRowTitle)
                         .font(Ink.labelFont)
@@ -97,7 +97,7 @@ struct HomePage: View {
                     HStack(spacing: Ink.space2) {
                         Rectangle()
                             .fill(Ink.record)
-                            .overlay(Rectangle().strokeBorder(Ink.onPrimary, lineWidth: 1))
+                            .overlay(Rectangle().strokeBorder(Ink.onPrimary, lineWidth: Ink.stroke))
                             .frame(width: 8, height: 8)
                         Text(session.phase == .recording ? "Stop" : "Start")
                             .font(Ink.buttonFont)
@@ -107,7 +107,7 @@ struct HomePage: View {
                 .background(
                     Rectangle()
                         .fill(Ink.paintRed)
-                        .offset(x: Ink.hardShadow, y: Ink.hardShadow)
+                        .offset(x: Ink.bevelOffset, y: Ink.bevelOffset)
                 )
                 .disabled(session.isBusy)
                 .accessibilityLabel(session.phase == .recording ? "Stop session" : "Start session")
@@ -184,7 +184,7 @@ struct HomePage: View {
                 Rectangle()
                     .fill(Ink.statRule)
                     .frame(width: 28, height: 3)
-                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -370,7 +370,7 @@ struct HomePage: View {
             Rectangle()
                 .fill(Ink.tileFace)
             Rectangle()
-                .strokeBorder(Ink.controlBorder, lineWidth: 1.5)
+                .strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke)
             Image(systemName: symbol)
                 .font(.system(size: Ink.tipSymbolPointSize, weight: .black))
                 .symbolRenderingMode(.monochrome)
@@ -473,7 +473,7 @@ struct HomePage: View {
                 .aspectRatio(contentMode: .fill)
                 .frame(width: side, height: side)
                 .clipped()
-                .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
         } else {
             Color.clear.frame(width: side, height: side)
         }
@@ -582,7 +582,7 @@ struct HomePage: View {
                     ZStack(alignment: .leading) {
                         Rectangle()
                             .fill(Ink.window)
-                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1.5))
+                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
                         Rectangle()
                             .fill(Ink.paintLime)
                             .frame(width: max(0, geo.size.width * (items.isEmpty ? 0 : CGFloat(done) / CGFloat(items.count))))
@@ -761,15 +761,15 @@ private struct HomeBentoCell<Content: View>: View {
         .background(Ink.front)
         .overlay(
             Rectangle()
-                .strokeBorder(Ink.label, lineWidth: 1)
+                .strokeBorder(Ink.label, lineWidth: Ink.stroke)
         )
         .background(
             Rectangle()
                 .fill(Ink.bevel)
-                .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
+                .offset(x: Ink.bevelOffset, y: Ink.bevelOffset)
         )
-        .padding(.trailing, Ink.buttonShadow)
-        .padding(.bottom, Ink.buttonShadow)
+        .padding(.trailing, Ink.bevelOffset)
+        .padding(.bottom, Ink.bevelOffset)
     }
 }
 

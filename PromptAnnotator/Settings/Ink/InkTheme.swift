@@ -112,10 +112,19 @@ enum Ink {
     static let fieldRadius: CGFloat = 2
     static let sidebarRowRadius: CGFloat = 2
     static let keycapRadius: CGFloat = 2
-    static let lineWidth: CGFloat = 1
-    static let selectedBorder: CGFloat = 2
-    static let hardShadow: CGFloat = 3
-    static let buttonShadow: CGFloat = 2
+    /// Chrome outline weight (tabs, shelf, cells, keycaps, mark, island, menu…).
+    /// Pixel-aligned at 1× and 2× (2pt → 2px / 4px).
+    static let stroke: CGFloat = 2
+    /// Internal content separators only (Recent rows, wordmark rule) — not chrome borders.
+    static let hairlineWidth: CGFloat = 1
+    /// Hard offset shadow for every double-pane / Paint bevel.
+    static let bevelOffset: CGFloat = 3
+    /// Aliases — prefer `stroke` / `bevelOffset` in new code.
+    static let lineWidth: CGFloat = stroke
+    static let selectedBorder: CGFloat = stroke
+    static let hardShadow: CGFloat = bevelOffset
+    static let buttonShadow: CGFloat = bevelOffset
+    static let menuBarShadow: CGFloat = bevelOffset
     static let scrollerRadius: CGFloat = 1
 
     // MARK: - Spacing scale (airier Paint layout)
@@ -151,7 +160,6 @@ enum Ink {
     static let gridGap: CGFloat = space4
     static let statusBarHeight: CGFloat = 32
     static let titleStripHeight: CGFloat = 40
-    static let menuBarShadow: CGFloat = 4
     /// Thin, inset scroller — only obvious on hover.
     static let scrollerWidth: CGFloat = 5
     static let scrollerThumbMin: CGFloat = 24
