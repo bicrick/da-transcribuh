@@ -6,7 +6,14 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–16)
+## Final summary (Runs 1–17)
+
+### Run 17 — Final dt-block brand assets
+
+- Replaced `assets/brand/` with final dt-block set (social 1x/2x, readme-banner, light/dark wordmarks, icon-g-dt-block-1024). Removed bubble assets (`icon-a-bubble-1024`, `logo-a-bubble`, `bubble16`).
+- README: `<picture>` light/dark wordmark (lowercase name + separate block cursor); banner kept; brand bits list dt files only.
+- Consistency: no user-facing “Mutter” outside deliberate exceptions (`PRODUCT_NAME`/`Mutter.app`/`Mutter.dmg`, bundle ID, storage paths, `MutterBoundary`).
+- Compile pass on B&W restyle: `ATSApplicationFontsPath=Fonts` + PostScript `DepartureMono-Regular`; AppIcon/MenuBarIcon/AppMark Contents.json valid; menu-bar template black-on-clear; motif `inked` welcome outline vs ready fill.
 
 ### Run 16 — B&W “da transcribuh” chrome
 
@@ -18,7 +25,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 ### Run 15a — README + brand assets (da transcribuh)
 
 - Repo is `bicrick/da-transcribuh`. README restyled (lowercase/mellow); assets under `assets/brand/`.
-- Docs URLs/name updated. No broken `demo.gif`. DMG link still points at real `Mutter.dmg` asset until renamed on a future release.
+- Docs URLs/name updated. No broken `demo.gif`. DMG link still points at real `Mutter.dmg` asset until renamed on a future release. (Bubble assets superseded by Run 17 dt-block.)
 
 ### What changed overall (kept)
 
@@ -34,7 +41,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 | **Ink restyle (Run 13)** | Settings + onboarding “Ink” theme (warm paper + logo red); shared design system; continuous waveform→pen motif; Advanced copy fix. Recording island/overlay untouched. |
 | **Ink polish (Run 13b)** | Fixed stacked top padding (~90pt); custom Ink sidebar selection (no system blue List highlight). |
 | **Paste hold (Run 14)** | Skip synthetic ⌘V when no editable focus; stage multi-rep clipboard; menu “Ready to paste”; ⌃⌥V still sequential. Cancel discards. |
-| **Brand / README (Run 15a)** | da transcribuh README + `assets/brand/` (banner, logo, social previews, bubble16). |
+| **Brand / README (Run 15a→17)** | da transcribuh README + final **dt-block** `assets/brand/` (wordmarks, banner, social, icon); bubble assets removed. |
 | **In-app rename (Run 15b)** | User-facing strings → “da transcribuh”; CFBundleDisplayName/Name; release URLs. Bundle ID / PromptAnnotator paths / PRODUCT_NAME=Mutter.app unchanged. |
 | **B&W chrome (Run 16)** | Settings/onboarding/menu-bar B/W restyle; single-column tile sidebar; status bar; Departure Mono; dt AppIcon. Island unchanged. |
 
@@ -54,12 +61,12 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - User-visible “Mutter” → “da transcribuh” (menus, onboarding, settings, a11y labels, usage descriptions, session markdown `#` title, island fallback status string).
 - `ReleaseCheck` → `bicrick/da-transcribuh`.
 - **Unchanged on purpose:** `com.bicrick.PromptAnnotator`, Swift target/module `PromptAnnotator`, `PRODUCT_NAME`/`Mutter.app` (TEST_HOST), UserDefaults keys, Keychain service, `~/Documents/PromptAnnotator/`, `MutterBoundary` multipart token, recording island visuals.
-- Patrick by hand: upload social preview; optionally rename `PRODUCT_NAME` / DMG / AppIcon to the bubble brand.
+- Patrick by hand: upload social preview; optionally rename `PRODUCT_NAME` / DMG on a future release.
 
-### Run 15a (README + brand)
+### Run 15a (README + brand) — superseded by Run 17
 
-- `assets/brand/`: readme-banner, social-preview 1x/2x, icon-a-bubble-1024, logo-a-bubble, bubble16.
-- README matches mock top (banner, one-liner, link row, install). Honest links only (MIT exists; DMG is still named `Mutter.dmg` on the v0.9.0-beta.2 release; no demo gif yet — HTML TODO).
+- Early bubble set replaced by final dt-block assets (Run 17). README now uses theme-aware wordmark `<picture>`.
+- Honest links only (MIT exists; DMG is still named `Mutter.dmg` on the v0.9.0-beta.2 release; no demo gif yet — HTML TODO).
 - `docs/BRING_YOUR_OWN_MODEL.md` → da transcribuh naming; clone URL `bicrick/da-transcribuh`.
 - Patrick must upload social preview in GitHub repo Settings (not API-settable here).
 
@@ -140,6 +147,14 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
 
 ---
+
+## Run 17 — Final dt-block brand assets
+
+See summary. Mac checklist:
+
+1. README wordmark flips light/dark with system appearance; banner + social files open.
+2. Dock / AppMark / menu bar show dt block (not bubble).
+3. No bubble filenames left under `assets/brand/`.
 
 ## Run 16 — B&W Settings / onboarding chrome
 

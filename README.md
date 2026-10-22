@@ -1,5 +1,12 @@
 <p align="center">
-  <img src="assets/brand/readme-banner.png" alt="da transcribuh — talk. it types. drag if u want the picture too." width="920">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/wordmark-g-dt-block-dark.png">
+    <img src="assets/brand/wordmark-g-dt-block.png" alt="da transcribuh" height="40">
+  </picture>
+</p>
+
+<p align="center">
+  <img src="assets/brand/readme-banner.png" alt="talk. it types. drag if u want the picture too." width="920">
 </p>
 
 <p align="center">dictation in ur menu bar. grab the screen when u want the picture with the words.</p>
@@ -82,7 +89,14 @@ cancel drops the take. nothing gets staged.
 
 ## brand bits
 
-logo and social preview art sit in [`assets/brand/`](assets/brand/). patrick: upload `social-preview-1280x640.png` (and the `@2x` if you want) under the repo’s **settings → general → social preview** — that part isn’t settable from here.
+final **dt block** art lives in [`assets/brand/`](assets/brand/):
+
+- `wordmark-g-dt-block.png` / `wordmark-g-dt-block-dark.png` — lowercase “da transcribuh” plus a separate block cursor after the h (light / dark)
+- `icon-g-dt-block-1024.png` — app mark
+- `readme-banner.png`, `social-preview-1280x640.png`, `social-preview-2560x1280@2x.png`
+- `menubar-g-dt-block-16.png` / `menubar-g-dt-block-32.png` — template menu-bar glyph
+
+patrick: upload `social-preview-1280x640.png` (and the `@2x` if you want) under the repo’s **settings → general → social preview** — that part isn’t settable from here.
 
 ## license
 

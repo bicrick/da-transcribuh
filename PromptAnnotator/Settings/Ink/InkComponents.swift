@@ -417,7 +417,12 @@ struct InkWavePenMotif: View {
                     let h = max(4, size.height * 0.55 * envelope)
                     let x = CGFloat(i) * (barW + gap)
                     let rect = CGRect(x: x, y: midY - h / 2, width: barW, height: h)
-                    context.fill(Path(rect), with: .color(Ink.label))
+                    // Welcome: outlined bars; Ready (`inked`): solid fill.
+                    if inked {
+                        context.fill(Path(rect), with: .color(Ink.label))
+                    } else {
+                        context.stroke(Path(rect), with: .color(Ink.label), lineWidth: 1)
+                    }
                 }
             }
             .frame(width: 120, height: 48)

@@ -122,7 +122,7 @@ struct SpeechModelPicker: View {
                     HStack(alignment: .top) {
                         Image(systemName: iconName(for: choice))
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(selected ? Ink.accent : Ink.label)
+                            .foregroundStyle(Ink.label)
                         Spacer(minLength: 4)
                         if selected {
                             ZStack {
