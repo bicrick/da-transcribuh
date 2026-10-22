@@ -55,6 +55,8 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.paintSwatches.count, 16)
         XCTAssertEqual(SettingsPage.tabOrder.count, 7)
         XCTAssertEqual(SettingsPage.tabOrder.first, .home)
+        XCTAssertEqual(SettingsPage.tabOrder[1], .appearance)
+        XCTAssertEqual(SettingsPage.tabOrder[2], .history)
         XCTAssertEqual(SettingsPage.tabOrder[3], .model)
     }
 
@@ -97,6 +99,8 @@ final class InkThemeTests: XCTestCase {
     }
 
     func testSidebarTileTitlesAreCompact() {
+        XCTAssertEqual(SettingsPage.appearance.title, "Appearance")
+        XCTAssertEqual(SettingsPage.appearance.symbol, "paintpalette")
         XCTAssertEqual(SettingsPage.configuration.title, "General")
         XCTAssertEqual(SettingsPage.performance.title, "Perf")
         XCTAssertEqual(SettingsPage.configuration.pageTitle, "General")
@@ -225,6 +229,7 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(lightStat.uppercased(), "000000")
         XCTAssertEqual(darkStat.uppercased(), "A8A8AD")
         XCTAssertEqual(SettingsPage.home.tabAccent, Ink.paintRed)
+        XCTAssertEqual(SettingsPage.appearance.tabAccent, Ink.paintOrange)
         XCTAssertEqual(SettingsPage.history.tabAccent, Ink.paintBlue)
         XCTAssertEqual(SettingsPage.performance.tabAccent, Ink.paintPink)
     }

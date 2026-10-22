@@ -19,9 +19,11 @@ SYMBOL = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 OUT_SHOTS = ROOT / "assets" / "brand" / "screenshots"
 OUT_MOCKS = ROOT / "assets" / "brand" / "mocks"
 
-W, H = 2040, 1400
-# Logical ~1020×700 at 2×
+W, H = 2040, 1560
+# Logical ~1020×780 at 2× (bento Home needs a bit more height)
 S = 2.0
+CELL_GAP = 12 * S
+BEVEL = 2 * S
 
 # FolderTabShape constants (Swift points → mock pixels via S)
 FLARE = 5 * S
@@ -95,8 +97,8 @@ DARK = {
 
 TABS = [
     ("Home", "#ED1C24"),
+    ("Appearance", "#FF7F27"),
     ("History", "#3F48CC"),
-    ("Recording", "#FF7F27"),
     ("Models", "#A349A4"),
     ("General", "#22B14C"),
     ("Sound", "#008080"),
@@ -248,6 +250,45 @@ def wrap(draw: ImageDraw.ImageDraw, text: str, f: ImageFont.ImageFont, width: fl
     return lines
 
 
+def draw_bento_cell(
+    draw: ImageDraw.ImageDraw,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    title: str,
+    pal: dict,
+    trailing: str | None = None,
+    compact: bool = False,
+) -> tuple[float, float]:
+    """Paint/Ink cell: face + 1pt border + bevel offset. Returns content origin (cx, cy)."""
+    pad = (12 if compact else 16) * S
+    # Bevel behind
+    draw.rectangle(
+        [x + BEVEL, y + BEVEL, x + w + BEVEL, y + h + BEVEL],
+        fill=c(pal, "bevel"),
+    )
+    draw.rectangle(
+        [x, y, x + w, y + h],
+        fill=c(pal, "front"),
+        outline=c(pal, "label"),
+        width=max(2, int(S)),
+    )
+    hf = font_departure(11 * S)
+    draw.text((x + pad, y + pad), title, font=hf, fill=c(pal, "label"))
+    if trailing:
+        tw, th = text_size(draw, trailing, hf)
+        draw.text(
+            (x + w - pad - tw, y + pad),
+            trailing,
+            font=hf,
+            fill=c(pal, "secondary"),
+        )
+    # Content starts below caption header
+    content_y = y + pad + 14 * S + (8 if compact else 12) * S
+    return x + pad, content_y
+
+
 def render(pal: dict) -> Image.Image:
     img = Image.new("RGB", (W, H), c(pal, "window"))
     d = ImageDraw.Draw(img)
@@ -345,85 +386,191 @@ def render(pal: dict) -> Image.Image:
     d.rectangle([bx + 10 * S, by + 11 * S, bx + 18 * S, by + 19 * S], fill=hex_rgb("#ED1C24"), outline=c(pal, "on_primary"), width=1)
     d.text((bx + 24 * S, by + 6 * S), "Start", font=font_departure(13 * S), fill=c(pal, "on_primary"))
 
-    # Stats
-    sy = row_y + 48 * S
-    labels = [("172", "SESSIONS"), ("50", "TILES"), ("3,138", "WORDS"), ("29", "MINUTES")]
-    gap = (W - 2 * PAGE_SIDE) / 4
-    for i, (num, lab) in enumerate(labels):
-        x = PAGE_SIDE + i * gap
-        col_w = gap - 16 * S
-        d.text((x, sy), num, font=font_departure(28 * S), fill=c(pal, "label"))
-        d.text((x, sy + 36 * S), lab, font=font_departure(11 * S), fill=c(pal, "secondary"))
-        d.rectangle([x, sy + 52 * S, x + col_w, sy + 52 * S + 4 * S], fill=c(pal, "stat_rule"), outline=c(pal, "label"), width=1)
+    # —— Bento grid (completed Home; example data, clearly fake) ——
+    content_left = PAGE_SIDE
+    content_w = W - 2 * PAGE_SIDE
+    # Account for bevel overhang on the right edge of the last cell in a row
+    usable_w = content_w - BEVEL
 
-    # Get Started
-    gy = sy + 80 * S
-    d.text((PAGE_SIDE, gy), "GET STARTED", font=font_departure(11 * S), fill=c(pal, "label"))
-    d.rectangle([PAGE_SIDE, gy + 20 * S, W - PAGE_SIDE, gy + 20 * S + 1], fill=c(pal, "hairline"))
-    d.text((PAGE_SIDE, gy + 32 * S), "3 OF 3 DONE", font=font_departure(11 * S), fill=c(pal, "label"))
-    bar_x = PAGE_SIDE + 120 * S
-    bar_y = gy + 34 * S
-    bar_w = W - PAGE_SIDE - bar_x
-    d.rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + 8 * S], fill=hex_rgb("#B5E61D"), outline=c(pal, "label"), width=max(2, int(S)))
-
-    items = [
-        ("Permissions", "Screen Recording, Microphone, and Accessibility are on."),
-        ("Speech model", "Balanced (small.en_217MB) is on this Mac."),
-        ("First take", "172 sessions in History."),
-    ]
-    iy = gy + 56 * S
-    for title, detail in items:
-        # green check box (drawn, not tofu)
-        d.rectangle([PAGE_SIDE, iy, PAGE_SIDE + 16 * S, iy + 16 * S], fill=hex_rgb("#22B14C"), outline=c(pal, "label"), width=max(2, int(S)))
-        # checkmark via lines
-        d.line(
-            [
-                (PAGE_SIDE + 3 * S, iy + 8 * S),
-                (PAGE_SIDE + 6 * S, iy + 12 * S),
-                (PAGE_SIDE + 13 * S, iy + 4 * S),
-            ],
-            fill=hex_rgb("#000000"),
-            width=max(2, int(S)),
+    # Row 1: four equal stat cells
+    sy = row_y + 44 * S
+    stats = [("172", "SESSIONS"), ("50", "TILES"), ("3,138", "WORDS"), ("29", "MINUTES")]
+    stat_h = 88 * S
+    stat_w = (usable_w - 3 * CELL_GAP) / 4
+    for i, (num, lab) in enumerate(stats):
+        x = content_left + i * (stat_w + CELL_GAP)
+        cx, cy = draw_bento_cell(d, x, sy, stat_w, stat_h, lab, pal, compact=True)
+        d.text((cx, cy), num, font=font_departure(28 * S), fill=c(pal, "label"))
+        # Short neutral tick (not a full-width rule)
+        tick_y = cy + 36 * S
+        d.rectangle(
+            [cx, tick_y, cx + 28 * S, tick_y + 3 * S],
+            fill=c(pal, "stat_rule"),
+            outline=c(pal, "label"),
+            width=1,
         )
-        d.text((PAGE_SIDE + 24 * S, iy - 2 * S), title, font=font_departure(13 * S), fill=c(pal, "label"))
-        d.text((PAGE_SIDE + 24 * S, iy + 16 * S), detail, font=font_departure(11 * S), fill=c(pal, "secondary"))
-        d.rectangle([PAGE_SIDE, iy + 36 * S, W - PAGE_SIDE, iy + 36 * S + 1], fill=c(pal, "hairline"))
-        iy += 48 * S
 
-    # Tips
-    ty = iy + 16 * S
-    tip_w = (W - 2 * PAGE_SIDE - 16 * S) / 2
-    tips = [
-        (
-            "viewfinder",
-            "Talk, or drag to capture",
-            "Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.",
-            False,
-        ),
-        ("folder", "Sessions folder", "~/Documents/PromptAnnotator/Sessions", True),
+    # Row 2: RECENT (~2/3) + THIS WEEK (~1/3)
+    r2y = sy + stat_h + BEVEL + CELL_GAP
+    week_w = 220 * S
+    recent_w = usable_w - week_w - CELL_GAP
+    row2_h = 220 * S
+
+    # RECENT cell
+    rx, ry = draw_bento_cell(
+        d, content_left, r2y, recent_w, row2_h, "RECENT", pal, trailing="All in History →"
+    )
+    recent = [
+        ("11:42", "Ship the folder tabs and keep Start inverted.", "86", True),
+        ("Tue", "Dictate standup notes while capturing the board.", "42", True),
+        ("Mon", "No speech", "0", False),
+        ("Oct 12", "Quick reply about the notarized build.", "19", False),
     ]
-    for i, (glyph, title, detail, show_btn) in enumerate(tips):
-        x = PAGE_SIDE + i * (tip_w + 16 * S)
-        icon = 48 * S
-        d.rectangle([x + 2 * S, ty + 2 * S, x + icon + 2 * S, ty + icon + 2 * S], fill=c(pal, "bevel"))
-        d.rectangle([x, ty, x + icon, ty + icon], fill=c(pal, "tile"), outline=c(pal, "control"), width=max(2, int(S)))
-        if glyph == "viewfinder":
-            m = 12 * S
-            d.rectangle([x + m, ty + m, x + icon - m, ty + icon - m], outline=c(pal, "on_tile"), width=max(2, int(S)))
-        else:
-            d.rectangle([x + 14 * S, ty + 18 * S, x + icon - 14 * S, ty + icon - 12 * S], outline=c(pal, "on_tile"), width=max(2, int(S)))
-            d.rectangle([x + 18 * S, ty + 12 * S, x + icon - 18 * S, ty + 20 * S], outline=c(pal, "on_tile"), width=max(2, int(S)))
-        d.text((x, ty + icon + 8 * S), title, font=font_departure(13 * S), fill=c(pal, "label"))
-        cf = font_departure(11 * S)
-        lines = wrap(d, detail, cf, tip_w - 4)
-        ly = ty + icon + 28 * S
-        for line in lines[:4]:
-            d.text((x, ly), line, font=cf, fill=c(pal, "secondary"))
-            ly += 16 * S
-        if show_btn:
-            d.rectangle([x + 2 * S, ly + 6 * S, x + 48 * S + 2 * S, ly + 28 * S], fill=c(pal, "bevel"))
-            d.rectangle([x, ly + 4 * S, x + 48 * S, ly + 26 * S], fill=c(pal, "front"), outline=c(pal, "control"), width=max(1, int(S)))
-            d.text((x + 10 * S, ly + 8 * S), "Show", font=font_departure(11 * S), fill=c(pal, "label"))
+    iy = ry
+    inner_right = content_left + recent_w - 16 * S
+    for when, preview, words, has_thumb in recent:
+        d.text((rx, iy + 4 * S), when, font=font_departure(11 * S), fill=c(pal, "secondary"))
+        d.text((rx + 52 * S, iy + 4 * S), preview, font=font_departure(11 * S), fill=c(pal, "label"))
+        ww, _ = text_size(d, words, font_departure(11 * S))
+        thumb_x = inner_right - 28 * S
+        d.text((thumb_x - 8 * S - ww, iy + 4 * S), words, font=font_departure(11 * S), fill=c(pal, "secondary"))
+        if has_thumb:
+            d.rectangle(
+                [thumb_x, iy, thumb_x + 28 * S, iy + 28 * S],
+                fill=c(pal, "fill"),
+                outline=c(pal, "label"),
+                width=max(1, int(S)),
+            )
+            d.rectangle(
+                [thumb_x + 6 * S, iy + 8 * S, thumb_x + 22 * S, iy + 20 * S],
+                outline=c(pal, "secondary"),
+                width=max(1, int(S)),
+            )
+        d.rectangle([rx, iy + 34 * S, inner_right, iy + 34 * S + 1], fill=c(pal, "hairline"))
+        iy += 40 * S
+
+    # THIS WEEK cell — compact bars (~12pt wide, 6pt gaps)
+    wx = content_left + recent_w + CELL_GAP
+    week = [12, 40, 8, 90, 55, 20, 70]  # fake words/day; last = today
+    week_total = sum(week)
+    twx, twy = draw_bento_cell(
+        d,
+        wx,
+        r2y,
+        week_w,
+        row2_h,
+        "THIS WEEK",
+        pal,
+        trailing=f"{week_total:,} words",
+    )
+    peak = max(week) or 1
+    bar_w = 12 * S
+    bar_gap = 6 * S
+    bar_max_h = 48 * S
+    day_letters = ["F", "S", "S", "M", "T", "W", "T"]
+    bar_base = twy + bar_max_h
+    for i, (val, letter) in enumerate(zip(week, day_letters)):
+        bx = twx + i * (bar_w + bar_gap)
+        bh = max(4 * S, (val / peak) * bar_max_h)
+        is_today = i == 6
+        color = hex_rgb("#ED1C24") if is_today else c(pal, "label")
+        # Neutral bars slightly softer; today full red
+        if not is_today:
+            # approximate 0.75 opacity over front
+            fr = c(pal, "front")
+            color = tuple(int(a * 0.75 + f * 0.25) for a, f in zip(color, fr))
+            if val == 0:
+                color = tuple(int(a * 0.22 + f * 0.78) for a, f in zip(c(pal, "label"), fr))
+        d.rectangle([bx, bar_base - bh, bx + bar_w, bar_base], fill=color)
+        lw, _ = text_size(d, letter, font_departure(11 * S))
+        d.text(
+            (bx + (bar_w - lw) / 2, bar_base + 4 * S),
+            letter,
+            font=font_departure(11 * S),
+            fill=c(pal, "label" if is_today else "secondary"),
+        )
+    best = max(week)
+    d.text(
+        (twx, bar_base + 22 * S),
+        f"Best day · {best} words",
+        font=font_departure(11 * S),
+        fill=c(pal, "secondary"),
+    )
+
+    # Row 3: CAPTURE + FOLDER action cells
+    r3y = r2y + row2_h + BEVEL + CELL_GAP
+    act_w = (usable_w - CELL_GAP) / 2
+    act_h = 168 * S
+    icon = 40 * S
+
+    # CAPTURE
+    cx0, cy0 = draw_bento_cell(d, content_left, r3y, act_w, act_h, "CAPTURE", pal)
+    d.rectangle([cx0 + BEVEL, cy0 + BEVEL, cx0 + icon + BEVEL, cy0 + icon + BEVEL], fill=c(pal, "bevel"))
+    d.rectangle(
+        [cx0, cy0, cx0 + icon, cy0 + icon],
+        fill=c(pal, "tile"),
+        outline=c(pal, "control"),
+        width=max(2, int(S)),
+    )
+    m = 10 * S
+    d.rectangle(
+        [cx0 + m, cy0 + m, cx0 + icon - m, cy0 + icon - m],
+        outline=c(pal, "on_tile"),
+        width=max(2, int(S)),
+    )
+    d.text((cx0, cy0 + icon + 8 * S), "Talk, or drag to capture", font=font_departure(13 * S), fill=c(pal, "label"))
+    cap_detail = (
+        "Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. "
+        "A capture pastes the picture with the words."
+    )
+    ly = cy0 + icon + 28 * S
+    for line in wrap(d, cap_detail, font_departure(11 * S), act_w - 36 * S)[:3]:
+        d.text((cx0, ly), line, font=font_departure(11 * S), fill=c(pal, "secondary"))
+        ly += 14 * S
+    # Quiet status caption inside CAPTURE (least clutter)
+    d.text(
+        (cx0, ly + 6 * S),
+        "small.en_217MB · System mic · Permissions OK",
+        font=font_departure(11 * S),
+        fill=c(pal, "secondary"),
+    )
+
+    # FOLDER
+    fx = content_left + act_w + CELL_GAP
+    fx0, fy0 = draw_bento_cell(d, fx, r3y, act_w, act_h, "FOLDER", pal)
+    d.rectangle([fx0 + BEVEL, fy0 + BEVEL, fx0 + icon + BEVEL, fy0 + icon + BEVEL], fill=c(pal, "bevel"))
+    d.rectangle(
+        [fx0, fy0, fx0 + icon, fy0 + icon],
+        fill=c(pal, "tile"),
+        outline=c(pal, "control"),
+        width=max(2, int(S)),
+    )
+    d.rectangle(
+        [fx0 + 12 * S, fy0 + 16 * S, fx0 + icon - 12 * S, fy0 + icon - 10 * S],
+        outline=c(pal, "on_tile"),
+        width=max(2, int(S)),
+    )
+    d.rectangle(
+        [fx0 + 15 * S, fy0 + 10 * S, fx0 + icon - 15 * S, fy0 + 18 * S],
+        outline=c(pal, "on_tile"),
+        width=max(2, int(S)),
+    )
+    d.text((fx0, fy0 + icon + 8 * S), "Sessions folder", font=font_departure(13 * S), fill=c(pal, "label"))
+    d.text(
+        (fx0, fy0 + icon + 28 * S),
+        "~/Documents/PromptAnnotator/Sessions",
+        font=font_departure(11 * S),
+        fill=c(pal, "secondary"),
+    )
+    by = fy0 + icon + 48 * S
+    d.rectangle([fx0 + BEVEL, by + BEVEL, fx0 + 48 * S + BEVEL, by + 22 * S + BEVEL], fill=c(pal, "bevel"))
+    d.rectangle(
+        [fx0, by, fx0 + 48 * S, by + 22 * S],
+        fill=c(pal, "front"),
+        outline=c(pal, "control"),
+        width=max(1, int(S)),
+    )
+    d.text((fx0 + 10 * S, by + 4 * S), "Show", font=font_departure(11 * S), fill=c(pal, "label"))
 
     # Status bar — proper glyphs via DejaVu
     d.rectangle([0, H - status_h, W, H], fill=c(pal, "status"))

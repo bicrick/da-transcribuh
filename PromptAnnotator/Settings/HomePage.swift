@@ -6,16 +6,22 @@ struct HomePage: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var permissions: PermissionModel
     var sessions: [SessionSummary]
+    /// Open History; pass a session id to select that row, or nil for the list.
+    var onOpenHistory: (String?) -> Void = { _ in }
+    var onOpenModels: () -> Void = {}
+    var onOpenSound: () -> Void = {}
+
+    @State private var getStartedComplete = HomeGetStartedStore.isComplete()
+    @State private var hoveredRecentID: String?
+
+    /// Bento gutters — airy but tighter than sectionGap so cells read as one composition.
+    private var cellGap: CGFloat { Ink.space3 }
 
     var body: some View {
         DTScrollView {
             VStack(alignment: .leading, spacing: Ink.sectionGap) {
                 hero
-                stats
-                SettingsSection(title: "Get started") {
-                    checklist
-                }
-                tips
+                bentoBody
             }
             .padding(.top, Ink.pageTop)
             .padding(.horizontal, Ink.pageSide)
@@ -24,10 +30,28 @@ struct HomePage: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .inkPageChrome()
-        .onAppear { permissions.refresh() }
+        .onAppear {
+            permissions.refresh()
+            syncGetStartedFlag()
+        }
+        .onChange(of: sessions.count) { _, _ in syncGetStartedFlag() }
+        .onReceive(permissions.objectWillChange) { _ in
+            DispatchQueue.main.async { syncGetStartedFlag() }
+        }
     }
 
-    /// Pre-#9 hero, minus yellow version badge, tagline, and shortcut caption.
+    private var showGetStarted: Bool { !getStartedComplete }
+
+    private func syncGetStartedFlag() {
+        guard !getStartedComplete else { return }
+        if checklistItems.allSatisfy(\.done) {
+            HomeGetStartedStore.markComplete()
+            getStartedComplete = true
+        }
+    }
+
+    // MARK: - Hero (unchanged)
+
     private var hero: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: Ink.space4) {
@@ -78,7 +102,24 @@ struct HomePage: View {
         }
     }
 
-    private var stats: some View {
+    // MARK: - Bento body
+
+    private var bentoBody: some View {
+        VStack(alignment: .leading, spacing: cellGap) {
+            statsRow
+            if showGetStarted {
+                HomeBentoCell(title: "GET STARTED") {
+                    checklist
+                }
+            } else {
+                recentAndWeekRow
+            }
+            actionsAndStatusRow
+        }
+    }
+
+    /// Row 1: four equal stat cells. Narrow → 2×2.
+    private var statsRow: some View {
         let numbers = SessionLibrary.stats(from: sessions)
         let items: [(Int, String)] = [
             (numbers.sessions, numbers.sessions == 1 ? "Session" : "Sessions"),
@@ -86,29 +127,394 @@ struct HomePage: View {
             (numbers.words, numbers.words == 1 ? "Word" : "Words"),
             (numbers.minutes, numbers.minutes == 1 ? "Minute" : "Minutes"),
         ]
-        return HStack(alignment: .top, spacing: Ink.gridGap) {
-            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                VStack(alignment: .leading, spacing: Ink.space2) {
-                    Text(item.0.formatted(.number.grouping(.automatic)))
-                        .font(Ink.numberFont)
-                        .monospacedDigit()
-                        .foregroundStyle(Ink.label)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Text(item.1.uppercased())
-                        .font(Ink.headingFont)
-                        .foregroundStyle(Ink.secondary)
-                    // Full-column neutral rule — per-stat colors moved to folder tabs.
-                    Rectangle()
-                        .fill(Ink.statRule)
-                        .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 4)
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: cellGap) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    statCell(value: item.0, label: item.1)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            VStack(spacing: cellGap) {
+                HStack(alignment: .top, spacing: cellGap) {
+                    statCell(value: items[0].0, label: items[0].1)
+                    statCell(value: items[1].0, label: items[1].1)
+                }
+                HStack(alignment: .top, spacing: cellGap) {
+                    statCell(value: items[2].0, label: items[2].1)
+                    statCell(value: items[3].0, label: items[3].1)
+                }
             }
         }
     }
+
+    private func statCell(value: Int, label: String) -> some View {
+        HomeBentoCell(title: label.uppercased(), compact: true) {
+            VStack(alignment: .leading, spacing: Ink.space2) {
+                Text(value.formatted(.number.grouping(.automatic)))
+                    .font(Ink.numberFont)
+                    .monospacedDigit()
+                    .foregroundStyle(Ink.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
+                Rectangle()
+                    .fill(Ink.statRule)
+                    .frame(width: 28, height: 3)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Row 2: RECENT (~2/3) + THIS WEEK (~1/3). Narrow → stack.
+    private var recentAndWeekRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: cellGap) {
+                recentCell
+                    .frame(maxWidth: .infinity)
+                thisWeekCell
+                    .frame(width: 220)
+            }
+            VStack(alignment: .leading, spacing: cellGap) {
+                recentCell
+                thisWeekCell
+            }
+        }
+    }
+
+    private var recentCell: some View {
+        let rows = SessionLibrary.recent(sessions, limit: 4)
+        return HomeBentoCell(
+            title: "RECENT",
+            trailing: AnyView(
+                Button("All in History →") { onOpenHistory(nil) }
+                    .buttonStyle(.plain)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+            )
+        ) {
+            if rows.isEmpty {
+                Text("No sessions yet — press Start for your first take.")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .padding(.vertical, Ink.space2)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(rows) { summary in
+                        recentRow(summary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var thisWeekCell: some View {
+        let counts = SessionLibrary.weeklyWordCounts(from: sessions)
+        let total = counts.reduce(0, +)
+        let maxCount = max(counts.max() ?? 0, 1)
+        let best = counts.max() ?? 0
+        let initials = weekDayInitials()
+        return HomeBentoCell(
+            title: "THIS WEEK",
+            trailing: AnyView(
+                Text("\(total.formatted(.number.grouping(.automatic))) words")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .monospacedDigit()
+            )
+        ) {
+            VStack(alignment: .leading, spacing: Ink.space3) {
+                HStack(alignment: .bottom, spacing: 6) {
+                    ForEach(0..<7, id: \.self) { index in
+                        let value = counts[index]
+                        let isToday = index == 6
+                        VStack(spacing: 4) {
+                            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                                .fill(isToday ? Ink.paintRed : Ink.label)
+                                .frame(
+                                    width: 12,
+                                    height: max(4, CGFloat(value) / CGFloat(maxCount) * 48)
+                                )
+                                .opacity(value == 0 && !isToday ? 0.22 : (isToday ? 1 : 0.75))
+                            Text(initials[index])
+                                .font(Ink.captionFont)
+                                .foregroundStyle(isToday ? Ink.label : Ink.tertiary)
+                        }
+                        .frame(width: 14)
+                        .accessibilityLabel("\(initials[index]), \(value) words")
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if best > 0 {
+                    Text("Best day · \(best.formatted(.number.grouping(.automatic))) words")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.tertiary)
+                } else {
+                    Text("No words this week yet")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.tertiary)
+                }
+            }
+        }
+    }
+
+    /// Row 3: two action cells; status caption lives under the capture cell (least clutter).
+    private var actionsAndStatusRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: cellGap) {
+                captureActionCell
+                    .frame(maxWidth: .infinity)
+                folderActionCell
+                    .frame(maxWidth: .infinity)
+            }
+            VStack(alignment: .leading, spacing: cellGap) {
+                captureActionCell
+                folderActionCell
+            }
+        }
+    }
+
+    private var captureActionCell: some View {
+        HomeBentoCell(title: "CAPTURE") {
+            VStack(alignment: .leading, spacing: Ink.space2) {
+                actionGlyph("viewfinder")
+                Text("Talk, or drag to capture")
+                    .font(Ink.labelFont)
+                    .foregroundStyle(Ink.label)
+                Text("Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                statusCaption
+                    .padding(.top, Ink.space2)
+            }
+        }
+    }
+
+    private var folderActionCell: some View {
+        HomeBentoCell(title: "FOLDER") {
+            VStack(alignment: .leading, spacing: Ink.space2) {
+                actionGlyph("folder.fill")
+                Text("Sessions folder")
+                    .font(Ink.labelFont)
+                    .foregroundStyle(Ink.label)
+                Text(SessionStore.displayPath())
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Show") {
+                    if let root = try? SessionPaths.sessionsRoot() {
+                        NSWorkspace.shared.open(root)
+                    }
+                }
+                .buttonStyle(InkSecondaryButtonStyle())
+                .padding(.top, Ink.space1)
+            }
+        }
+    }
+
+    private func actionGlyph(_ symbol: String) -> some View {
+        ZStack {
+            Rectangle()
+                .fill(Ink.tileFace)
+            Rectangle()
+                .strokeBorder(Ink.controlBorder, lineWidth: 1.5)
+            Image(systemName: symbol)
+                .font(.system(size: Ink.tipSymbolPointSize, weight: .black))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(Ink.onTile)
+        }
+        .frame(width: Ink.tipIconSize, height: Ink.tipIconSize)
+    }
+
+    private var statusCaption: some View {
+        Group {
+            if let issue = homeStatusIssue {
+                HStack(alignment: .center, spacing: Ink.space2) {
+                    Circle()
+                        .fill(Ink.paintRed)
+                        .frame(width: 7, height: 7)
+                    Text(issue.message)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.label)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: Ink.space1)
+                    Button(issue.actionTitle) { issue.action() }
+                        .buttonStyle(InkSecondaryButtonStyle())
+                }
+            } else {
+                Text(homeStatusOK)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.tertiary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Recent row
+
+    private func recentRow(_ summary: SessionSummary) -> some View {
+        let hovering = hoveredRecentID == summary.id
+        return HStack(alignment: .center, spacing: Ink.space2) {
+            Button {
+                onOpenHistory(summary.id)
+            } label: {
+                HStack(alignment: .center, spacing: Ink.space2) {
+                    Text(SessionLibrary.recentWhen(summary.started))
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .monospacedDigit()
+                        .frame(width: 44, alignment: .leading)
+                        .lineLimit(1)
+
+                    Text(summary.preview.isEmpty ? "No speech" : summary.preview)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(summary.preview.isEmpty ? Ink.tertiary : Ink.label)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text("\(summary.words)")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .monospacedDigit()
+                        .frame(width: 36, alignment: .trailing)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if hovering {
+                Button("Copy") { copy(summary) }
+                    .buttonStyle(InkSecondaryButtonStyle())
+            }
+
+            recentThumb(summary)
+        }
+        .padding(.vertical, Ink.space2)
+        .onHover { over in
+            if over {
+                hoveredRecentID = summary.id
+            } else if hoveredRecentID == summary.id {
+                hoveredRecentID = nil
+            }
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Ink.hairline).frame(height: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(recentAccessibility(summary))
+        .accessibilityAddTraits(.isButton)
+    }
+
+    @ViewBuilder
+    private func recentThumb(_ summary: SessionSummary) -> some View {
+        let side: CGFloat = 28
+        if let url = SessionLibrary.thumbnailURL(for: summary),
+           let image = NSImage(contentsOf: url) {
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: side, height: side)
+                .clipped()
+                .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+        } else {
+            Color.clear.frame(width: side, height: side)
+        }
+    }
+
+    private func recentAccessibility(_ summary: SessionSummary) -> String {
+        let when = SessionLibrary.recentWhen(summary.started)
+        let text = summary.preview.isEmpty ? "No speech" : summary.preview
+        return "\(when), \(text), \(summary.words) words"
+    }
+
+    private func copy(_ summary: SessionSummary) {
+        let image = NSImage(contentsOf: summary.url.appendingPathComponent("sheet.png"))
+        SessionClipboard.copy(image: image, transcript: summary.transcript)
+    }
+
+    private func weekDayInitials(now: Date = Date(), calendar: Calendar = .current) -> [String] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEEE"
+        let today = calendar.startOfDay(for: now)
+        return (0..<7).map { offset in
+            let day = calendar.date(byAdding: .day, value: offset - 6, to: today) ?? today
+            return formatter.string(from: day).uppercased()
+        }
+    }
+
+    // MARK: - Status helpers
+
+    private var homeStatusOK: String {
+        "\(modelStatusLabel) · \(micDisplayName) · Permissions OK"
+    }
+
+    private var modelStatusLabel: String {
+        if settings.speechEngine == .openAICompatible {
+            return OpenAICompatibleTranscriber.isConfigured()
+                ? "Server model ready"
+                : "Server key missing"
+        }
+        if WhisperKitTranscriber.modelIsInstalled() {
+            return settings.speechModel
+        }
+        return "Model not downloaded"
+    }
+
+    private var micDisplayName: String {
+        let uid = settings.inputDeviceUID
+        if uid.isEmpty { return "System mic" }
+        return AudioInputs.devices().first(where: { $0.id == uid })?.name ?? "Mic unavailable"
+    }
+
+    private struct HomeStatusIssue {
+        var message: String
+        var actionTitle: String
+        var action: () -> Void
+    }
+
+    private var homeStatusIssue: HomeStatusIssue? {
+        if !permissions.status.isReady {
+            let missing = permissions.status.summary ?? "permissions"
+            return HomeStatusIssue(
+                message: "Turn on \(missing).",
+                actionTitle: "Fix",
+                action: {
+                    Permissions.revealSettings(for: Permissions.current())
+                    permissions.refresh()
+                }
+            )
+        }
+        if settings.speechEngine == .openAICompatible {
+            if !OpenAICompatibleTranscriber.isConfigured() {
+                return HomeStatusIssue(
+                    message: "Add a server API key on Models.",
+                    actionTitle: "Models",
+                    action: onOpenModels
+                )
+            }
+        } else if !WhisperKitTranscriber.modelIsInstalled() {
+            return HomeStatusIssue(
+                message: "Download a speech model on Models.",
+                actionTitle: "Models",
+                action: onOpenModels
+            )
+        }
+        let uid = settings.inputDeviceUID
+        if !uid.isEmpty, AudioInputs.devices().first(where: { $0.id == uid }) == nil {
+            return HomeStatusIssue(
+                message: "Chosen mic is unavailable.",
+                actionTitle: "Sound",
+                action: onOpenSound
+            )
+        }
+        return nil
+    }
+
+    // MARK: - Get started checklist
 
     private var checklist: some View {
         let items = checklistItems
@@ -160,63 +566,6 @@ struct HomePage: View {
                 }
             }
         }
-    }
-
-    private var tips: some View {
-        HStack(alignment: .top, spacing: Ink.gridGap) {
-            tipColumn(
-                glyph: "viewfinder",
-                title: "Talk, or drag to capture",
-                detail: "Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.",
-                trailing: nil
-            )
-            tipColumn(
-                glyph: "folder.fill",
-                title: "Sessions folder",
-                detail: SessionStore.displayPath(),
-                trailing: AnyView(
-                    Button("Show") {
-                        if let root = try? SessionPaths.sessionsRoot() {
-                            NSWorkspace.shared.open(root)
-                        }
-                    }
-                    .buttonStyle(InkSecondaryButtonStyle())
-                )
-            )
-        }
-    }
-
-    private func tipColumn(
-        glyph: String,
-        title: String,
-        detail: String,
-        trailing: AnyView?
-    ) -> some View {
-        VStack(alignment: .leading, spacing: Ink.space2) {
-            ZStack {
-                Rectangle()
-                    .fill(Ink.tileFace)
-                Rectangle()
-                    .strokeBorder(Ink.controlBorder, lineWidth: 1.5)
-                Image(systemName: glyph)
-                    .font(.system(size: Ink.tipSymbolPointSize, weight: .black))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(Ink.onTile)
-            }
-            .frame(width: Ink.tipIconSize, height: Ink.tipIconSize)
-            Text(title)
-                .font(Ink.labelFont)
-                .foregroundStyle(Ink.label)
-            Text(detail)
-                .font(Ink.captionFont)
-                .foregroundStyle(Ink.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if let trailing {
-                trailing
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private struct ChecklistItem {
@@ -311,6 +660,45 @@ struct HomePage: View {
             return "Turn on \(missing). If a switch is already on, turn it off and on, then reopen."
         }
         return "Screen Recording, Microphone, and Accessibility are on."
+    }
+}
+
+// MARK: - Bento cell
+
+/// Paint/Ink bordered cell: `Ink.front` face, 1pt label border, subtle bevel offset.
+private struct HomeBentoCell<Content: View>: View {
+    var title: String
+    var trailing: AnyView? = nil
+    var compact: Bool = false
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? Ink.space2 : Ink.space3) {
+            HStack(alignment: .firstTextBaseline, spacing: Ink.space2) {
+                Text(title)
+                    .font(Ink.headingFont)
+                    .foregroundStyle(Ink.label)
+                Spacer(minLength: 0)
+                if let trailing {
+                    trailing
+                }
+            }
+            content()
+        }
+        .padding(compact ? Ink.space3 : Ink.space4)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(Ink.front)
+        .overlay(
+            Rectangle()
+                .strokeBorder(Ink.label, lineWidth: 1)
+        )
+        .background(
+            Rectangle()
+                .fill(Ink.bevel)
+                .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
+        )
+        .padding(.trailing, Ink.buttonShadow)
+        .padding(.bottom, Ink.buttonShadow)
     }
 }
 

@@ -200,10 +200,10 @@ struct FolderTabShape: Shape {
 }
 
 extension SettingsPage {
-    /// Groups with subtle gaps between Session / Speech / App clusters.
+    /// Groups: primary (Home / Appearance / History), speech (Models), app plumbing.
     static var tabGroups: [[SettingsPage]] {
         [
-            [.home, .history, .recording],
+            [.home, .appearance, .history],
             [.model],
             [.configuration, .sound, .performance],
         ]
@@ -215,8 +215,8 @@ extension SettingsPage {
     var keyboardDigit: KeyEquivalent {
         switch self {
         case .home: return "1"
-        case .history: return "2"
-        case .recording: return "3"
+        case .appearance: return "2"
+        case .history: return "3"
         case .model: return "4"
         case .configuration: return "5"
         case .sound: return "6"
@@ -228,8 +228,8 @@ extension SettingsPage {
     var tabAccent: Color {
         switch self {
         case .home: return Ink.paintRed
+        case .appearance: return Ink.paintOrange
         case .history: return Ink.paintBlue
-        case .recording: return Ink.paintOrange
         case .model: return Ink.paintMagenta
         case .configuration: return Ink.paintGreen
         case .sound: return Ink.paintTeal

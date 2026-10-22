@@ -61,10 +61,11 @@ enum SettingsSearch {
         hit("home.permissions", .home, "Permissions", "Screen Recording, Microphone, Accessibility"),
         hit("home.model", .home, "Speech model", "WhisperKit on this Mac"),
         hit("home.first", .home, "First take", "Start a session"),
-        // Recording
-        hit("rec.style", .recording, "Recording window", "Default, Compact, Minimal, Hidden"),
-        hit("rec.tool", .recording, "Annotation tool", "Shift-drag defaults"),
-        hit("rec.color", .recording, "Annotation color", "Ink swatch defaults"),
+        // Appearance (theme + former Recording page)
+        hit("app.theme", .appearance, "Theme", "System, Light, Dark"),
+        hit("app.style", .appearance, "Recording window", "Default, Compact, Minimal, Hidden"),
+        hit("app.tool", .appearance, "Annotation tool", "Shift-drag defaults"),
+        hit("app.color", .appearance, "Annotation color", "Ink swatch defaults"),
         // Models
         hit("model.engine", .model, "Engine", "WhisperKit or server"),
         hit("model.builtin", .model, "Built-in WhisperKit", "Download English weights"),
@@ -72,7 +73,6 @@ enum SettingsSearch {
         hit("model.hf", .model, "Add from Hugging Face", "Bring your own model"),
         hit("model.server", .model, "Server", "OpenAI-compatible final pass"),
         // General
-        hit("gen.appearance", .configuration, "Appearance", "System, Light, Dark"),
         hit("gen.start", .configuration, "Start and stop", "Session shortcut"),
         hit("gen.cancel", .configuration, "Cancel recording", "Discard shortcut"),
         hit("gen.ptt", .configuration, "Push to talk", "Hold to record"),

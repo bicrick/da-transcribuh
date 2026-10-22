@@ -19,14 +19,8 @@ struct ConfigurationPage: View {
     var body: some View {
         SettingsPageStack(
             title: "General",
-            subtitle: "Appearance, shortcuts, launch behavior, and paste rules."
+            subtitle: "Shortcuts, launch behavior, and paste rules. Theme and island live on Appearance."
         ) {
-            SettingsSection(
-                title: "Appearance",
-                footer: "Also cycles from the menu bar as theme: …"
-            ) {
-                appearanceCard
-            }
             SettingsSection(title: "Keyboard shortcuts") {
                 shortcutCard
             }
@@ -57,19 +51,6 @@ struct ConfigurationPage: View {
         )) { event in
             apply(event)
         })
-    }
-
-    private var appearanceCard: some View {
-        InkCard {
-            InkAppearanceSegment(
-                selection: Binding(
-                    get: { settings.appearance },
-                    set: { settings.setAppearance($0) }
-                )
-            )
-            .padding(.horizontal, Ink.rowHPad)
-            .padding(.vertical, Ink.rowVPad)
-        }
     }
 
     private var shortcutCard: some View {
