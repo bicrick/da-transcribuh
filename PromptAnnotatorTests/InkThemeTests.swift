@@ -58,6 +58,13 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.sectionTitleFont, Ink.headingFont)
         XCTAssertEqual(Ink.rowTitleFont, Ink.labelFont)
         XCTAssertEqual(Ink.statValueFont, Ink.numberFont)
+        // mono() must resolve even when the OTF is missing (system mono fallback).
+        _ = Ink.mono(13)
+    }
+
+    func testOnboardingRailLabelsMatchStepCount() {
+        XCTAssertEqual(OnboardingStep.railLabels.count, OnboardingStep.allCases.count)
+        XCTAssertEqual(OnboardingStep.railLabels.count, 6)
     }
 
     func testPaintPaletteIsClassicFlat() {

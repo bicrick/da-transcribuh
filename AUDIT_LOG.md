@@ -6,7 +6,16 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–23)
+## Final summary (Runs 1–24)
+
+### Run 24 — Layout elevation (terminal History, Paint onboarding rail, page headers)
+
+- After PR #1 merged to `main` (`412fcd8`). Branch fast-forwarded; this run opens a new PR.
+- **Shared:** `InkPageHeader`, `InkStepRail` (Paint step progress), SettingsSection captions flush under headers, Departure Mono `mono()` falls back to system mono if OTF missing.
+- **History:** full-width terminal log — WHEN / DUR / TILES / WORDS / TEXT / ACT columns, per-row Copy/Show, transcript pane below; `DTScrollView` for log + detail.
+- **Onboarding:** Paint step rail + shared page header; duplicate step titles removed.
+- **Recording / Sound / Models / General / Perf:** compact headers + one short section caption; same bindings.
+- Compile-safety: font PostScript `DepartureMono-Regular`, `ATSApplicationFontsPath=Fonts`, macOS 14 APIs only; `InkThemeTests` rail-label count.
 
 ### Run 23 — Remaining Settings pages + onboarding layout redesign
 
@@ -192,6 +201,22 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
 
 ---
+
+## Run 24 — Layout elevation + new PR
+
+See summary. Mac checklist:
+
+1. Build Debug + `InkThemeTests` (Departure Mono registers; rail labels = 6).
+2. History: column-aligned log; select row → transcript; Copy / Show on row and detail; search; empty state.
+3. Onboarding: Paint step rail advances; Skip / Back / Continue; model download; practice.
+4. General / Sound / Recording / Models / Perf: headers + captions; B/W toggles/menus/slider; no system blue.
+5. Narrow window (~820): History columns + text wrap without clipping.
+
+### Risky spots (Mac)
+- History nested `DTScrollView` (page + log + detail) — scroll ownership.
+- History ACT column width at minimum window.
+- Onboarding rail labels may truncate on localized builds (English only for now).
+- Font fallback path only visible if OTF fails to register.
 
 ## Run 23 — Remaining pages layout + compile-safety
 
