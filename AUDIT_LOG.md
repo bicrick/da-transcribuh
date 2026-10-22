@@ -15,7 +15,8 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - **Dark mode softened:** window `#1E1E1E`, sidebar `#232323`, fill `#2B2B2B`, hairline `#3A3A3A`, text `#EDEDED`. Accents stay vivid.
 - **Icons:** `mocks/icon-concepts.png` (6 concepts; **recommend #1 dt-block + red shadow**). Sidebar/home use `InkDtMark` square — no nested squircle. Footer version upright Departure Mono. **AppIcon not replaced.**
 - README look section, screenshots, social preview, banner refreshed each visual chunk.
-- Compile-safety (Linux, no Xcode): no `.italic()`, no stale APIs, synchronized root group picks up `InkDtMark.swift`, island panel size grows only for shadow (layout metrics unchanged).
+- Compile-safety (Linux, no Xcode): no `.italic()`, no stale APIs, synchronized root group picks up `InkDtMark.swift`, island panel size grows only for shadow (layout metrics unchanged). Follow-up: AppKit `withSymbolicTraits` is **non-optional** — `upright()` no longer `guard let`s (UIKit-only pattern); `Ink.mono()` always wraps the upright `NSFont`.
+- Italic audit: sidebar footer, status bar, menu panel, onboarding version, About footers — Departure Mono upright; wordmark is lowercase + block cursor after the h only.
 
 ### Run 25 — Departure Mono fix + full MS Paint reskin
 

@@ -181,15 +181,10 @@ enum Ink {
 
     /// Departure Mono for chrome. Falls back to **system monospaced only** — never proportional,
     /// never italic/oblique (Departure has no italic face; do not synthesize slant).
+    /// Always wraps the upright `NSFont` so SwiftUI cannot re-apply a synthetic oblique face.
     static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         _ = weight
-        let ns = InkFontRegistrar.resolveNSFont(size: size)
-        for name in InkFontRegistrar.candidateNames {
-            if NSFont(name: name, size: size) != nil {
-                return Font.custom(name, size: size)
-            }
-        }
-        return Font(ns)
+        return Font(InkFontRegistrar.resolveNSFont(size: size))
     }
 
     static var monoIsRegistered: Bool {

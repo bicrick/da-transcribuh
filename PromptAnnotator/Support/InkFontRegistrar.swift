@@ -54,12 +54,13 @@ enum InkFontRegistrar {
     }
 
     /// Strip italic/oblique traits — Departure Mono has no italic; never synthesize slant.
+    /// AppKit `withSymbolicTraits` returns a non-optional `NSFontDescriptor` (unlike UIKit).
     static func upright(_ font: NSFont) -> NSFont {
         var traits = font.fontDescriptor.symbolicTraits
+        guard traits.contains(.italic) else { return font }
         traits.remove(.italic)
-        guard let descriptor = font.fontDescriptor.withSymbolicTraits(traits) else {
-            return font
-        }
+        // macOS: non-optional. Do not `guard let` — that only compiles against UIKit.
+        let descriptor = font.fontDescriptor.withSymbolicTraits(traits)
         return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
     }
 

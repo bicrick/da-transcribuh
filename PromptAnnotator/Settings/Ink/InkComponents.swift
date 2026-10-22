@@ -224,13 +224,13 @@ struct InkShortcutRecorder: View {
             Group {
                 if listening {
                     Text("press keys…")
-                        .font(Ink.captionFont)
+                        .font(Ink.mono(11))
                         .foregroundStyle(Ink.secondary)
                         .padding(.horizontal, 10)
                         .frame(minHeight: 26)
                 } else if keys.isEmpty {
                     Text(emptyLabel)
-                        .font(Ink.captionFont)
+                        .font(Ink.mono(11))
                         .foregroundStyle(Ink.secondary)
                         .padding(.horizontal, 10)
                         .frame(minHeight: 26)
