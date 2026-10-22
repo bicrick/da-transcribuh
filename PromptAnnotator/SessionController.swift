@@ -1169,7 +1169,18 @@ final class SessionController: ObservableObject {
         }
     }
 
+    /// NSPanel frame including the double-pane gutter (`Ink.buttonShadow`).
     func islandPanelSize() -> CGSize {
+        IslandMetrics.layout(
+            style: AppSettings.shared.islandStyle,
+            slots: islandChrome.slots,
+            captures: captureCount,
+            elapsed: elapsed
+        ).chrome
+    }
+
+    /// Face size only — used to keep the bar visually centered (shadow hangs down-right).
+    func islandBarSize() -> CGSize {
         IslandMetrics.layout(
             style: AppSettings.shared.islandStyle,
             slots: islandChrome.slots,

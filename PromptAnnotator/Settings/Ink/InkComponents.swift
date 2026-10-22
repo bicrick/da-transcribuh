@@ -39,6 +39,61 @@ struct DTWordmark: View {
     }
 }
 
+// MARK: - Double pane (sidebar tile / recording island)
+
+/// Hard offset “double pane” — identical tokens to the Settings sidebar tiles:
+/// `Ink.label` face border (1.5), `Ink.label` solid offset block at `Ink.buttonShadow`,
+/// gutter reserved so the offset never clips. Charcoal dark uses the same dynamic colors.
+struct InkDoublePaneModifier: ViewModifier {
+    var cornerRadius: CGFloat = Ink.sidebarRowRadius
+    var borderWidth: CGFloat = 1.5
+    var fill: Color = Ink.window
+    /// Pressed/selected: pane sits flush and the face slides into the gutter (sidebar tiles).
+    var pressed: Bool = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                fill,
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Ink.label, lineWidth: borderWidth)
+            )
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Ink.label)
+                    .offset(
+                        x: pressed ? 0 : Ink.buttonShadow,
+                        y: pressed ? 0 : Ink.buttonShadow
+                    )
+            )
+            .offset(x: pressed ? Ink.buttonShadow : 0, y: pressed ? Ink.buttonShadow : 0)
+            .padding(.trailing, Ink.buttonShadow)
+            .padding(.bottom, Ink.buttonShadow)
+    }
+}
+
+extension View {
+    /// Shared double-pane chrome (sidebar tiles + recording island).
+    func inkDoublePane(
+        cornerRadius: CGFloat = Ink.sidebarRowRadius,
+        borderWidth: CGFloat = 1.5,
+        fill: Color = Ink.window,
+        pressed: Bool = false
+    ) -> some View {
+        modifier(
+            InkDoublePaneModifier(
+                cornerRadius: cornerRadius,
+                borderWidth: borderWidth,
+                fill: fill,
+                pressed: pressed
+            )
+        )
+    }
+}
+
 // MARK: - Card / Tile
 
 struct InkCard<Content: View>: View {

@@ -28,7 +28,7 @@ struct RecordingIslandView: View {
             elapsed: session.elapsed
         )
         let scale = layout.scale
-        // [record + timer] — wave — [chip?]. Trailing slot width is 0 when there are no captures.
+        // [record + timer] — wave — [chip?]. Double-pane matches Settings sidebar tiles.
         return HStack(spacing: 0) {
             leading(layout)
             Color.clear.frame(width: layout.sideGapLeading)
@@ -43,14 +43,11 @@ struct RecordingIslandView: View {
         }
         .padding(.horizontal, scale.inset)
         .frame(width: layout.panel.width, height: layout.panel.height)
-        .background {
-            RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                .fill(Ink.window)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                        .strokeBorder(Ink.hairline, lineWidth: 1)
-                )
-        }
+        .inkDoublePane(cornerRadius: Ink.cardRadius, fill: Ink.window)
+        // Hits stay on the bar face — not the down-right pane gutter.
+        .contentShape(
+            Path(CGRect(x: 0, y: 0, width: layout.panel.width, height: layout.panel.height))
+        )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(islandAccessibilityLabel)
         .onAppear { pulse = true }

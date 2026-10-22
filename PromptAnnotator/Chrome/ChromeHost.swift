@@ -51,7 +51,7 @@ final class ChromeHost {
             panel.alphaValue = 1
         }
         panel.orderFrontRegardless()
-        place(panel, size: size, screen: ScreenGeometry.screenUnderMouse(), animated: false)
+        placeIsland(size, animated: false)
         guard fadeIn else { return }
         let token = fadeToken
         NSAnimationContext.runAnimationGroup { context in
@@ -68,7 +68,19 @@ final class ChromeHost {
 
     func placeIsland(_ size: CGSize, animated: Bool) {
         guard !islandDismissing, let panel = islandPanel else { return }
-        place(panel, size: size, screen: ScreenGeometry.screenUnderMouse(), animated: animated)
+        // `size` is chrome (bar + double-pane gutter). Center on the bar face so the
+        // down-right offset doesn’t shift the bar’s visual position.
+        let bar = session?.islandBarSize() ?? CGSize(
+            width: max(1, size.width - Ink.buttonShadow),
+            height: max(1, size.height - Ink.buttonShadow)
+        )
+        place(
+            panel,
+            size: size,
+            screen: ScreenGeometry.screenUnderMouse(),
+            animated: animated,
+            visualSize: bar
+        )
     }
 
     func dismissIsland(animated: Bool, hideToolbar: Bool, completion: @escaping () -> Void) {
@@ -108,12 +120,7 @@ final class ChromeHost {
     func relayout() {
         guard let screen = ScreenGeometry.screenUnderMouse() else { return }
         if !islandDismissing, let session, session.islandChrome.presence != .hidden {
-            place(
-                islandPanel,
-                size: session.islandPanelSize(),
-                screen: screen,
-                animated: !session.islandChrome.isAnimating
-            )
+            placeIsland(session.islandPanelSize(), animated: !session.islandChrome.isAnimating)
         }
         resize(toolbarHost, panel: toolbarPanel, screen: screen, edge: .bottom, animated: false)
     }
@@ -152,12 +159,21 @@ final class ChromeHost {
         }
     }
 
-    private func place(_ panel: ChromePanel?, size: CGSize, screen: NSScreen?, animated: Bool) {
+    private func place(
+        _ panel: ChromePanel?,
+        size: CGSize,
+        screen: NSScreen?,
+        animated: Bool,
+        visualSize: CGSize? = nil
+    ) {
         guard let panel, let screen, size.width > 1, size.height > 1 else { return }
         let visible = screen.visibleFrame
+        // When `visualSize` is set (island bar face), anchor that rect — not the
+        // shadow gutter — so the double-pane offset doesn’t nudge the bar.
+        let anchor = visualSize ?? size
         let origin = NSPoint(
-            x: visible.midX - size.width / 2,
-            y: visible.maxY - size.height - 8
+            x: visible.midX - anchor.width / 2,
+            y: visible.maxY - anchor.height - 8
         )
         panel.adopt(frame: NSRect(origin: origin, size: size), animated: animated)
     }

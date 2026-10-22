@@ -101,8 +101,11 @@ struct IslandChromeScale: Equatable {
 }
 
 /// Sizes for the capsule. Trailing slot collapses to zero when there are no captures.
+/// `panel` is the bar face; `chrome` adds the double-pane gutter (`Ink.buttonShadow`).
 struct IslandLayout: Equatable {
     var panel = CGSize(width: 280, height: 48)
+    /// NSPanel frame — bar + hard offset gutter so the pane isn’t clipped.
+    var chrome = CGSize(width: 282, height: 50)
     var leadingSide: CGFloat = 0
     var trailingSide: CGFloat = 0
     var wave = CGSize(width: 188, height: 26)
@@ -223,8 +226,11 @@ enum IslandMetrics {
             width: scale.inset * 2 + leadingSide + gapL + scale.wave.width + gapR + trailingSide,
             height: scale.barHeight
         )
+        let gutter = Ink.buttonShadow
+        let chrome = CGSize(width: panel.width + gutter, height: panel.height + gutter)
         return IslandLayout(
             panel: panel,
+            chrome: chrome,
             leadingSide: leadingSide,
             trailingSide: trailingSide,
             wave: scale.wave,

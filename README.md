@@ -28,7 +28,7 @@ appearance is system / light / dark from **general**, or mash `theme: …` in th
 
 the start/stop chord lives in **general** as paint keycaps — click, press a combo (modifier required, or a function key), it rebinds live. reset drops you back on ⌃⌥Space. home, the status bar, the menu panel, and onboarding all read the same stored shortcut.
 
-the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform, screenshot-count chip on the right when you’ve grabbed a tile (the chip slot fully collapses when there are none). default size is the everyday footprint; compact is the same layout, tighter. flat fill, thin hairline, no label text, no palette, no hard shadow.
+the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform, screenshot-count chip on the right when you’ve grabbed a tile (the chip slot fully collapses when there are none). default size is the everyday footprint; compact is the same layout, tighter. same double-pane hard offset as the settings sidebar tiles (ink.label block down-right) — no palette strip, no extra chrome.
 
 <p align="center">
   <img src="assets/brand/screenshots/settings-home-light.png" alt="da transcribuh settings — home" width="920">
@@ -40,7 +40,7 @@ the recording island stays minimal and symmetric: paint-red record square + fixe
   <img src="assets/brand/mocks/recording-paint-light.png" alt="da transcribuh recording island" width="640">
 </p>
 
-<p align="center"><em>recording island · default size · with a capture</em></p>
+<p align="center"><em>recording island · double-pane · with a capture</em></p>
 
 <p align="center">
   <img src="assets/brand/mocks/icon-concepts.png" alt="da transcribuh app icon concepts" width="920">

@@ -185,24 +185,13 @@ struct SettingsSidebar: View {
                     .frame(maxWidth: .infinity)
             }
             .frame(width: Ink.sidebarTileSize, height: Ink.sidebarTileSize)
-            .background(
-                (selected ? Ink.label : Ink.window),
-                in: RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
+            .inkDoublePane(
+                fill: selected ? Ink.label : Ink.window,
+                pressed: selected
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
-                    .strokeBorder(Ink.label, lineWidth: 1.5)
-            )
-            .background(
-                RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
-                    .fill(Ink.label)
-                    .offset(x: selected ? 0 : Ink.buttonShadow, y: selected ? 0 : Ink.buttonShadow)
-            )
-            .offset(x: selected ? Ink.buttonShadow : 0, y: selected ? Ink.buttonShadow : 0)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.bottom, Ink.buttonShadow)
         .accessibilityLabel(item.title)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
     }
