@@ -208,7 +208,7 @@ struct HighlightedSnippet: View {
 }
 
 /// Quiet discoverability chip — tab row trailing.
-/// Square face + hard ink bevel (same Paint language as folder tabs / bento cells).
+/// Square + 2pt outline, no bevel (matches folder tabs).
 struct SettingsSearchAffordance: View {
     var action: () -> Void
 
@@ -225,13 +225,6 @@ struct SettingsSearchAffordance: View {
             .padding(.vertical, 4)
             .background(Ink.fill)
             .overlay(Rectangle().strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke))
-            .background(alignment: .topTrailing) {
-                Rectangle()
-                    .fill(Ink.bevel)
-                    .frame(width: Ink.bevelOffset)
-                    .offset(x: Ink.bevelOffset)
-            }
-            .padding(.trailing, Ink.bevelOffset)
         }
         .buttonStyle(.plain)
         .help("Search settings (⌘K)")

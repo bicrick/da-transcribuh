@@ -2,17 +2,15 @@ import SwiftUI
 
 /// Paint-style folder tabs across the top of Settings.
 ///
-/// Square faces with `Ink.stroke` outlines and a hard `Ink.bevelOffset` ink bevel on
-/// the **right** edge only (never below the shelf) — same language as bento cards.
-/// Layout is **selection-invariant**: frames identical whether selected or not; only
-/// paint changes. The full-width accent shelf joins the selected tab’s sides at
-/// crisp right angles.
+/// Square faces, `Ink.stroke` (2pt) accent outlines, **no bevels**. Layout is
+/// **selection-invariant**. Selected outline + continuous shelf are one path
+/// drawn on top (full accent, open bottom merging into the page). Unselected
+/// tabs get the same 2pt accent weight on the face and rest on the shelf.
 struct SettingsFolderTabs: View {
     @Binding var selection: SettingsPage
     var onSearch: (() -> Void)? = nil
 
     private var tabHeight: CGFloat { Ink.folderTabHeight }
-    /// Top pad absorbs optional selected raise paint; layout height stays fixed.
     private var shelfHeight: CGFloat { Ink.space2 + tabHeight }
     private var selectedBleed: CGFloat { Ink.stroke }
 
@@ -36,7 +34,7 @@ struct SettingsFolderTabs: View {
             Spacer(minLength: Ink.space2)
             if let onSearch {
                 SettingsSearchAffordance(action: onSearch)
-                    .frame(height: tabHeight, alignment: .bottom)
+                    .frame(height: tabHeight, alignment: .center)
             }
         }
         .padding(.horizontal, Ink.pageSide)
@@ -47,13 +45,19 @@ struct SettingsFolderTabs: View {
         .coordinateSpace(name: ShelfSpace.name)
         .background {
             ZStack(alignment: .bottom) {
+                // Tab row well; page color under the shelf stroke (no fill→front band).
                 Ink.fill
-                // Continuous accent shelf — on top of unselected bottoms, under selected fill bleed.
-                SelectedTabShelfStroke(gap: selectedFrame)
-                    .stroke(selection.tabAccent, lineWidth: Ink.stroke)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .allowsHitTesting(false)
+                Ink.front
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Ink.stroke)
             }
+        }
+        // Continuous shelf + selected U on TOP so stroke weight matches unselected faces
+        // (never double-drawn, never hidden behind fill).
+        .overlay(alignment: .bottom) {
+            SelectedTabShelfStroke(gap: selectedFrame)
+                .stroke(selection.tabAccent, lineWidth: Ink.stroke)
+                .allowsHitTesting(false)
         }
         .onPreferenceChange(SelectedTabFrameKey.self) { frame in
             selectedFrame = frame ?? .null
@@ -83,20 +87,11 @@ struct SettingsFolderTabs: View {
                     .fill(selected ? Ink.front : Ink.fill)
             }
             .overlay {
-                // Unselected: muted accent, open bottom onto the shelf.
-                // Selected outline is the continuous accent shelf stroke.
+                // Unselected only — selected outline is the overlay shelf path (same 2pt).
                 if !selected {
                     FolderTabShape(closeBottom: false)
-                        .stroke(page.tabAccent.opacity(0.55), lineWidth: Ink.stroke)
+                        .stroke(page.tabAccent, lineWidth: Ink.stroke)
                 }
-            }
-            .background(alignment: .topTrailing) {
-                // Hard ink bevel on the RIGHT only — matches cards; never below the shelf.
-                // Ink (not accent): same as bento cells / mark so the row reads as one system.
-                Rectangle()
-                    .fill(Ink.bevel)
-                    .frame(width: Ink.bevelOffset)
-                    .offset(x: Ink.bevelOffset)
             }
             .background(alignment: .bottom) {
                 if selected {
@@ -115,8 +110,6 @@ struct SettingsFolderTabs: View {
                     }
                 }
             }
-            // Reserve bevel gutter so neighbors never shift when selection changes.
-            .padding(.trailing, Ink.bevelOffset)
         }
         .buttonStyle(.plain)
         .zIndex(selected ? 1 : 0)
@@ -126,15 +119,14 @@ struct SettingsFolderTabs: View {
     }
 }
 
-// MARK: - Shelf space + selected frame
+// MARK: - Preference plumbing
 
 private enum ShelfSpace {
-    static let name = "settings.folderTabShelf"
+    static let name = "SettingsFolderShelf"
 }
 
 enum FolderTabMetrics {
-    /// Gap between tab faces inside a group (selection-invariant).
-    /// Bevel gutters live in each tab’s trailing padding, not in this gap.
+    /// Gap between tabs inside a group (selection-invariant).
     static let intraGroupGap: CGFloat = 2
 }
 
@@ -149,8 +141,8 @@ private struct SelectedTabFrameKey: PreferenceKey {
 }
 
 /// Full-width accent rule joined to the selected tab’s square open outline.
-/// `gap` is the face frame (excludes the trailing bevel gutter). Pixel-centered
-/// for `Ink.stroke` at 1× / 2× so sides meet the shelf at whole-pixel corners.
+/// Pixel-centered for `Ink.stroke` at 1× / 2× so sides meet the shelf at whole-pixel corners.
+/// Drawn once on top of the tab row — never doubles the selected edge.
 private struct SelectedTabShelfStroke: Shape {
     var gap: CGRect
 
@@ -165,7 +157,6 @@ private struct SelectedTabShelfStroke: Shape {
             return path
         }
 
-        // Center the vertical / top strokes on the face edges.
         let left = gap.minX
         let right = gap.maxX
         let top = gap.minY + stroke / 2
@@ -182,12 +173,9 @@ private struct SelectedTabShelfStroke: Shape {
 
 // MARK: - Square tab silhouette
 
-/// Square folder-tab face (no rounded tops, no cove feet).
-/// Open-bottom outlines let the continuous accent shelf show through.
+/// Square folder-tab face (no rounded tops, no cove feet, no bevel).
 struct FolderTabShape: Shape {
-    /// Kept at 0 — square Paint chrome (tests assert this).
     static let corner: CGFloat = 0
-    /// Legacy alias; bevel lives in `Ink.bevelOffset`, not a fillet.
     static let foot: CGFloat = 0
 
     var closeBottom: Bool = true
@@ -205,7 +193,7 @@ struct FolderTabShape: Shape {
         return path
     }
 
-    /// Ideal layout size for a tab **face** (selection-invariant; excludes bevel gutter).
+    /// Ideal layout size for a tab (selection-invariant).
     static func layoutSize(titleWidth: CGFloat, height: CGFloat = Ink.folderTabHeight) -> CGSize {
         let width = 10 + (Ink.space1 + 1) + titleWidth + Ink.space3 * 2
         return CGSize(width: width, height: height)
@@ -213,7 +201,6 @@ struct FolderTabShape: Shape {
 }
 
 extension SettingsPage {
-    /// Groups: primary (Home / Appearance / History), speech (Models), app plumbing.
     static var tabGroups: [[SettingsPage]] {
         [
             [.home, .appearance, .history],
@@ -236,7 +223,6 @@ extension SettingsPage {
         }
     }
 
-    /// Accent for selected shelf stroke / unselected outline (muted via opacity at the call site).
     var tabAccent: Color {
         switch self {
         case .home: return Ink.tabStrokeRed

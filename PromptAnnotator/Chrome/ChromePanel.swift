@@ -85,7 +85,9 @@ final class ChromePanel: NSPanel {
         content.wantsLayer = true
         content.layer?.cornerRadius = cornerRadius
         content.layer?.cornerCurve = .continuous
-        content.layer?.masksToBounds = true
+        // Do not clip — the Paint double-pane offset draws into the chrome gutter
+        // (`Ink.bevelOffset`) reserved outside the bar face.
+        content.layer?.masksToBounds = false
         content.layer?.backgroundColor = NSColor.clear.cgColor
         invalidateShadow()
     }

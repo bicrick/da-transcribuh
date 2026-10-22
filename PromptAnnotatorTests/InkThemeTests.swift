@@ -16,12 +16,12 @@ final class InkThemeTests: XCTestCase {
 
 
     func testDarkGraphitePalette() {
-        // Soft graphite — nothing in chrome darker than bevel #1A1A1C.
+        // Soft graphite surfaces; bevel inverts to near-white in dark.
         XCTAssertEqual(Ink.nsColor(hex: "#2C2C2E").redComponent * 255, 44, accuracy: 0.6)
         XCTAssertEqual(Ink.nsColor(hex: "#353538").redComponent * 255, 53, accuracy: 0.6)
         XCTAssertEqual(Ink.nsColor(hex: "#3A3A3D").redComponent * 255, 58, accuracy: 0.6)
         XCTAssertEqual(Ink.nsColor(hex: "#4A4A4E").redComponent * 255, 74, accuracy: 0.6)
-        XCTAssertEqual(Ink.nsColor(hex: "#1A1A1C").redComponent * 255, 26, accuracy: 0.6)
+        XCTAssertEqual(Ink.nsColor(hex: "#F2F2F2").redComponent * 255, 242, accuracy: 0.6)
         // Dynamic tokens resolve (light side checked via layout; dark via NSColor provider).
         _ = Ink.window
         _ = Ink.front
@@ -234,7 +234,7 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(SettingsPage.model.tabAccent, Ink.tabStrokeOrange)
         XCTAssertEqual(SettingsPage.performance.tabAccent, Ink.tabStrokePink)
         XCTAssertEqual(FolderTabShape.corner, 0, "Tabs are square Paint chrome")
-        XCTAssertEqual(FolderTabShape.foot, 0, "No cove feet — bevel uses Ink.bevelOffset")
+        XCTAssertEqual(FolderTabShape.foot, 0, "No cove feet — tabs have no bevel")
         XCTAssertEqual(Ink.stroke, 2)
         XCTAssertEqual(Ink.bevelOffset, 3)
         XCTAssertEqual(Ink.hairlineWidth, 1)
@@ -246,8 +246,8 @@ final class InkThemeTests: XCTestCase {
     }
 
     func testFolderTabLayoutSizeIgnoresSelection() {
-        // Bevel gutter is trailing padding outside layoutSize — face width is
-        // label-based and identical whether selected or not.
+        // Face width is label-based and identical whether selected or not
+        // (tabs have no bevel gutter).
         let home = FolderTabShape.layoutSize(titleWidth: 40)
         let appearance = FolderTabShape.layoutSize(titleWidth: 90)
         XCTAssertEqual(home.height, Ink.folderTabHeight)

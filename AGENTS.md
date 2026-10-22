@@ -22,7 +22,7 @@ Home Start-row keycaps are an inline chord editor (`HomeChordEditor` + shared `R
 | “d” + outer hairline (`markInk`) | `#000000` | `#F2F2F2` |
 | “t” block (`markInvertFace`) | `#000000` | `#F2F2F2` |
 | “t” letter (`markInvertInk`) | `#FFFFFF` | `#3A3A3D` |
-| Bevel | `Ink.bevel` | `Ink.bevel` (`#1A1A1C`) |
+| Bevel | `Ink.bevel` | `Ink.bevel` (`#F2F2F2`, theme-inverted) |
 
 AppIcon / README brand PNGs stay the light plate (white square). In-app mark follows the tokens above. Regenerate AppIcon with `scripts/render_dt_icon.py`.
 
@@ -40,17 +40,17 @@ AppIcon / README brand PNGs stay the light plate (white square). In-app mark fol
 | `onPrimary` | `#FFFFFF` | `#2C2C2E` |
 | `statRule` (Home stats underline) | `#000000` | `#A8A8AD` |
 | `controlBorder` | `#000000` | `#F2F2F2` |
-| `bevel` (double-pane offset) | `#000000` | `#1A1A1C` |
+| `bevel` (double-pane offset) | `#000000` | `#F2F2F2` (theme-inverted) |
 
-Nothing in chrome should paint darker than `#1A1A1C` except the bevel itself. Route surfaces through `Ink.*` — no hard-coded `Color.white` / `Color.black` for chrome controls (functional Paint swatches, annotation ink, and export canvases are the exceptions).
+Hard offset bevels use **`Ink.bevel`** (black ↔ light ink, same invert as the dt mark). Start’s red bevel stays red. Route surfaces through `Ink.*` — no hard-coded `Color.white` / `Color.black` for chrome controls (functional Paint swatches, annotation ink, and export canvases are the exceptions).
 
 ### Copy / Home
 
 Home keeps the pre-declutter structure (stats grid, Get Started checklist, tip tiles). Nits only: no yellow version badge (status bar has it), no hero tagline, no “^⌥Space starts…” caption under Start. Stat underlines are neutral (`Ink.statRule`). Start / primary stays high-contrast invert (`primaryFill` / `onPrimary`: black↔`#F2F2F2`), not a flat graphite plate.
 
-Chrome borders use **`Ink.stroke` (2pt)** and hard offsets use **`Ink.bevelOffset` (3pt)** everywhere (tabs, shelf, cells, keycaps, mark, island, menu). Internal separators stay **`Ink.hairlineWidth` (1pt)**.
+Chrome borders use **`Ink.stroke` (2pt)** everywhere. Hard offsets use **`Ink.bevelOffset` (3pt)** of **`Ink.bevel`** on cards, keycaps, mark, Start, island, and menu — **not** on folder tabs or the ⌘K chip. Internal separators stay **`Ink.hairlineWidth` (1pt)**.
 
-Folder tabs are Paint-style squares (`FolderTabShape`): **selection-invariant layout** (same x/width/height/label whether selected or not). Square faces, `Ink.stroke` outlines, hard **`Ink.bevel` / `Ink.bevelOffset` strip on the right only** (never below the shelf — same bevel language as bento cards; bevel stays ink, not accent). Selected: page fill + accent outline open at the bottom; unselected: shelf fill + muted accent open-bottom outline. The shelf + selected outline are **one continuous `Ink.stroke` path** in the selected accent (`SettingsPage.tabAccent` / `Ink.tabStroke*`, lifted in dark; Appearance = purple), joining selected sides at right angles. ⌘K chip matches (square + right bevel). README mocks: `scripts/render_home_mocks.py`.
+Folder tabs are Paint-style squares (`FolderTabShape`): **selection-invariant layout** (same x/width/height/label whether selected or not). Square faces, **no bevel** — only `Ink.stroke` (2pt) accent outlines at **identical weight** (selected = full accent open at the bottom merging into the page; unselected = same 2pt accent resting on the continuous shelf). Selected outline + shelf are one continuous path drawn on top (no double stroke). ⌘K chip matches (square, 2pt outline, no bevel). README mocks: `scripts/render_home_mocks.py`.
 
 ### Home after Get Started
 
