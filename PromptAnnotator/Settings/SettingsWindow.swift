@@ -100,16 +100,10 @@ struct SettingsRoot: View {
 
     private var sidebarFooter: some View {
         VStack(spacing: Ink.space1) {
-            Image("AppMark")
-                .resizable()
-                .interpolation(.high)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .strokeBorder(Ink.label, lineWidth: 1)
-                )
+            InkDtMark(side: 28, shadow: Ink.paintRed)
             Text(AppVersion.label)
-                .font(Ink.captionFont)
+                // Departure Mono (no italic face) — upright chrome only.
+                .font(Ink.mono(10))
                 .foregroundStyle(Ink.secondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)

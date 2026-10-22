@@ -49,6 +49,12 @@ the recording island matches home: paint-red record square, cyan waveform comb, 
 
 <p align="center"><em>recording island · paint chrome</em></p>
 
+<p align="center">
+  <img src="assets/brand/mocks/icon-concepts.png" alt="da transcribuh app icon concepts" width="920">
+</p>
+
+<p align="center"><em>icon concepts (not shipped) · recommend #1 dt-block square + red shadow</em></p>
+
 ## install
 
 download the [latest beta dmg](https://github.com/bicrick/da-transcribuh/releases/download/v0.9.0-beta.2/Mutter.dmg), open it, drag it to applications. done.
@@ -125,6 +131,7 @@ final **dt block** art lives in [`assets/brand/`](assets/brand/):
 - `screenshots/settings-home-light.png` / `settings-home-dark.png` — settings home mocks for the readme
 - `mocks/home-paint-light.png` / `home-paint-dark.png` — Paint-direction lock mocks
 - `mocks/recording-paint-light.png` / `recording-paint-dark.png` — recording island Paint chrome
+- `mocks/icon-concepts.png` — app icon explorations (AppIcon not replaced); recommend #1 dt-block square + red shadow
 - `menubar-g-dt-block-16.png` / `menubar-g-dt-block-32.png` — template menu-bar glyph
 
 patrick: upload `assets/brand/social-preview.png` under the repo’s **settings → general → social preview** at launch (repo stays private until then). that part isn’t settable from here.
