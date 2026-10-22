@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Graphite README art. Banner, island demo, and social cards.
-
-One Ink palette. Stroke is 2pt and the hard offset is 3pt at S=2.
-Canvases are opaque window graphite so the art still reads on a light page.
-"""
 
 from __future__ import annotations
 
@@ -152,13 +147,26 @@ class Island(NamedTuple):
     wave: tuple[int, int]
 
 
+class IslandMetrics(NamedTuple):
+    w: float
+    h: float
+    pad: float
+    rec: float
+    tw: float
+    th: float
+    gap: float
+    wave_w: float
+    wave_h: float
+    chip_w: float
+    inner_h: float
+
+
 def island_metrics(
     d: ImageDraw.ImageDraw,
     s: float,
     timer: str,
     chip: int | None,
-) -> tuple[float, float, float, float, float, float, float]:
-    """One measure for the island. Returns w, h, pad, rec, tw, th, gap."""
+) -> IslandMetrics:
     pad = 10 * s
     rec = 10 * s
     tw, th = text_size(d, timer, font(12 * s))
@@ -171,7 +179,7 @@ def island_metrics(
     if chip is not None:
         w += gap + chip_w
     w += pad
-    return w, h, pad, rec, tw, th, gap
+    return IslandMetrics(w, h, pad, rec, tw, th, gap, wave_w, wave_h, chip_w, inner_h)
 
 
 def draw_island(
@@ -183,32 +191,29 @@ def draw_island(
     timer: str = "0:12",
     chip: int | None = 1,
 ) -> Island:
-    w, h, pad, rec, tw, th, gap = island_metrics(d, s, timer, chip)
-    wave_w, wave_h = 88 * s, 22 * s
-    chip_w = (36 * s) if chip is not None else 0
+    m = island_metrics(d, s, timer, chip)
     timer_f = font(12 * s)
-    inner_h = h - pad * 2
 
-    pane(d, x, y, w, h, Ink.front, s)
-    cy = y + (h - inner_h) / 2
-    rx = x + pad
-    ry = cy + (inner_h - rec) / 2
+    pane(d, x, y, m.w, m.h, Ink.front, s)
+    cy = y + (m.h - m.inner_h) / 2
+    rx = x + m.pad
+    ry = cy + (m.inner_h - m.rec) / 2
     d.rectangle(
-        [rx, ry, rx + rec, ry + rec],
+        [rx, ry, rx + m.rec, ry + m.rec],
         fill=Ink.record,
         outline=Ink.label,
-        width=max(1, stroke_px(s) // 2),
+        width=stroke_px(s),
     )
-    tx = rx + rec + 8 * s
-    d.text((tx, cy + (inner_h - th) / 2), timer, font=timer_f, fill=Ink.secondary)
-    wx = tx + tw + gap
-    wy = cy + (inner_h - wave_h) / 2
-    wave = draw_waveform(d, wx, wy, wave_w, wave_h, s)
+    tx = rx + m.rec + 8 * s
+    d.text((tx, cy + (m.inner_h - m.th) / 2), timer, font=timer_f, fill=Ink.secondary)
+    wx = tx + m.tw + m.gap
+    wy = cy + (m.inner_h - m.wave_h) / 2
+    wave = draw_waveform(d, wx, wy, m.wave_w, m.wave_h, s)
     if chip is not None:
-        cx0 = wx + wave_w + gap
+        cx0 = wx + m.wave_w + m.gap
         ch = 18 * s
-        cw = chip_w
-        cy0 = cy + (inner_h - ch) / 2
+        cw = m.chip_w
+        cy0 = cy + (m.inner_h - ch) / 2
         d.rectangle([cx0, cy0, cx0 + cw, cy0 + ch], outline=Ink.label, width=stroke_px(s), fill=Ink.front)
         cf = font(10 * s)
         label = str(chip)
@@ -222,8 +227,8 @@ def draw_island(
             width=max(1, int(round(s / 2))),
         )
         d.text((cx0 + cw - 5 * s - lw, cy0 + (ch - lh) / 2), label, font=cf, fill=Ink.label)
-    record = (int(rx + rec / 2), int(ry + rec / 2))
-    return Island(w, h, record, wave)
+    record = (int(rx + m.rec / 2), int(ry + m.rec / 2))
+    return Island(m.w, m.h, record, wave)
 
 
 def draw_capture_tile(d: ImageDraw.ImageDraw, x: float, y: float, side: float, s: float) -> None:
@@ -270,9 +275,9 @@ def render_banner() -> tuple[Image.Image, Island]:
     tw, _ = text_size(d, BANNER_TAG, tf)
     d.text((wx, wy + wh + 10 * s), BANNER_TAG, font=tf, fill=Ink.secondary)
 
-    iw, ih, *_ = island_metrics(d, s, "0:12", 1)
-    ix = W - 44 * s - iw - bevel_px(s)
-    iy = (H - ih) / 2
+    m = island_metrics(d, s, "0:12", 1)
+    ix = W - 44 * s - m.w - bevel_px(s)
+    iy = (H - m.h) / 2
     if ix < wx + max(ww, tw) + 16 * s:
         raise SystemExit("banner island overlaps the wordmark")
     island = draw_island(d, ix, iy, s, timer="0:12", chip=1)
@@ -285,14 +290,14 @@ def render_demo() -> tuple[Image.Image, Island]:
     img = Image.new("RGB", (W, H), Ink.window)
     d = ImageDraw.Draw(img)
 
-    iw, ih, *_ = island_metrics(d, s, "0:12", 1)
-    ix = (W - iw) / 2
+    m = island_metrics(d, s, "0:12", 1)
+    ix = (W - m.w) / 2
     iy = 72 * s
     island = draw_island(d, ix, iy, s, timer="0:12", chip=1)
 
     lines = ("okay so the save button", "should go on the left")
     lf = font(16 * s)
-    ly = iy + ih + bevel_px(s) + 36 * s
+    ly = iy + m.h + bevel_px(s) + 36 * s
     for line in lines:
         lw, lh = text_size(d, line, lf)
         d.text(((W - lw) / 2, ly), line, font=lf, fill=Ink.label)
