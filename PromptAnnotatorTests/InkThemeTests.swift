@@ -23,7 +23,8 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.sidebarRowRadius, 8)
         XCTAssertEqual(Ink.keycapRadius, 8)
         XCTAssertEqual(Ink.sidebarWidth, 220)
-        XCTAssertEqual(Ink.pageTop, 52)
+        // Post–title-bar breathing room only (system safe area already clears the chrome).
+        XCTAssertEqual(Ink.pageTop, 22)
         XCTAssertEqual(Ink.pageSide, 36)
         XCTAssertEqual(Ink.maxContentWidth, 680)
         XCTAssertEqual(Ink.sectionGap, 28)

@@ -59,7 +59,10 @@ enum Ink {
     // MARK: - Layout
 
     static let sidebarWidth: CGFloat = 220
-    static let pageTop: CGFloat = 52
+    /// Breathing room below the window title-bar / NavigationSplitView safe area.
+    /// Mockup "52" included title-bar clearance; SwiftUI already applies that inset, so stacking
+    /// another 52 produced ~90pt empty space. Keep only the post-chrome gap here.
+    static let pageTop: CGFloat = 22
     static let pageSide: CGFloat = 36
     static let pageBottom: CGFloat = 36
     static let maxContentWidth: CGFloat = 680

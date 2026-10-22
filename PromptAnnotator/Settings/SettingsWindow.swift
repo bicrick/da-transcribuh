@@ -10,30 +10,13 @@ struct SettingsRoot: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var session: SessionController
     @StateObject private var permissions = PermissionModel()
-    @State private var page: SettingsPage? = .home
+    @State private var page: SettingsPage = .home
     @State private var sessions: [SessionSummary] = []
 
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                List(selection: $page) {
-                    ForEach(SettingsPage.sidebarSections, id: \.title) { section in
-                        Section {
-                            ForEach(section.pages) { item in
-                                Label(item.title, systemImage: item.symbol)
-                                    .tag(item)
-                                    .listRowBackground(sidebarRowBackground(for: item))
-                            }
-                        } header: {
-                            Text(section.title)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Ink.tertiary)
-                                .textCase(nil)
-                        }
-                    }
-                }
-                .listStyle(.sidebar)
-                .scrollContentBackground(.hidden)
+                SettingsSidebar(selection: $page)
                 footer
             }
             .background(Ink.sidebar)
@@ -43,22 +26,9 @@ struct SettingsRoot: View {
                 max: Ink.sidebarWidth + 20
             )
         } detail: {
-            switch page ?? .home {
-            case .home:
-                HomePage(session: session, settings: settings, permissions: permissions, sessions: sessions)
-            case .history:
-                HistoryPage(sessions: sessions, reload: reload)
-            case .recording:
-                RecordingPage(settings: settings, session: session)
-            case .configuration:
-                ConfigurationPage(settings: settings)
-            case .sound:
-                SoundPage(settings: settings)
-            case .model:
-                ModelPage()
-            case .performance:
-                PerformancePage()
-            }
+            detail
+                // Avoid an empty detail toolbar band stacking on top of pageTop.
+                .toolbar(.hidden, for: .automatic)
         }
         .navigationSplitViewStyle(.balanced)
         .tint(Ink.accent)
@@ -73,10 +43,24 @@ struct SettingsRoot: View {
         }
     }
 
-    private func sidebarRowBackground(for item: SettingsPage) -> some View {
-        RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
-            .fill(page == item ? Ink.sidebarSelection : Color.clear)
-            .padding(.horizontal, 4)
+    @ViewBuilder
+    private var detail: some View {
+        switch page {
+        case .home:
+            HomePage(session: session, settings: settings, permissions: permissions, sessions: sessions)
+        case .history:
+            HistoryPage(sessions: sessions, reload: reload)
+        case .recording:
+            RecordingPage(settings: settings, session: session)
+        case .configuration:
+            ConfigurationPage(settings: settings)
+        case .sound:
+            SoundPage(settings: settings)
+        case .model:
+            ModelPage()
+        case .performance:
+            PerformancePage()
+        }
     }
 
     private var footer: some View {
@@ -103,6 +87,67 @@ struct SettingsRoot: View {
 
     private func reload() {
         sessions = SessionLibrary.load()
+    }
+}
+
+/// Custom sidebar so selection uses Ink tint (List + `.sidebar` forces the system accent pill).
+struct SettingsSidebar: View {
+    @Binding var selection: SettingsPage
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(SettingsPage.sidebarSections, id: \.title) { section in
+                    Text(section.title)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Ink.tertiary)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 16)
+                        .padding(.bottom, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    ForEach(section.pages) { item in
+                        sidebarRow(item)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Settings")
+    }
+
+    private func sidebarRow(_ item: SettingsPage) -> some View {
+        let selected = selection == item
+        return Button {
+            selection = item
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: item.symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(selected ? Ink.accent : Ink.secondary)
+                    .frame(width: 18, alignment: .center)
+                Text(item.title)
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? Ink.accent : Ink.label)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
+                    .fill(selected ? Ink.sidebarSelection : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.title)
+        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
     }
 }
 

@@ -47,6 +47,7 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
 /// Layout metrics — Ink tokens, kept under the SettingsMetrics name for call sites.
 enum SettingsMetrics {
     static let pagePadding: CGFloat = Ink.pageSide
+    /// Extra top padding after system title-bar safe area (see `Ink.pageTop`).
     static let pageTop: CGFloat = Ink.pageTop
     static let pageSpacing: CGFloat = Ink.sectionGap
     static let sectionSpacing: CGFloat = Ink.sectionInnerGap

@@ -6,7 +6,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–13)
+## Final summary (Runs 1–13b)
 
 ### What changed overall (kept)
 
@@ -20,10 +20,16 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 | Live window (Run 9–10) | Cap truncates the **end** (from `confirmedEnd`); holdback uses **window end**, not full buffer duration |
 | **BYOM (Run 12)** | Custom WhisperKit Core ML folder + HF repo/variant; optional OpenAI-compatible final engine (Keychain); `RoutingTranscriber`; fallback to default Whisper on failure |
 | **Ink restyle (Run 13)** | Settings + onboarding “Ink” theme (warm paper + logo red); shared design system; continuous waveform→pen motif; Advanced copy fix. Recording island/overlay untouched. |
+| **Ink polish (Run 13b)** | Fixed stacked top padding (~90pt); custom Ink sidebar selection (no system blue List highlight). |
 
 ### Reverted (Run 9, still gone)
 
 - **Quiet-room calibration** — fixed SpeechGate **0.28** (matches `main`). No dangling Swift/pbxproj refs.
+
+### Run 13b (Ink padding + sidebar selection)
+
+- **Cause of ~90pt top gap:** mockup `pageTop` 52pt was designed as clearance from the window top (including title-bar). With `fullSizeContentView` + `NavigationSplitView`, SwiftUI already insets detail content below the title-bar safe area; stacking another 52pt (plus an empty detail toolbar band) produced the empty strip. **Fix:** `Ink.pageTop` / `SettingsMetrics.pageTop` → **22** (breathing room only); hide automatic detail toolbar.
+- **Sidebar:** replaced `List(selection:)` / `.sidebar` (forces system accent pill) with `SettingsSidebar` Button rows — Ink selection fill (12%/18%) + accent icon/label.
 
 ### Run 13 (Ink visual restyle)
 
@@ -46,7 +52,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - MenuBarExtra SF Symbol swaps mid-session.
 - BYOM: huge custom models; stale security-scoped bookmarks; OpenAI schema drift; network on stop.
 - Unused `PushToTalk.isArmed` left from Run 9 (harmless; latch-only stop path).
-- Ink: NavigationSplitView sidebar selection styling may still show system highlight under custom row backgrounds — visual only.
+- (Run 13b) Custom sidebar replaces List selection; confirm keyboard/VoiceOver still feel fine on Mac.
 
 ---
 
@@ -58,6 +64,8 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 - [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`, `SpeechModelTests` holdback, **`FontMetricsTests`**, **`BYOMTests`**, **`InkThemeTests`**).
 - [ ] **Ink Settings**: Home / Models / History / Recording / Configuration / Sound / Performance in light + dark — accent tint, card chrome, no island restyle.
+- [ ] **Ink padding**: ~20–24pt gap below title-bar to first content on every Settings page (not ~90pt).
+- [ ] **Ink sidebar**: selected row is Ink tint + accent icon/text (not system blue).
 - [ ] **Ink Onboarding**: STEP n OF 6 eyebrow, step dots, Skip / Back / primary order; Welcome+Ready waveform→pen is one continuous line (not a smile); Ready bars inked red.
 - [ ] Configuration Advanced reads “Speech models are on the Models page.”
 - [ ] **Hotkey toggle** (PTT off): start → speak → stop → transcript on clipboard / paste.
@@ -85,6 +93,28 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Optional: >10 min under PCM retain cap → file merge OK.
 - [ ] Display plug/unplug while marking; double Paste Image and Text once only.
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
+
+---
+
+## Run 13b — Ink top padding + sidebar selection
+
+### Padding root cause
+
+`Ink.pageTop = 52` matched the HTML mockup’s page padding, which cleared the title-bar *and* added air. In the real window (`fullSizeContentView` + `NavigationSplitView`), the detail column is already laid out below the title-bar safe area; the extra 52pt stacked on that inset (and an empty automatic toolbar band), yielding ~90pt of empty space above Home/Models/etc.
+
+### Fix
+
+| Change | Detail |
+| --- | --- |
+| `Ink.pageTop` → 22 | Shared token used by `SettingsPageStack`, Home, History — ~20–24pt below chrome |
+| `.toolbar(.hidden, for: .automatic)` on detail | Drops empty toolbar band |
+| `SettingsSidebar` | Custom Button rows; Ink `sidebarSelection` + accent label/icon (no `List` system blue) |
+
+### Mac check
+
+1. Home (and other pages): gap under title-bar ≈ 20–24pt.
+2. Select each sidebar item — coral/red tint, not blue.
+3. Light + dark.
 
 ---
 
