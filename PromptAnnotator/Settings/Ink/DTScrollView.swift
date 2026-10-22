@@ -41,6 +41,9 @@ struct DTScrollView<Content: View>: View {
                 ZStack {
                     Color.clear
                     if geometry.needsScroller {
+                        // Track is full height of the scroll area (flush with
+                        // container top/bottom). Do not pad — scrollerInset gaps
+                        // were the root cause of short tracks after #24.
                         DTScrollerRail(
                             geometry: geometry,
                             scrollView: scrollView,
@@ -50,7 +53,6 @@ struct DTScrollView<Content: View>: View {
                                 else { flash() }
                             }
                         )
-                        .padding(.vertical, Ink.scrollerInset)
                         .opacity((visible || hovering || dragging) ? 1 : 0.55)
                         .animation(.easeOut(duration: 0.18), value: visible || hovering || dragging)
                     }
