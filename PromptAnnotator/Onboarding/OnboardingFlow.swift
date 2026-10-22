@@ -15,7 +15,7 @@ enum OnboardingStep: Int, CaseIterable {
         switch self {
         case .welcome: return "Welcome"
         case .permissions: return "Permissions"
-        case .shortcut: return "Recording shortcut"
+        case .shortcut: return "Keybinds"
         case .clipboard: return "Clipboard history"
         case .appearance: return "Appearance"
         case .model: return "Model"
@@ -38,7 +38,7 @@ enum OnboardingStep: Int, CaseIterable {
         case .permissions:
             return "Microphone, Screen Recording, and Accessibility. Flip them, then Reopen so da transcribuh picks them up."
         case .shortcut:
-            return "Default is ⌥Space. A tap starts; a second tap stops. Shift stays free for drawing."
+            return "Recording defaults to ⌥Space; clipboard history to ⌘⇧C. Both are rebindable. ⌘Space / ⌥⌘Space stay with the system."
         case .clipboard:
             return "Maccy-style history of text, images, and files. Default shortcut ⌘⇧C — uses Accessibility you already granted for paste."
         case .appearance:

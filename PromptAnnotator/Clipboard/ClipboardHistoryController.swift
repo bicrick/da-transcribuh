@@ -92,27 +92,33 @@ final class ClipboardHistoryController {
         }
     }
 
-    /// Session transcript / screenshot ingest (tagged).
+    /// Session transcript / screenshot ingest (tagged). Skips empty quiet takes.
     func ingestSession(transcript: String?, imagePNG: Data?) {
-        if let imagePNG {
+        if ClipboardEmptySession.shouldSkip(transcript: transcript, imagePNG: imagePNG) {
+            return
+        }
+        if let imagePNG, !imagePNG.isEmpty {
             _ = store.ingest(
                 kind: .image,
                 source: .screenshot,
                 text: nil,
                 imagePNG: imagePNG,
                 filePaths: nil,
-                fingerprint: ClipboardFingerprint.image(imagePNG)
+                fingerprint: ClipboardFingerprint.image(imagePNG),
+                applicationName: "da transcribuh"
             )
         }
         let text = transcript?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !text.isEmpty {
+        let scrubbed = NonSpeechFilter.scrub(text).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !scrubbed.isEmpty {
             _ = store.ingest(
                 kind: .text,
                 source: .transcript,
-                text: text,
+                text: scrubbed,
                 imagePNG: nil,
                 filePaths: nil,
-                fingerprint: ClipboardFingerprint.text(text)
+                fingerprint: ClipboardFingerprint.text(scrubbed),
+                applicationName: "da transcribuh"
             )
         }
     }

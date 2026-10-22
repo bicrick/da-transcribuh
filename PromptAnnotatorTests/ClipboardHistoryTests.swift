@@ -18,7 +18,7 @@ final class ClipboardHistoryTests: XCTestCase {
         try? FileManager.default.removeItem(at: folder)
     }
 
-    func testDedupeMovesExistingToTop() {
+    func testDedupeMovesExistingToTopAndBumpsCopyCount() {
         _ = store.ingest(
             kind: .text, source: .pasteboard, text: "hello",
             imagePNG: nil, filePaths: nil, fingerprint: ClipboardFingerprint.text("hello")
@@ -34,6 +34,7 @@ final class ClipboardHistoryTests: XCTestCase {
         )
         XCTAssertEqual(store.items.count, 2)
         XCTAssertEqual(store.items.first?.text, "hello")
+        XCTAssertEqual(store.items.first?.copyCount, 2)
     }
 
     func testSensitiveTypesAreDetected() {
@@ -64,24 +65,52 @@ final class ClipboardHistoryTests: XCTestCase {
     }
 
     func testHistoryLimitDropsOldestUnpinned() {
-        let defaults = UserDefaults(suiteName: "test.clip.limit.\(UUID().uuidString)")!
-        defer { defaults.removePersistentDomain(forName: defaults.suiteName!) }
-        defaults.set(true, forKey: "clipboard.historyEnabled")
-        defaults.set(20, forKey: "clipboard.historyLimit")
-        // AppSettings.shared is process-wide; exercise trim via store with synthetic limit by ingesting many
-        // and calling clear + re-ingest under a small folder store that we trim manually.
-        for i in 0..<25 {
+        store.historyLimitOverride = 5
+        for i in 0..<8 {
             _ = store.ingest(
                 kind: .text, source: .pasteboard, text: "item-\(i)",
                 imagePNG: nil, filePaths: nil, fingerprint: "f-\(i)"
             )
         }
-        // Default limit from AppSettings.shared may be 200 — pin one and clear keeping pinned.
+        XCTAssertEqual(store.items.count, 5)
         let pinID = store.items[0].id
         store.togglePin(pinID)
+        for i in 8..<12 {
+            _ = store.ingest(
+                kind: .text, source: .pasteboard, text: "item-\(i)",
+                imagePNG: nil, filePaths: nil, fingerprint: "f-\(i)"
+            )
+        }
+        XCTAssertTrue(store.items.contains(where: { $0.id == pinID && $0.pinned }))
+        XCTAssertEqual(store.items.count, 5)
         store.clearHistory(keepingPinned: true)
         XCTAssertEqual(store.items.count, 1)
         XCTAssertTrue(store.items[0].pinned)
+    }
+
+    func testEmptySessionExclusion() {
+        XCTAssertTrue(ClipboardEmptySession.shouldSkip(transcript: nil, imagePNG: nil))
+        XCTAssertTrue(ClipboardEmptySession.shouldSkip(transcript: "   ", imagePNG: nil))
+        XCTAssertTrue(ClipboardEmptySession.shouldSkip(transcript: "[BLANK_AUDIO]", imagePNG: nil))
+        XCTAssertTrue(ClipboardEmptySession.shouldSkip(transcript: "(silence)", imagePNG: nil))
+        XCTAssertFalse(ClipboardEmptySession.shouldSkip(transcript: "hello", imagePNG: nil))
+        XCTAssertFalse(ClipboardEmptySession.shouldSkip(transcript: nil, imagePNG: Data([1, 2, 3])))
+        XCTAssertFalse(ClipboardEmptySession.shouldSkip(transcript: "   ", imagePNG: Data([1])))
+
+        ClipboardHistoryController.shared.store.historyLimitOverride = 50
+        // Use isolated store via controller path — exercise controller against shared store carefully.
+        let before = ClipboardHistoryStore.shared.items.count
+        ClipboardHistoryController.shared.ingestSession(transcript: "", imagePNG: nil)
+        ClipboardHistoryController.shared.ingestSession(transcript: "[BLANK_AUDIO]", imagePNG: nil)
+        XCTAssertEqual(ClipboardHistoryStore.shared.items.count, before)
+
+        // Local store path: empty skip is pure; ingest on local store still works for speech.
+        let countBefore = store.items.count
+        _ = store.ingest(
+            kind: .text, source: .transcript, text: "kept",
+            imagePNG: nil, filePaths: nil, fingerprint: "kept"
+        )
+        XCTAssertEqual(store.items.count, countBefore + 1)
     }
 
     func testClipboardDefaultChordAllowsShift() {
@@ -96,7 +125,7 @@ final class ClipboardHistoryTests: XCTestCase {
         let labels = OnboardingStep.allCases.map(\.title)
         XCTAssertTrue(labels.contains("Clipboard history"))
         XCTAssertTrue(labels.contains("Appearance"))
-        XCTAssertTrue(labels.contains("Recording shortcut"))
+        XCTAssertTrue(labels.contains("Keybinds"))
         XCTAssertEqual(OnboardingStep.railLabels.count, OnboardingStep.allCases.count)
     }
 }

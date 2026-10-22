@@ -11,6 +11,9 @@ final class ClipboardHistoryStore: ObservableObject {
     /// While > 0, the watcher ignores pasteboard changes (our own paste-back / staging).
     private(set) var suppressWatcher = 0
 
+    /// Test override for history limit (nil → AppSettings).
+    var historyLimitOverride: Int?
+
     private let fileManager = FileManager.default
     private var folderURL: URL
     private var indexURL: URL
@@ -34,7 +37,7 @@ final class ClipboardHistoryStore: ObservableObject {
     func endOwnWrite() { suppressWatcher = max(0, suppressWatcher - 1) }
 
     var historyLimit: Int {
-        AppSettings.shared.clipboardHistoryLimit
+        historyLimitOverride ?? AppSettings.shared.clipboardHistoryLimit
     }
 
     // MARK: - Mutations
@@ -46,11 +49,20 @@ final class ClipboardHistoryStore: ObservableObject {
         text: String?,
         imagePNG: Data?,
         filePaths: [String]?,
-        fingerprint: String
+        fingerprint: String,
+        applicationName: String? = nil,
+        imageWidth: Int? = nil,
+        imageHeight: Int? = nil
     ) -> ClipboardItem? {
+        let now = Date()
         if let existing = items.first(where: { $0.fingerprint == fingerprint }) {
             var moved = existing
-            moved.createdAt = Date()
+            moved.lastCopiedAt = now
+            moved.createdAt = now
+            moved.copyCount += 1
+            if let applicationName, !applicationName.isEmpty {
+                moved.applicationName = applicationName
+            }
             items.removeAll { $0.id == existing.id }
             items.insert(moved, at: 0)
             persist()
@@ -58,12 +70,18 @@ final class ClipboardHistoryStore: ObservableObject {
         }
 
         var imageName: String?
+        var width = imageWidth
+        var height = imageHeight
         if let imagePNG {
             let name = "\(UUID().uuidString).png"
             let url = imagesURL.appendingPathComponent(name)
             do {
                 try imagePNG.write(to: url, options: .atomic)
                 imageName = name
+                if width == nil || height == nil, let image = NSImage(data: imagePNG) {
+                    width = Int(image.size.width)
+                    height = Int(image.size.height)
+                }
             } catch {
                 return nil
             }
@@ -71,14 +89,20 @@ final class ClipboardHistoryStore: ObservableObject {
 
         let item = ClipboardItem(
             id: UUID(),
-            createdAt: Date(),
+            createdAt: now,
             kind: kind,
             source: source,
             text: text,
             imageFileName: imageName,
             filePaths: filePaths,
             pinned: false,
-            fingerprint: fingerprint
+            fingerprint: fingerprint,
+            applicationName: applicationName,
+            firstCopiedAt: now,
+            lastCopiedAt: now,
+            copyCount: 1,
+            imageWidth: width,
+            imageHeight: height
         )
         items.insert(item, at: 0)
         trimToLimit()
@@ -102,7 +126,7 @@ final class ClipboardHistoryStore: ObservableObject {
         persist()
     }
 
-    func clearHistory(keepingPinned: Bool = false) {
+    func clearHistory(keepingPinned: Bool = true) {
         if keepingPinned {
             let remove = items.filter { !$0.pinned }
             for item in remove {
@@ -132,11 +156,12 @@ final class ClipboardHistoryStore: ObservableObject {
             filtered = base.filter {
                 $0.previewLine.lowercased().contains(q)
                     || ($0.text?.lowercased().contains(q) ?? false)
+                    || ($0.applicationName?.lowercased().contains(q) ?? false)
             }
         }
         return filtered.sorted { lhs, rhs in
             if lhs.pinned != rhs.pinned { return lhs.pinned && !rhs.pinned }
-            return lhs.createdAt > rhs.createdAt
+            return lhs.lastCopiedAt > rhs.lastCopiedAt
         }
     }
 
@@ -171,7 +196,7 @@ final class ClipboardHistoryStore: ObservableObject {
     private func trimToLimit() {
         let limit = max(1, historyLimit)
         var pinned = items.filter(\.pinned)
-        var unpinned = items.filter { !$0.pinned }
+        var unpinned = items.filter { !$0.pinned }.sorted { $0.lastCopiedAt > $1.lastCopiedAt }
         while pinned.count + unpinned.count > limit, let drop = unpinned.popLast() {
             if let name = drop.imageFileName {
                 try? fileManager.removeItem(at: imagesURL.appendingPathComponent(name))
@@ -184,7 +209,7 @@ final class ClipboardHistoryStore: ObservableObject {
     private func sortPinnedFirst() {
         items.sort { lhs, rhs in
             if lhs.pinned != rhs.pinned { return lhs.pinned && !rhs.pinned }
-            return lhs.createdAt > rhs.createdAt
+            return lhs.lastCopiedAt > rhs.lastCopiedAt
         }
     }
 }
