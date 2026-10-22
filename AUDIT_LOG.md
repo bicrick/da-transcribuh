@@ -6,7 +6,15 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–22)
+## Final summary (Runs 1–23)
+
+### Run 23 — Remaining Settings pages + onboarding layout redesign
+
+- **Shared controls:** `InkToggleStyle` / `InkSwitch` / `InkToggleRow`, `InkCheckboxStyle`, `InkSlider`, `InkMenuPicker`, `InkSettingRow` — B/W terminal rows; no system `.switch` / blue Slider / Form chrome on Settings pages.
+- **Pages redesigned (layout, not reskin):** History (split list+detail, radio selection, `DTScrollView` columns), Recording (style grid + inverted tool chips), Models (custom-row selection language + spacing), General, Sound, Performance (Home-like stat tiles).
+- **Onboarding:** same content grid / spacing / typography tokens, wordmark chrome strip, `DTScrollView`, vertical model picker; fixed stale `showsDownloadButton:` call (compile break).
+- **Compile-safety since `a29f899`:** `DTScrollView` `onChange` → two-parameter (macOS 14); font PostScript `DepartureMono-Regular` + `ATSApplicationFontsPath=Fonts` unchanged; no Preview providers in tree; deployment target 14.0 APIs only.
+- README screenshots left alone (Home unchanged this run).
 
 ### Run 22 — GitHub presentation (README / screenshots / social)
 
@@ -184,6 +192,26 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
 
 ---
+
+## Run 23 — Remaining pages layout + compile-safety
+
+See summary. Mac checklist:
+
+1. Build Debug + unit tests (`InkThemeTests` + prior suites).
+2. General: System/Light/Dark segment; all toggles are B/W switches (no system blue); silence/max pickers are Ink menus; shortcuts still capture.
+3. Sound: mic menu + B/W volume slider; theme radio tiles still preview.
+4. Recording: island style radio tiles; tool chips invert when selected; color rings; island refreshes on style change.
+5. History: search; radio + leading bar selection; Copy / Show; empty dashed state.
+6. Models: engine + built-in cards; custom row select/remove; HF add; OpenAI fields.
+7. Onboarding: full walk (permissions → shortcut → model download → practice → ready); Skip / Back; no crash on close.
+8. Appearance cycle from menu `theme: …` still reaches Settings + onboarding + island.
+
+### Risky spots (Mac)
+- `InkMenuPicker` / `InkSlider` hit targets and VoiceOver vs native controls.
+- History split widths on narrow window (min 820).
+- Onboarding wordmark strip + system titlebar both present (stock traffic lights remain on welcome window).
+- Nested `DTScrollView` in History list/detail — scroll gesture ownership.
+- Models custom-row Button + Remove side-by-side (no nested Button).
 
 ## Run 18 — Traffic lights + menu-bar panel
 
