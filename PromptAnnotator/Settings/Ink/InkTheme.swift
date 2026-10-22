@@ -174,7 +174,7 @@ enum Ink {
     /// face inside the 2pt border holds exactly three checks across.
     static let scrollerCheck: CGFloat = 2
     /// Flat Paint gray track (light silver, darker graphite gray in dark).
-    static let scrollerTrack = color(light: "#C3C3C3", dark: "#48484C")
+    static let scrollerTrack = color(light: "#C3C3C3", dark: "#66666B")
     /// Thumb checks. Light: white + light gray under a black outline.
     static let scrollerCheckLightA = nsColor(hex: "#FFFFFF")
     static let scrollerCheckLightB = nsColor(hex: "#D4D4D4")

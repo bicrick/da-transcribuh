@@ -57,7 +57,7 @@ final class ClipboardPreviewPanelController {
         guard let panel, let host else { return }
         let fitting = host.fittingSize
         let size = CGSize(
-            width: max(280, min(fitting.width, 420)),
+            width: max(ClipboardPreviewPopover.width, min(fitting.width, 420)),
             height: max(160, min(fitting.height, 520))
         )
         host.frame = NSRect(origin: .zero, size: size)

@@ -388,10 +388,13 @@ struct ClipboardPreviewPopover: View {
     var item: ClipboardItem
     var image: NSImage?
 
+    /// Preview width. 280 truncated copy times ("Oct 22, 2026 at 4:34:4…").
+    static let width: CGFloat = 320
+
+    /// Localized date + time with seconds, e.g. "Oct 22, 2026 at 4:34:42 PM".
     private static let stamp: DateFormatter = {
         let f = DateFormatter()
-        f.dateStyle = .medium
-        f.timeStyle = .medium
+        f.setLocalizedDateFormatFromTemplate("yMMMdjmmss")
         return f
     }()
 
@@ -412,7 +415,7 @@ struct ClipboardPreviewPopover: View {
             InkGlyphString(text: "Press ⌥⌫ to delete.", size: 10, color: Ink.secondary)
         }
         .padding(Ink.space3)
-        .frame(width: 280, alignment: .leading)
+        .frame(width: Self.width, alignment: .leading)
         .background(Ink.front)
         .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
         .background(
@@ -430,7 +433,7 @@ struct ClipboardPreviewPopover: View {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: 248, maxHeight: 180)
+                    .frame(maxWidth: Self.width - 2 * Ink.space3, maxHeight: 180)
                     .frame(maxWidth: .infinity)
             }
         case .text, .fileURL:
@@ -447,10 +450,13 @@ struct ClipboardPreviewPopover: View {
             Text(label)
                 .font(Ink.mono(10))
                 .foregroundStyle(Ink.secondary)
+                .fixedSize()
+            // Wrap instead of truncating if a value is still too long.
             Text(value)
                 .font(Ink.mono(10))
                 .foregroundStyle(Ink.label)
-                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
