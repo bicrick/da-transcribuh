@@ -76,6 +76,9 @@ enum SettingsSearch {
         // General
         hit("gen.start", .configuration, "Start and stop", "Session shortcut"),
         hit("gen.cancel", .configuration, "Cancel recording", "Discard shortcut"),
+        hit("gen.clipboard", .configuration, "Clipboard history", "Enable pasteboard history panel"),
+        hit("gen.clipboardChord", .configuration, "Clipboard shortcut", "Open history near the pointer (⌘⇧C)"),
+        hit("gen.clipboardLimit", .configuration, "Clipboard history limit", "Max items; pinned survive Clear"),
         hit("gen.ptt", .configuration, "Push to talk", "Hold to record"),
         hit("gen.login", .configuration, "Launch at login", "Open at login"),
         hit("gen.updates", .configuration, "Updates", "Check for a new build"),
