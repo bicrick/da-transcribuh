@@ -126,7 +126,8 @@ enum Ink {
     static let hardShadow: CGFloat = bevelOffset
     static let buttonShadow: CGFloat = bevelOffset
     static let menuBarShadow: CGFloat = bevelOffset
-    static let scrollerRadius: CGFloat = 1
+    /// Square scroller chrome (no rounded pills).
+    static let scrollerRadius: CGFloat = 0
 
     // MARK: - Spacing scale (airier Paint layout)
 
@@ -163,10 +164,15 @@ enum Ink {
     static let gridGap: CGFloat = space4
     static let statusBarHeight: CGFloat = 32
     static let titleStripHeight: CGFloat = 40
-    /// Thin, inset scroller — only obvious on hover.
-    static let scrollerWidth: CGFloat = 5
+    /// Dedicated track width inside the reserved gutter (content never draws under it).
+    static let scrollerWidth: CGFloat = 10
     static let scrollerThumbMin: CGFloat = 24
-    static let scrollerInset: CGFloat = 3
+    static let scrollerInset: CGFloat = 2
+    /// Gap between scroll content and the track.
+    static let scrollerGutterGap: CGFloat = 2
+    /// Total trailing gutter reserved beside content (`gap + track`).
+    /// Kept even when content fits so headers / columns stay aligned.
+    static let scrollerGutter: CGFloat = scrollerGutterGap + scrollerWidth
 
     // MARK: - Type
     //

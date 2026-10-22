@@ -3,18 +3,17 @@ import SwiftUI
 
 // MARK: - DTScrollView
 
-/// ScrollView with native indicators hidden and a B/W track + square-ended thumb.
+/// Scroll view with a **reserved trailing gutter** for a Paint ink scroller.
 ///
-/// Thumb position is driven by the enclosing `NSClipView` bounds — not a SwiftUI
-/// GeometryReader preference. AppKit scrolls by mutating clip-view bounds without a
-/// SwiftUI layout pass, so preference-based offset stayed stuck at 0.
+/// Content never draws under the thumb: width shrinks by `Ink.scrollerGutter`.
+/// Offset / sizes come from the hosting `NSScrollView` clip-view
+/// (`boundsDidChange`), not a GeometryReader preference (those stay stuck at 0
+/// under AppKit-driven scrolls and trackpad momentum).
 struct DTScrollView<Content: View>: View {
     var axes: Axis.Set = .vertical
     var showsIndicators: Bool = true
     /// Extra bottom inset so content clears a sticky footer (sidebar).
     var bottomInset: CGFloat = 0
-    /// Trailing inset for the custom rail (sidebar uses a larger gutter so tiles stay clear).
-    var railInset: CGFloat = Ink.scrollerInset
     @ViewBuilder var content: () -> Content
 
     @State private var offset: CGFloat = 0
@@ -24,51 +23,50 @@ struct DTScrollView<Content: View>: View {
     @State private var dragging = false
     @State private var visible = false
     @State private var fadeTask: Task<Void, Never>?
+    @State private var scrollView: NSScrollView?
+
+    private var needsScroller: Bool {
+        showsIndicators && contentHeight > viewportHeight + 1
+    }
 
     var body: some View {
-        GeometryReader { viewport in
-            let vh = max(viewport.size.height, 1)
-            ZStack(alignment: .trailing) {
-                ScrollView(axes, showsIndicators: false) {
-                    content()
-                        .padding(.bottom, bottomInset)
-                }
-                .scrollIndicators(.hidden)
-                .background(
-                    DTScrollProbe { metrics in
-                        let changed = abs(metrics.offset - offset) > 0.5
-                            || abs(metrics.contentHeight - contentHeight) > 0.5
-                            || abs(metrics.viewportHeight - viewportHeight) > 0.5
-                        offset = metrics.offset
-                        contentHeight = metrics.contentHeight
-                        viewportHeight = metrics.viewportHeight
-                        if changed { flash() }
-                    }
-                )
-                .background(DTNativeScrollerHider())
+        // Content | gap | track — content width never includes the gutter.
+        HStack(alignment: .top, spacing: showsIndicators ? Ink.scrollerGutterGap : 0) {
+            DTAppKitScrollHost(
+                bottomInset: bottomInset,
+                offset: $offset,
+                contentHeight: $contentHeight,
+                viewportHeight: $viewportHeight,
+                scrollView: $scrollView,
+                onScroll: { flash() }
+            ) {
+                content()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                if showsIndicators && contentHeight > vh + 1 {
-                    DTScrollerRail(
-                        offset: offset,
-                        contentHeight: contentHeight,
-                        viewportHeight: max(viewportHeight, vh),
-                        onDragging: { active in
-                            dragging = active
-                            if active { visible = true }
-                            else { flash() }
-                        }
-                    )
-                    .padding(.vertical, railInset)
-                    .padding(.trailing, railInset)
-                    .opacity((visible || hovering || dragging) ? 0.85 : 0)
-                    .animation(.easeOut(duration: 0.18), value: visible || hovering || dragging)
+            // Keep the gutter even when content fits so headers/columns don't jump.
+            if showsIndicators {
+                ZStack {
+                    Color.clear
+                    if needsScroller {
+                        DTScrollerRail(
+                            offset: offset,
+                            contentHeight: contentHeight,
+                            viewportHeight: max(viewportHeight, 1),
+                            scrollView: scrollView,
+                            onDragging: { active in
+                                dragging = active
+                                if active { visible = true }
+                                else { flash() }
+                            }
+                        )
+                        .padding(.vertical, Ink.scrollerInset)
+                        .opacity((visible || hovering || dragging) ? 1 : 0.55)
+                        .animation(.easeOut(duration: 0.18), value: visible || hovering || dragging)
+                    }
                 }
-            }
-            .onAppear {
-                if viewportHeight < 1 { viewportHeight = vh }
-            }
-            .onChange(of: viewport.size.height) { _, height in
-                if height > 1 { viewportHeight = height }
+                .frame(width: Ink.scrollerWidth)
+                .frame(maxHeight: .infinity)
             }
         }
         .onHover { isHovering in
@@ -90,12 +88,13 @@ struct DTScrollView<Content: View>: View {
     }
 }
 
-// MARK: - Rail + thumb
+// MARK: - Rail + thumb (square, 2pt stroke)
 
 private struct DTScrollerRail: View {
     var offset: CGFloat
     var contentHeight: CGFloat
     var viewportHeight: CGFloat
+    var scrollView: NSScrollView?
     var onDragging: (Bool) -> Void
 
     var body: some View {
@@ -108,22 +107,25 @@ private struct DTScrollerRail: View {
             let thumbY = min(max(offset / scrollable, 0), 1) * travel
 
             ZStack(alignment: .top) {
-                // Visuals do not steal hits — the drag surface owns the rail.
-                RoundedRectangle(cornerRadius: Ink.scrollerRadius, style: .continuous)
+                Rectangle()
                     .fill(Ink.window)
                     .overlay(
-                        RoundedRectangle(cornerRadius: Ink.scrollerRadius, style: .continuous)
+                        Rectangle()
                             .strokeBorder(Ink.label, lineWidth: Ink.stroke)
                     )
                     .overlay {
                         DTDitherGrip()
-                            .opacity(0.3)
-                            .clipShape(RoundedRectangle(cornerRadius: Ink.scrollerRadius, style: .continuous))
+                            .opacity(0.28)
+                            .clipShape(Rectangle())
                     }
                     .allowsHitTesting(false)
 
-                RoundedRectangle(cornerRadius: Ink.scrollerRadius, style: .continuous)
+                Rectangle()
                     .fill(Ink.label)
+                    .overlay(
+                        Rectangle()
+                            .strokeBorder(Ink.label, lineWidth: Ink.stroke)
+                    )
                     .frame(height: thumbH)
                     .offset(y: thumbY)
                     .allowsHitTesting(false)
@@ -131,6 +133,7 @@ private struct DTScrollerRail: View {
                 DTScrollDragSurface(
                     contentHeight: contentHeight,
                     viewportHeight: viewportHeight,
+                    scrollView: scrollView,
                     onDragging: onDragging
                 )
             }
@@ -140,54 +143,101 @@ private struct DTScrollerRail: View {
     }
 }
 
-// MARK: - AppKit helpers
+// MARK: - AppKit scroll host
 
-private struct DTScrollMetrics: Equatable {
-    var offset: CGFloat
-    var contentHeight: CGFloat
-    var viewportHeight: CGFloat
-}
+private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
+    var bottomInset: CGFloat
+    @Binding var offset: CGFloat
+    @Binding var contentHeight: CGFloat
+    @Binding var viewportHeight: CGFloat
+    @Binding var scrollView: NSScrollView?
+    var onScroll: () -> Void
+    @ViewBuilder var content: () -> Content
 
-/// Walks up to the enclosing `NSScrollView`, enables clip-view bounds notifications,
-/// and reports scroll offset / content / viewport sizes whenever AppKit scrolls.
-private struct DTScrollProbe: NSViewRepresentable {
-    var onChange: (DTScrollMetrics) -> Void
-
-    func makeNSView(context: Context) -> DTScrollProbeView {
-        let view = DTScrollProbeView()
-        view.onChange = onChange
-        return view
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
     }
 
-    func updateNSView(_ nsView: DTScrollProbeView, context: Context) {
-        nsView.onChange = onChange
-        nsView.attachIfNeeded()
-        nsView.publish()
+    func makeNSView(context: Context) -> DTScrollHostView {
+        let host = DTScrollHostView()
+        context.coordinator.install(in: host)
+        DispatchQueue.main.async {
+            scrollView = host.scrollView
+        }
+        return host
     }
 
-    final class DTScrollProbeView: NSView {
-        var onChange: ((DTScrollMetrics) -> Void)?
+    func updateNSView(_ nsView: DTScrollHostView, context: Context) {
+        context.coordinator.parent = self
+        context.coordinator.updateContent(content(), bottomInset: bottomInset)
+        DispatchQueue.main.async {
+            if scrollView !== nsView.scrollView {
+                scrollView = nsView.scrollView
+            }
+        }
+    }
+
+    final class Coordinator: NSObject {
+        var parent: DTAppKitScrollHost
+        private var hosting: NSHostingView<AnyView>?
         private weak var observedClip: NSClipView?
         private weak var observedDoc: NSView?
-        private var last: DTScrollMetrics?
+        private var lastMetrics: DTScrollMetrics?
 
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            attachIfNeeded()
-            publish()
+        init(parent: DTAppKitScrollHost) {
+            self.parent = parent
+            super.init()
         }
 
-        override func viewDidMoveToSuperview() {
-            super.viewDidMoveToSuperview()
-            attachIfNeeded()
-            publish()
+        deinit {
+            NotificationCenter.default.removeObserver(self)
         }
 
-        func attachIfNeeded() {
-            guard let scroll = enclosingScrollView() else { return }
+        func install(in host: DTScrollHostView) {
+            let root = AnyView(parent.content().padding(.bottom, parent.bottomInset))
+            let hosting = NSHostingView(rootView: root)
+            hosting.translatesAutoresizingMaskIntoConstraints = false
+            self.hosting = hosting
+
+            let document = DTFlippedDocumentView()
+            document.translatesAutoresizingMaskIntoConstraints = false
+            document.addSubview(hosting)
+            NSLayoutConstraint.activate([
+                hosting.leadingAnchor.constraint(equalTo: document.leadingAnchor),
+                hosting.trailingAnchor.constraint(equalTo: document.trailingAnchor),
+                hosting.topAnchor.constraint(equalTo: document.topAnchor),
+                hosting.bottomAnchor.constraint(equalTo: document.bottomAnchor),
+            ])
+            host.scrollView.documentView = document
+
+            let clip = host.scrollView.contentView
+            NSLayoutConstraint.activate([
+                document.widthAnchor.constraint(equalTo: clip.widthAnchor),
+            ])
+            attach(to: host.scrollView)
+            publish(from: host.scrollView)
+        }
+
+        func updateContent(_ content: Content, bottomInset: CGFloat) {
+            hosting?.rootView = AnyView(content.padding(.bottom, bottomInset))
+            hosting?.invalidateIntrinsicContentSize()
+            if let scroll = hosting?.enclosingScrollView {
+                DispatchQueue.main.async { [weak self] in
+                    self?.publish(from: scroll)
+                }
+            }
+        }
+
+        func attach(to scroll: NSScrollView) {
             let clip = scroll.contentView
             if observedClip !== clip {
-                detach()
+                if let previous = observedClip {
+                    NotificationCenter.default.removeObserver(
+                        self,
+                        name: NSView.boundsDidChangeNotification,
+                        object: previous
+                    )
+                }
                 clip.postsBoundsChangedNotifications = true
                 NotificationCenter.default.addObserver(
                     self,
@@ -216,104 +266,102 @@ private struct DTScrollProbe: NSViewRepresentable {
             }
         }
 
-        deinit {
-            NotificationCenter.default.removeObserver(self)
-        }
-
-        private func detach() {
-            if let clip = observedClip {
-                NotificationCenter.default.removeObserver(
-                    self,
-                    name: NSView.boundsDidChangeNotification,
-                    object: clip
-                )
-            }
-            observedClip = nil
-        }
-
         @objc private func clipBoundsChanged(_ note: Notification) {
-            publish()
+            guard let clip = note.object as? NSClipView,
+                  let scroll = clip.enclosingScrollView else { return }
+            publish(from: scroll)
         }
 
         @objc private func documentFrameChanged(_ note: Notification) {
-            publish()
+            guard let doc = note.object as? NSView,
+                  let scroll = doc.enclosingScrollView else { return }
+            publish(from: scroll)
         }
 
-        func publish() {
-            guard let scroll = enclosingScrollView() else { return }
-            let clip = scroll.contentView
-            let doc = scroll.documentView
-            let viewport = clip.bounds.height
-            let content = max(doc?.frame.height ?? 0, viewport)
-            // SwiftUI's hosted document is flipped: y=0 at top, increases as you scroll down.
-            let originY = clip.bounds.origin.y
-            let offset: CGFloat
-            if clip.isFlipped || doc?.isFlipped == true {
-                offset = max(0, originY)
-            } else {
-                // Unflipped: top of document is at high y.
-                let scrollable = max(content - viewport, 0)
-                offset = max(0, scrollable - originY)
-            }
-            let metrics = DTScrollMetrics(
-                offset: offset,
-                contentHeight: content,
-                viewportHeight: viewport
-            )
-            guard metrics != last else { return }
-            last = metrics
-            // Avoid publishing into SwiftUI during an in-flight view update.
+        func publish(from scroll: NSScrollView) {
+            let metrics = DTScrollMetrics.metrics(from: scroll)
+            guard metrics != lastMetrics else { return }
+            lastMetrics = metrics
             DispatchQueue.main.async { [weak self] in
-                self?.onChange?(metrics)
+                guard let self else { return }
+                let scrolled = abs(metrics.offset - self.parent.offset) > 0.5
+                self.parent.offset = metrics.offset
+                self.parent.contentHeight = metrics.contentHeight
+                self.parent.viewportHeight = metrics.viewportHeight
+                if scrolled {
+                    self.parent.onScroll()
+                }
             }
-        }
-
-        private func enclosingScrollView() -> NSScrollView? {
-            var current: NSView? = self
-            while let node = current {
-                if let scroll = node as? NSScrollView { return scroll }
-                current = node.superview
-            }
-            return nil
         }
     }
 }
 
-/// Suppresses the stock NSScrollView scroller chrome under a SwiftUI ScrollView.
-private struct DTNativeScrollerHider: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async { Self.hide(from: view) }
-        return view
+/// Flipped document so y=0 is the top — matches SwiftUI scroll direction.
+private final class DTFlippedDocumentView: NSView {
+    override var isFlipped: Bool { true }
+}
+
+private final class DTScrollHostView: NSView {
+    let scrollView = NSScrollView()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        scrollView.drawsBackground = false
+        scrollView.backgroundColor = .clear
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
+        scrollView.borderType = .noBorder
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        addSubview(scrollView)
+        NSLayoutConstraint.activate([
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { Self.hide(from: nsView) }
-    }
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
 
-    static func hide(from view: NSView) {
-        var current: NSView? = view
-        while let node = current {
-            if let scroll = node as? NSScrollView {
-                scroll.hasVerticalScroller = false
-                scroll.hasHorizontalScroller = false
-                scroll.scrollerStyle = .overlay
-                scroll.autohidesScrollers = true
-                scroll.verticalScroller?.alphaValue = 0
-                scroll.horizontalScroller?.alphaValue = 0
-                scroll.verticalScroller?.isHidden = true
-                scroll.horizontalScroller?.isHidden = true
-                return
-            }
-            current = node.superview
+// MARK: - Metrics
+
+private struct DTScrollMetrics: Equatable {
+    var offset: CGFloat
+    var contentHeight: CGFloat
+    var viewportHeight: CGFloat
+
+    static func metrics(from scroll: NSScrollView) -> DTScrollMetrics {
+        let clip = scroll.contentView
+        let doc = scroll.documentView
+        let viewport = clip.bounds.height
+        let content = max(doc?.frame.height ?? 0, viewport)
+        let originY = clip.bounds.origin.y
+        let offset: CGFloat
+        if clip.isFlipped || doc?.isFlipped == true {
+            offset = max(0, originY)
+        } else {
+            let scrollable = max(content - viewport, 0)
+            offset = max(0, scrollable - originY)
         }
+        return DTScrollMetrics(
+            offset: offset,
+            contentHeight: content,
+            viewportHeight: viewport
+        )
     }
 }
 
-/// Click / drag on the custom rail scrolls the enclosing NSScrollView.
+// MARK: - Drag / click track
+
 private struct DTScrollDragSurface: NSViewRepresentable {
     var contentHeight: CGFloat
     var viewportHeight: CGFloat
+    var scrollView: NSScrollView?
     var onDragging: (Bool) -> Void
 
     func makeNSView(context: Context) -> DTScrollDragNSView {
@@ -325,6 +373,7 @@ private struct DTScrollDragSurface: NSViewRepresentable {
     func updateNSView(_ nsView: DTScrollDragNSView, context: Context) {
         nsView.contentHeight = contentHeight
         nsView.viewportHeight = viewportHeight
+        nsView.boundScrollView = scrollView
         nsView.onDragging = onDragging
     }
 }
@@ -332,6 +381,7 @@ private struct DTScrollDragSurface: NSViewRepresentable {
 private final class DTScrollDragNSView: NSView {
     var contentHeight: CGFloat = 0
     var viewportHeight: CGFloat = 0
+    weak var boundScrollView: NSScrollView?
     var onDragging: ((Bool) -> Void)?
     private var dragThumb = false
     private var grabOffsetInThumb: CGFloat = 0
@@ -347,7 +397,7 @@ private final class DTScrollDragNSView: NSView {
             grabOffsetInThumb = local.y - metrics.thumbY
         } else {
             dragThumb = false
-            jump(to: local.y, pinThumbCenter: true)
+            jump(to: local.y)
         }
     }
 
@@ -356,9 +406,9 @@ private final class DTScrollDragNSView: NSView {
         if dragThumb {
             let metrics = thumbMetrics()
             let thumbTop = local.y - grabOffsetInThumb
-            jump(to: thumbTop + metrics.thumbH / 2, pinThumbCenter: true)
+            jump(to: thumbTop + metrics.thumbH / 2)
         } else {
-            jump(to: local.y, pinThumbCenter: true)
+            jump(to: local.y)
         }
     }
 
@@ -383,32 +433,28 @@ private final class DTScrollDragNSView: NSView {
         let travel = max(trackH - thumbH, 1)
         let offset = currentOffset()
         let thumbY = min(max(offset / scrollable, 0), 1) * travel
-        return ThumbMetrics(trackH: trackH, thumbH: thumbH, thumbY: thumbY, scrollable: scrollable, travel: travel)
+        return ThumbMetrics(
+            trackH: trackH,
+            thumbH: thumbH,
+            thumbY: thumbY,
+            scrollable: scrollable,
+            travel: travel
+        )
+    }
+
+    private func resolvedScrollView() -> NSScrollView? {
+        boundScrollView ?? enclosingScrollView()
     }
 
     private func currentOffset() -> CGFloat {
-        guard let scroll = enclosingScrollView() else { return 0 }
-        let clip = scroll.contentView
-        let doc = scroll.documentView
-        let viewport = clip.bounds.height
-        let content = max(doc?.frame.height ?? 0, viewport)
-        let originY = clip.bounds.origin.y
-        if clip.isFlipped || doc?.isFlipped == true {
-            return max(0, originY)
-        }
-        let scrollable = max(content - viewport, 0)
-        return max(0, scrollable - originY)
+        guard let scroll = resolvedScrollView() else { return 0 }
+        return DTScrollMetrics.metrics(from: scroll).offset
     }
 
-    private func jump(to trackY: CGFloat, pinThumbCenter: Bool) {
-        guard let scroll = enclosingScrollView() else { return }
+    private func jump(to trackY: CGFloat) {
+        guard let scroll = resolvedScrollView() else { return }
         let metrics = thumbMetrics()
-        let yInTrack: CGFloat
-        if pinThumbCenter {
-            yInTrack = trackY - metrics.thumbH / 2
-        } else {
-            yInTrack = trackY
-        }
+        let yInTrack = trackY - metrics.thumbH / 2
         let fraction = min(max(yInTrack / max(metrics.travel, 1), 0), 1)
         let clip = scroll.contentView
         let doc = scroll.documentView
