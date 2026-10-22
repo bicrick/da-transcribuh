@@ -145,13 +145,38 @@ final class ClipboardHistoryTests: XCTestCase {
     func testOwnWriteSuppressNestsAndClears() {
         let store = ClipboardHistoryStore.shared
         let before = store.suppressWatcher
+        var ended = 0
+        let previous = store.onOwnWriteEnded
+        store.onOwnWriteEnded = { ended += 1 }
+        defer { store.onOwnWriteEnded = previous }
+
         store.beginOwnWrite()
         store.beginOwnWrite()
         XCTAssertEqual(store.suppressWatcher, before + 2)
         store.endOwnWrite()
         XCTAssertEqual(store.suppressWatcher, before + 1)
+        XCTAssertEqual(ended, 0, "nested end must not fire until fully clear")
         store.endOwnWrite()
         XCTAssertEqual(store.suppressWatcher, before)
+        XCTAssertEqual(ended, 1, "watcher must sync changeCount when suppress hits 0")
+    }
+
+    @MainActor
+    func testRecordingChordRejectsClipboardChord() {
+        let name = "clipboard-chord-collision-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        let settings = AppSettings(defaults: defaults)
+        let clip = HotkeyChord.clipboardDefault
+        XCTAssertTrue(settings.setClipboardChord(clip))
+        // Recording chords forbid Shift; use a no-Shift clipboard-shaped chord.
+        let clash = HotkeyChord(keyCode: clip.keyCode, carbonModifiers: UInt32(cmdKey | optionKey))
+        if clash.canRegister {
+            _ = settings.setClipboardChord(clash)
+            XCTAssertFalse(settings.setChord(clash))
+            XCTAssertFalse(settings.setCancelChord(clash))
+        }
+        defaults.removePersistentDomain(forName: name)
     }
 
     func testCarbonHotKeyIdsDoNotCollide() {

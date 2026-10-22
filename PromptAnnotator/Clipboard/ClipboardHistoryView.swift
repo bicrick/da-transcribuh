@@ -89,8 +89,9 @@ struct ClipboardHistoryView: View {
                 .lineLimit(1)
             Spacer(minLength: 4)
             HStack(spacing: 4) {
-                Text("⌕")
-                    .font(Ink.mono(11))
+                // Drawn — Departure Mono has no ⌕; tofu showed in dark mode.
+                ClipboardSearchGlyph()
+                    .frame(width: 11, height: 11)
                     .foregroundStyle(Ink.secondary)
                 TextField("type to search…", text: $filter)
                     .textFieldStyle(.plain)
@@ -470,5 +471,26 @@ private struct KeyboardMonitor: NSViewRepresentable {
                 return false
             }
         }
+    }
+}
+
+/// Paint-style magnifying glass (circle + handle). Avoids missing-glyph tofu
+/// from `⌕`, which Departure Mono does not include.
+private struct ClipboardSearchGlyph: View {
+    var body: some View {
+        Canvas { context, size in
+            let stroke = max(Ink.stroke * 0.75, 1.2)
+            let inset = stroke / 2
+            let glass = min(size.width, size.height) * 0.62
+            let origin = CGPoint(x: inset, y: inset)
+            let circle = CGRect(x: origin.x, y: origin.y, width: glass, height: glass)
+            var path = Path(ellipseIn: circle)
+            let handleStart = CGPoint(x: circle.maxX - stroke * 0.2, y: circle.maxY - stroke * 0.2)
+            let handleEnd = CGPoint(x: size.width - inset, y: size.height - inset)
+            path.move(to: handleStart)
+            path.addLine(to: handleEnd)
+            context.stroke(path, with: .foreground, lineWidth: stroke)
+        }
+        .accessibilityHidden(true)
     }
 }

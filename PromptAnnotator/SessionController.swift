@@ -944,6 +944,16 @@ final class SessionController: ObservableObject {
             }
         }
 
+        // Quiet stop with no tiles: drop the folder, leave History/stats/clipboard alone.
+        if SessionEmptyTake.shouldDiscard(
+            words: spoken,
+            tileCount: groups.count,
+            transcriptionError: transcriptionError
+        ) {
+            discardEmptyTake(directory: directory)
+            return
+        }
+
         do {
             let exportGroups = groups.map {
                 ExportGroup(
@@ -969,6 +979,7 @@ final class SessionController: ObservableObject {
             lastSessionURL = directory
             // Empty clipboard text after silence looks like a broken stop — surface a calm cue.
             // Prefer an existing transcription failure message when both apply.
+            // (Image-only takes still land here; pure quiet takes were discarded above.)
             if saved.pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                transcriptionError == nil {
                 lastError = "No speech detected"
@@ -986,6 +997,25 @@ final class SessionController: ObservableObject {
             lastSessionURL = directory
             setPhase(.idle)
         }
+    }
+
+    /// Silent island dismiss for empty+no-tiles takes: no History write, no pasteboard touch.
+    private func discardEmptyTake(directory: URL) {
+        skipNextPaste = false
+        try? FileManager.default.removeItem(at: directory)
+        self.directory = nil
+        audioURL = nil
+        groups = []
+        captureCount = 0
+        pasteText = ""
+        sheetURL = nil
+        // Keep the calm quiet-room cue in the menu; do not stage clipboard or paste.
+        if transcriptionError == nil {
+            lastError = "No speech detected"
+        }
+        pasteReadyHint = nil
+        PasteFollowUp.shared.clearAwaitingPaste()
+        setPhase(.idle)
     }
 
     private func commitCanvas() {

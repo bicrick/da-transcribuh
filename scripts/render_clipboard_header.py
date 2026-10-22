@@ -63,11 +63,23 @@ def render(pal: dict, name: str) -> Image.Image:
     fx = W - pad_x - field_w
     fy = (H - field_h) // 2
     d.rectangle([fx, fy, fx + field_w, fy + field_h], fill=c(pal, "window"), outline=c(pal, "label"), width=STROKE)
-    placeholder = "⌕  type to search…"
+    # Drawn glass — Departure Mono has no ⌕ (tofu in dark).
+    gx = fx + int(6 * S)
+    gy = fy + int(5 * S)
+    gs = int(11 * S)
+    stroke = max(2, int(1.5 * S))
+    glass = gs * 0.62
+    d.ellipse([gx, gy, gx + glass, gy + glass], outline=c(pal, "secondary"), width=stroke)
+    d.line(
+        [gx + glass * 0.72, gy + glass * 0.72, gx + gs - 1, gy + gs - 1],
+        fill=c(pal, "secondary"),
+        width=stroke,
+    )
+    placeholder = "type to search…"
     pf = font(12 * S)
     pbb = d.textbbox((0, 0), placeholder, font=pf)
     ph = pbb[3] - pbb[1]
-    d.text((fx + int(6 * S), fy + (field_h - ph) // 2 - 1), placeholder, font=pf, fill=c(pal, "secondary"))
+    d.text((fx + int(22 * S), fy + (field_h - ph) // 2 - 1), placeholder, font=pf, fill=c(pal, "secondary"))
     return img
 
 

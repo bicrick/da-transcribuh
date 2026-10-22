@@ -251,7 +251,9 @@ final class AppSettings: ObservableObject {
     func setClipboardChord(_ chord: HotkeyChord) -> Bool {
         guard chord.canRegister(allowingShift: true) else { return false }
         guard chord != self.chord, chord != cancelChord else { return false }
-        guard ClipboardHistoryController.shared.applyHotkey(chord) else { return false }
+        if clipboardHistoryEnabled {
+            guard ClipboardHistoryController.shared.applyHotkey(chord) else { return false }
+        }
         clipboardChord = chord
         defaults.set(Int(chord.keyCode), forKey: Keys.clipboardChordKey)
         defaults.set(Int(chord.carbonModifiers), forKey: Keys.clipboardChordMods)
