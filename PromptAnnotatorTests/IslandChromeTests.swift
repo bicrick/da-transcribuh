@@ -60,7 +60,20 @@ final class IslandChromeTests: XCTestCase {
             )
             XCTAssertEqual(withChip.leadingSide, withChip.trailingSide, accuracy: 0.01, "\(style)")
             XCTAssertGreaterThan(withChip.panel.width, empty.panel.width, "\(style)")
+            XCTAssertEqual(withChip.chrome.width, withChip.panel.width + Ink.buttonShadow, accuracy: 0.01, "\(style)")
+            XCTAssertEqual(withChip.chrome.height, withChip.panel.height + Ink.buttonShadow, accuracy: 0.01, "\(style)")
         }
+    }
+
+    func testChromeIncludesDoublePaneGutter() {
+        let layout = IslandMetrics.layout(
+            style: .classic,
+            slots: IslandSlots.recording(style: .classic, captures: 0),
+            captures: 0,
+            elapsed: 0
+        )
+        XCTAssertEqual(layout.chrome.width - layout.panel.width, Ink.buttonShadow)
+        XCTAssertEqual(layout.chrome.height - layout.panel.height, Ink.buttonShadow)
     }
 
     func testTheCombStaysCenteredWhenChipIsOpen() {

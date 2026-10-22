@@ -15,7 +15,7 @@ final class ChromePanel: NSPanel {
         isMovable = false
         isOpaque = false
         backgroundColor = .clear
-        // Soft system shadow off — island / toolbar draw their own thin hairline.
+        // Soft system shadow off — island draws the Paint double-pane inside its frame.
         hasShadow = false
         sharingType = .none
         isReleasedWhenClosed = false
