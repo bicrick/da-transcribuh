@@ -138,7 +138,7 @@ struct ModelPage: View {
 
     private func customRow(_ model: CustomWhisperModel) -> some View {
         let selected = settings.customModelID == model.id
-        return HStack(alignment: .top, spacing: 12) {
+        return HStack(alignment: .top, spacing: Ink.space2) {
             Button {
                 settings.selectCustomModel(model.id)
                 clearStatus()
@@ -149,10 +149,11 @@ struct ModelPage: View {
                     )
                 }
             } label: {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: Ink.space3) {
                     InkRadio(selected: selected)
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
+                        .padding(.top, 1)
+                    VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                        HStack(spacing: Ink.space2) {
                             Text(model.name)
                                 .font(Ink.rowTitleFont)
                                 .foregroundStyle(Ink.label)
@@ -162,26 +163,42 @@ struct ModelPage: View {
                             .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
                             .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, Ink.rowHPad)
                 .padding(.vertical, Ink.rowVPad)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .background(selected ? Ink.fill : Color.clear)
+                .overlay(alignment: .leading) {
+                    Rectangle()
+                        .fill(selected ? Ink.label : Color.clear)
+                        .frame(width: 2)
+                }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(transfer.isWorking)
+            .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
 
-            Button(role: .destructive) {
+            Button {
                 settings.removeCustomModel(id: model.id)
                 setStatus("Removed \(model.name).", error: false)
             } label: {
-                Image(systemName: "trash")
-                    .foregroundStyle(Ink.error)
+                Text("Remove")
+                    .font(Ink.buttonSmallFont)
+                    .foregroundStyle(Ink.label)
+                    .padding(.horizontal, 11)
+                    .frame(height: 24)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
+                            .strokeBorder(Ink.label, lineWidth: 1)
+                    )
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .padding(.trailing, Ink.rowHPad)
+            .padding(.top, Ink.rowVPad)
             .disabled(transfer.isWorking)
         }
     }
@@ -218,8 +235,8 @@ struct ModelPage: View {
                         InkErrorBanner(message: message)
                     }
                 }
-                .padding(Ink.rowHPad)
-                .padding(.vertical, 14)
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
             }
         }
     }
@@ -258,8 +275,8 @@ struct ModelPage: View {
                         InkErrorBanner(message: "Add an API key before recording with this engine.")
                     }
                 }
-                .padding(Ink.rowHPad)
-                .padding(.vertical, 14)
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
             }
         }
     }
@@ -267,9 +284,9 @@ struct ModelPage: View {
     private var diskSection: some View {
         SettingsSection(title: "On disk") {
             InkCard {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: Ink.space3) {
                     InkIconChip(systemName: "internaldrive")
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Ink.space2) {
                         Text("Downloaded WhisperKit weights live here. Custom folders you add stay in place and are remembered with a bookmark.")
                             .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
@@ -279,12 +296,9 @@ struct ModelPage: View {
                             .foregroundStyle(Ink.secondary)
                             .lineLimit(2)
                             .textSelection(.enabled)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Ink.field, in: RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous))
+                            .inkFieldStyle()
                     }
-                    Spacer(minLength: 8)
+                    Spacer(minLength: Ink.space2)
                     Button("Show") {
                         let folder = WhisperKitTranscriber.modelsFolder()
                         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -292,8 +306,8 @@ struct ModelPage: View {
                     }
                     .buttonStyle(InkSecondaryButtonStyle())
                 }
-                .padding(Ink.rowHPad)
-                .padding(.vertical, 14)
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
             }
         }
     }

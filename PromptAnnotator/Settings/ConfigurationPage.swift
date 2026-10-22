@@ -33,13 +33,15 @@ struct ConfigurationPage: View {
             SettingsSection(
                 footer: "da transcribuh \(AppVersion.label) is free and open source."
             ) {
-                HStack(spacing: 10) {
+                HStack(spacing: Ink.space2) {
                     Button("View on GitHub") {
                         NSWorkspace.shared.open(ReleaseCheck.repo)
                     }
+                    .buttonStyle(InkSecondaryButtonStyle())
                     Button("Show welcome") {
                         OnboardingPresenter.shared.show()
                     }
+                    .buttonStyle(InkSecondaryButtonStyle())
                 }
             }
         }
@@ -52,8 +54,8 @@ struct ConfigurationPage: View {
     }
 
     private var appearanceCard: some View {
-        SettingsCard {
-            VStack(alignment: .leading, spacing: Ink.space3) {
+        InkCard {
+            VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: Ink.titleDescGap) {
                     Text("Theme")
                         .font(Ink.rowTitleFont)
@@ -63,6 +65,10 @@ struct ConfigurationPage: View {
                         .foregroundStyle(Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.top, Ink.rowVPad)
+                .padding(.bottom, Ink.space3)
+
                 InkAppearanceSegment(
                     selection: Binding(
                         get: { settings.appearance },
@@ -70,84 +76,87 @@ struct ConfigurationPage: View {
                     ),
                     onChange: { settings.setAppearance($0) }
                 )
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.bottom, Ink.rowVPad)
             }
-            .padding(Ink.cardPad)
         }
     }
 
     private var shortcutCard: some View {
-        SettingsCard {
+        InkCard {
             VStack(alignment: .leading, spacing: 0) {
-                shortcutRow(
+                InkSettingRow(
                     title: "Start and stop",
                     detail: settings.pushToTalk
                         ? "Hold \(settings.chord.display) to talk. Release to stop."
-                        : "\(settings.chord.display) starts a session. Press it again to stop.",
-                    label: capture == .toggle ? "Press shortcut" : settings.chord.display
+                        : "\(settings.chord.display) starts a session. Press it again to stop."
                 ) {
-                    capture = .toggle
-                    message = nil
+                    Button(capture == .toggle ? "Press shortcut" : settings.chord.display) {
+                        capture = .toggle
+                        message = nil
+                    }
+                    .buttonStyle(InkSecondaryButtonStyle())
                 }
-                SettingsDivider()
-                shortcutRow(
+                InkDivider(leading: 0)
+                InkSettingRow(
                     title: "Cancel recording",
                     detail: settings.cancelChord.map {
                         "\($0.display) drops the session without a transcript or screenshot."
-                    } ?? "Optional. Set a shortcut to drop a take without saving.",
-                    label: capture == .cancel ? "Press shortcut" : (settings.cancelChord?.display ?? "None")
+                    } ?? "Optional. Set a shortcut to drop a take without saving."
                 ) {
-                    capture = .cancel
-                    message = nil
-                }
-                SettingsDivider()
-                Toggle(isOn: Binding(
-                    get: { settings.pushToTalk },
-                    set: { settings.setPushToTalk($0) }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Push to talk")
-                            .font(Ink.rowTitleFont)
-                            .foregroundStyle(Ink.label)
-                        Text("Hold the recording shortcut. The menu bar command stays a tap.")
-                            .font(Ink.captionFont)
-                            .foregroundStyle(Ink.secondary)
+                    Button(capture == .cancel ? "Press shortcut" : (settings.cancelChord?.display ?? "None")) {
+                        capture = .cancel
+                        message = nil
                     }
+                    .buttonStyle(InkSecondaryButtonStyle())
                 }
-                .toggleStyle(.switch)
-                .padding(12)
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Push to talk",
+                    detail: "Hold the recording shortcut. The menu bar command stays a tap.",
+                    isOn: Binding(
+                        get: { settings.pushToTalk },
+                        set: { settings.setPushToTalk($0) }
+                    )
+                )
                 if let message {
                     Text(message)
                         .font(Ink.captionFont)
                         .foregroundStyle(Ink.error)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 4)
+                        .padding(.horizontal, Ink.rowHPad)
+                        .padding(.bottom, Ink.space2)
                 }
                 Text("The menu bar repeats this shortcut under Start Session. Shift stays free for drawing. Option-Space, Command-Space, and Option-Command-Space stay with the system. Press Escape while capturing Cancel to clear it.")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, Ink.rowHPad)
+                    .padding(.bottom, Ink.space3)
                 HStack {
                     Spacer()
                     Button("Reset to ⌃⌥Space") {
                         capture = nil
                         message = settings.setChord(.default) ? nil : "macOS would not register the default shortcut."
                     }
+                    .buttonStyle(InkSecondaryButtonStyle())
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.bottom, Ink.rowVPad)
             }
         }
     }
 
     private var applicationCard: some View {
-        SettingsCard {
+        InkCard {
             VStack(alignment: .leading, spacing: 0) {
-                toggleRow("Launch at login", "Opens da transcribuh when you sign in.") {
-                    settings.launchAtLogin
-                } set: {
-                    settings.setLaunchAtLogin($0)
-                }
+                InkToggleRow(
+                    title: "Launch at login",
+                    detail: "Opens da transcribuh when you sign in.",
+                    isOn: Binding(
+                        get: { settings.launchAtLogin },
+                        set: { settings.setLaunchAtLogin($0) }
+                    )
+                )
                 if let note = settings.loginItemNote {
                     Text(note)
                         .font(Ink.captionFont)
@@ -156,42 +165,41 @@ struct ConfigurationPage: View {
                         .padding(.bottom, Ink.space2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                SettingsDivider()
-                HStack(spacing: Ink.space3) {
-                    VStack(alignment: .leading, spacing: Ink.titleDescGap) {
-                        Text("Updates")
-                            .font(Ink.rowTitleFont)
-                            .foregroundStyle(Ink.label)
-                        Text(updateMessage)
-                            .font(Ink.captionFont)
-                            .foregroundStyle(Ink.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 8)
+                InkDivider(leading: 0)
+                InkSettingRow(title: "Updates", detail: updateMessage) {
                     Button(checkingUpdate ? "Checking" : "Check") {
                         checkForUpdate()
                     }
+                    .buttonStyle(InkSecondaryButtonStyle())
                     .disabled(checkingUpdate)
                 }
-                .padding(12)
-                SettingsDivider()
-                toggleRow("Keep this window above others", "The settings window stays in front while you work.") {
-                    settings.keepWindowOnTop
-                } set: {
-                    settings.setKeepWindowOnTop($0)
-                }
-                SettingsDivider()
-                toggleRow("Show in the Dock", "Turn this off to keep da transcribuh in the menu bar only.") {
-                    settings.showInDock
-                } set: {
-                    settings.setShowInDock($0)
-                }
-                SettingsDivider()
-                toggleRow("Write errors to a log", "Records start failures and transcription errors.") {
-                    settings.errorLogging
-                } set: {
-                    settings.setErrorLogging($0)
-                }
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Keep this window above others",
+                    detail: "The settings window stays in front while you work.",
+                    isOn: Binding(
+                        get: { settings.keepWindowOnTop },
+                        set: { settings.setKeepWindowOnTop($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Show in the Dock",
+                    detail: "Turn this off to keep da transcribuh in the menu bar only.",
+                    isOn: Binding(
+                        get: { settings.showInDock },
+                        set: { settings.setShowInDock($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Write errors to a log",
+                    detail: "Records start failures and transcription errors.",
+                    isOn: Binding(
+                        get: { settings.errorLogging },
+                        set: { settings.setErrorLogging($0) }
+                    )
+                )
                 HStack {
                     Spacer()
                     Button("Show log") {
@@ -202,51 +210,66 @@ struct ConfigurationPage: View {
                         }
                         NSWorkspace.shared.activateFileViewerSelecting([url])
                     }
+                    .buttonStyle(InkSecondaryButtonStyle())
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.bottom, Ink.rowVPad)
             }
         }
     }
 
     private var advancedCard: some View {
-        SettingsCard {
-            VStack(alignment: .leading, spacing: 12) {
-                labeledPicker("Stop after silence", "Ends a spoken session once the microphone stays quiet.") {
-                    Picker("Stop after silence", selection: Binding(
-                        get: { settings.silenceStopSeconds },
-                        set: { settings.setSilenceStopSeconds($0) }
-                    )) {
-                        Text("Off").tag(0.0)
-                        Text("0.75 s").tag(0.75)
-                        Text("1.25 s").tag(1.25)
-                        Text("2 s").tag(2.0)
-                        Text("3 s").tag(3.0)
-                    }
-                    .labelsHidden()
-                    .frame(width: 110)
+        InkCard {
+            VStack(alignment: .leading, spacing: 0) {
+                InkSettingRow(
+                    title: "Stop after silence",
+                    detail: "Ends a spoken session once the microphone stays quiet."
+                ) {
+                    InkMenuPicker(
+                        title: "Stop after silence",
+                        selection: Binding(
+                            get: { settings.silenceStopSeconds },
+                            set: { settings.setSilenceStopSeconds($0) }
+                        ),
+                        options: [
+                            (0.0, "Off"),
+                            (0.75, "0.75 s"),
+                            (1.25, "1.25 s"),
+                            (2.0, "2 s"),
+                            (3.0, "3 s"),
+                        ]
+                    )
                 }
-                labeledPicker("Maximum session", "Stops a long recording even if you are still talking.") {
-                    Picker("Maximum session", selection: Binding(
-                        get: { settings.maxSessionMinutes },
-                        set: { settings.setMaxSessionMinutes($0) }
-                    )) {
-                        Text("Off").tag(0.0)
-                        Text("2 min").tag(2.0)
-                        Text("5 min").tag(5.0)
-                        Text("10 min").tag(10.0)
-                        Text("30 min").tag(30.0)
-                    }
-                    .labelsHidden()
-                    .frame(width: 110)
+                InkDivider(leading: 0)
+                InkSettingRow(
+                    title: "Maximum session",
+                    detail: "Stops a long recording even if you are still talking."
+                ) {
+                    InkMenuPicker(
+                        title: "Maximum session",
+                        selection: Binding(
+                            get: { settings.maxSessionMinutes },
+                            set: { settings.setMaxSessionMinutes($0) }
+                        ),
+                        options: [
+                            (0.0, "Off"),
+                            (2.0, "2 min"),
+                            (5.0, "5 min"),
+                            (10.0, "10 min"),
+                            (30.0, "30 min"),
+                        ]
+                    )
                 }
-                Toggle(isOn: Binding(
-                    get: { settings.normalizeSpeech },
-                    set: { settings.setNormalizeSpeech($0) }
-                )) {
-                    settingCopy("Normalize quiet speech", "Raises a quiet take before transcription. Silence is left alone.")
-                }
-                .toggleStyle(.switch)
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Normalize quiet speech",
+                    detail: "Raises a quiet take before transcription. Silence is left alone.",
+                    isOn: Binding(
+                        get: { settings.normalizeSpeech },
+                        set: { settings.setNormalizeSpeech($0) }
+                    )
+                )
+                InkDivider(leading: 0)
                 VStack(alignment: .leading, spacing: Ink.space2) {
                     Text("Sessions folder")
                         .font(Ink.rowTitleFont)
@@ -262,93 +285,60 @@ struct ConfigurationPage: View {
                             .foregroundStyle(Ink.error)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    HStack {
+                    HStack(spacing: Ink.space2) {
                         Button("Change") { chooseFolder() }
+                            .buttonStyle(InkSecondaryButtonStyle())
                         Button("Use Documents") {
                             SessionStore.reset()
                             refreshFolder()
                         }
-                            .disabled(!customFolder)
+                        .buttonStyle(InkSecondaryButtonStyle())
+                        .disabled(!customFolder)
                         Button("Show") {
                             if let root = try? SessionPaths.sessionsRoot() {
                                 NSWorkspace.shared.open(root)
                             }
                         }
+                        .buttonStyle(InkSecondaryButtonStyle())
                     }
                 }
-                Toggle(isOn: Binding(
-                    get: { settings.pasteOnStop },
-                    set: { settings.setPasteOnStop($0) }
-                )) {
-                    settingCopy("Paste when the session ends", "On by default. Pastes into the front app, the way a dictation stop does. It waits while this window is focused.")
-                }
-                .toggleStyle(.switch)
-                Toggle(isOn: Binding(
-                    get: { settings.returnOnShift },
-                    set: { settings.setReturnOnShift($0) }
-                )) {
-                    settingCopy("Press Return when Shift is held", "After an automatic paste, Shift sends the message.")
-                }
-                .toggleStyle(.switch)
-                .disabled(!settings.pasteOnStop)
-                Toggle(isOn: Binding(
-                    get: { settings.capitalizeTranscript },
-                    set: { settings.setCapitalizeTranscript($0) }
-                )) {
-                    settingCopy("Capitalize the pasted transcript", "The first letter is capitalized. A leading tile number stays put.")
-                }
-                .toggleStyle(.switch)
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Paste when the session ends",
+                    detail: "On by default. Pastes into the front app, the way a dictation stop does. It waits while this window is focused.",
+                    isOn: Binding(
+                        get: { settings.pasteOnStop },
+                        set: { settings.setPasteOnStop($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Press Return when Shift is held",
+                    detail: "After an automatic paste, Shift sends the message.",
+                    isOn: Binding(
+                        get: { settings.returnOnShift },
+                        set: { settings.setReturnOnShift($0) }
+                    ),
+                    enabled: settings.pasteOnStop
+                )
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Capitalize the pasted transcript",
+                    detail: "The first letter is capitalized. A leading tile number stays put.",
+                    isOn: Binding(
+                        get: { settings.capitalizeTranscript },
+                        set: { settings.setCapitalizeTranscript($0) }
+                    )
+                )
                 Text("Speech models are on the Models page.")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, Ink.rowHPad)
+                    .padding(.bottom, Ink.rowVPad)
             }
-            .padding(12)
-        }
-    }
-
-    private func shortcutRow(title: String, detail: String, label: String, action: @escaping () -> Void) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(Ink.rowTitleFont)
-                    .foregroundStyle(Ink.label)
-                Text(detail)
-                    .font(Ink.captionFont)
-                    .foregroundStyle(Ink.secondary)
-            }
-            Spacer(minLength: 8)
-            Button(label, action: action)
-                .buttonStyle(InkSecondaryButtonStyle())
-        }
-        .padding(12)
-    }
-
-    private func toggleRow(_ title: String, _ detail: String, get: @escaping () -> Bool, set: @escaping (Bool) -> Void) -> some View {
-        Toggle(isOn: Binding(get: get, set: set)) {
-            settingCopy(title, detail)
-        }
-        .toggleStyle(.switch)
-        .padding(12)
-    }
-
-    private func settingCopy(_ title: String, _ detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(Ink.rowTitleFont)
-                .foregroundStyle(Ink.label)
-            Text(detail)
-                .font(Ink.captionFont)
-                .foregroundStyle(Ink.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func labeledPicker<Control: View>(_ title: String, _ detail: String, @ViewBuilder control: () -> Control) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            settingCopy(title, detail)
-            Spacer(minLength: 8)
-            control()
         }
     }
 

@@ -38,7 +38,7 @@ struct PerformancePage: View {
             }
             SettingsSection(title: "Overview") {
                 InkCard {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Ink.space2) {
                         Text(shareSentence)
                             .font(Ink.rowTitleFont)
                             .foregroundStyle(Ink.label)
@@ -51,8 +51,8 @@ struct PerformancePage: View {
                             .foregroundStyle(Ink.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(Ink.rowHPad)
-                    .padding(.vertical, 14)
+                    .padding(.horizontal, Ink.rowHPad)
+                    .padding(.vertical, Ink.rowVPad)
                 }
             }
             HStack {
@@ -78,21 +78,25 @@ struct PerformancePage: View {
     }
 
     private func memoryTile(title: String, value: String, detail: String, fraction: Double) -> some View {
-        InkTile {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(title)
-                    .font(Ink.captionFont)
-                    .foregroundStyle(Ink.secondary)
-                Text(value)
-                    .font(Ink.statValueFont)
-                    .monospacedDigit()
-                    .foregroundStyle(Ink.label)
-                Text(detail)
-                    .font(Ink.headingFont)
-                    .foregroundStyle(Ink.secondary)
-                InkSegmentMeter(label: "Load", fraction: max(0.05, min(1, fraction)), emphasized: true)
-            }
+        VStack(alignment: .leading, spacing: Ink.space2) {
+            Text(title.uppercased())
+                .font(Ink.headingFont)
+                .foregroundStyle(Ink.secondary)
+            Text(value)
+                .font(Ink.statValueFont)
+                .monospacedDigit()
+                .foregroundStyle(Ink.label)
+            Text(detail)
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
+            InkSegmentMeter(label: "Load", fraction: max(0.05, min(1, fraction)), emphasized: true)
         }
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
+        .padding(Ink.space3)
+        .overlay(
+            Rectangle()
+                .strokeBorder(Ink.label, lineWidth: 1)
+        )
     }
 
     private func refresh(forceModelBytes: Bool) {

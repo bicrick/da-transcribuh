@@ -8,83 +8,86 @@ struct SoundPage: View {
         SettingsPageStack(title: "Sound") {
             SettingsSection(title: "Microphone") {
                 InkCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Input")
-                                .font(Ink.rowTitleFont)
-                                .foregroundStyle(Ink.label)
-                            Spacer()
-                            Picker("Input", selection: Binding(
-                                get: { settings.inputDeviceUID },
-                                set: { settings.setInputDeviceUID($0) }
-                            )) {
-                                Text("System default").tag("")
-                                ForEach(devices) { device in
-                                    Text(device.name).tag(device.id)
-                                }
-                            }
-                            .labelsHidden()
-                            .frame(maxWidth: 240)
+                    VStack(alignment: .leading, spacing: 0) {
+                        InkSettingRow(
+                            title: "Input",
+                            detail: "A chosen microphone is used for the session, then the previous system input is restored."
+                        ) {
+                            InkMenuPicker(
+                                title: "Input",
+                                selection: Binding(
+                                    get: { settings.inputDeviceUID },
+                                    set: { settings.setInputDeviceUID($0) }
+                                ),
+                                options: deviceOptions
+                            )
                         }
-                        Text("A chosen microphone is used for the session, then the previous system input is restored.")
-                            .font(Ink.captionFont)
-                            .foregroundStyle(Ink.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Toggle(isOn: Binding(
-                            get: { settings.raiseInputVolume },
-                            set: { settings.setRaiseInputVolume($0) }
-                        )) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Raise the input level")
-                                    .font(Ink.rowTitleFont)
-                                    .foregroundStyle(Ink.label)
-                                Text("Turns a quiet microphone up when the device allows it.")
-                                    .font(Ink.captionFont)
-                                    .foregroundStyle(Ink.secondary)
-                            }
-                        }
-                        .toggleStyle(.switch)
+                        InkDivider(leading: 0)
+                        InkToggleRow(
+                            title: "Raise the input level",
+                            detail: "Turns a quiet microphone up when the device allows it.",
+                            isOn: Binding(
+                                get: { settings.raiseInputVolume },
+                                set: { settings.setRaiseInputVolume($0) }
+                            )
+                        )
                     }
-                    .padding(Ink.rowHPad)
-                    .padding(.vertical, 14)
                 }
             }
 
             SettingsSection(title: "Sound effects") {
                 InkCard {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Toggle(isOn: Binding(
-                            get: { settings.soundEnabled },
-                            set: { settings.setSoundEnabled($0) }
-                        )) {
-                            Text("Play a tone when a session starts, a capture lands, and a session stops")
-                                .font(Ink.bodyFont)
-                                .foregroundStyle(Ink.label)
+                    VStack(alignment: .leading, spacing: 0) {
+                        InkToggleRow(
+                            title: "Play session tones",
+                            detail: "A tone when a session starts, a capture lands, and a session stops.",
+                            isOn: Binding(
+                                get: { settings.soundEnabled },
+                                set: { settings.setSoundEnabled($0) }
+                            )
+                        )
+                        InkDivider(leading: 0)
+                        VStack(alignment: .leading, spacing: Ink.space2) {
+                            Text("Volume")
+                                .font(Ink.rowTitleFont)
+                                .foregroundStyle(settings.soundEnabled ? Ink.label : Ink.tertiary)
+                            HStack(spacing: Ink.space3) {
+                                Text("▁")
+                                    .font(Ink.headingFont)
+                                    .foregroundStyle(Ink.secondary)
+                                InkSlider(
+                                    value: Binding(
+                                        get: { settings.soundVolume },
+                                        set: { settings.setSoundVolume($0) }
+                                    ),
+                                    enabled: settings.soundEnabled
+                                )
+                                Text("▅")
+                                    .font(Ink.headingFont)
+                                    .foregroundStyle(Ink.secondary)
+                            }
+                        }
+                        .padding(.horizontal, Ink.rowHPad)
+                        .padding(.vertical, Ink.rowVPad)
+                        InkDivider(leading: 0)
+                        VStack(alignment: .leading, spacing: Ink.space3) {
+                            Text("Choose a set. Selecting one plays start, a spoken stop, and a silent stop.")
+                                .font(Ink.captionFont)
+                                .foregroundStyle(Ink.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
+                            soundChoices
                         }
-                        .toggleStyle(.switch)
-                        HStack {
-                            Image(systemName: "speaker")
-                                .foregroundStyle(Ink.secondary)
-                            Slider(value: Binding(
-                                get: { settings.soundVolume },
-                                set: { settings.setSoundVolume($0) }
-                            ), in: 0...1)
-                            .disabled(!settings.soundEnabled)
-                            Image(systemName: "speaker.wave.2")
-                                .foregroundStyle(Ink.secondary)
-                        }
-                        Text("Choose a set. Selecting one plays start, a spoken stop, and a silent stop.")
-                            .font(Ink.captionFont)
-                            .foregroundStyle(Ink.secondary)
-                        soundChoices
+                        .padding(.horizontal, Ink.rowHPad)
+                        .padding(.vertical, Ink.rowVPad)
                     }
-                    .padding(Ink.rowHPad)
-                    .padding(.vertical, 14)
                 }
             }
         }
         .onAppear { devices = AudioInputs.devices() }
+    }
+
+    private var deviceOptions: [(String, String)] {
+        [(("", "System default"))] + devices.map { ($0.id, $0.name) }
     }
 
     private var soundChoices: some View {

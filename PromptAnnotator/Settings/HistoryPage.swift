@@ -20,67 +20,121 @@ struct HistoryPage: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("History")
-                .font(Ink.pageTitleFont)
-                .foregroundStyle(Ink.label)
-                .padding(.horizontal, Ink.pageSide)
-                .padding(.top, Ink.pageTop)
-                .padding(.bottom, 16)
+        Group {
             if sessions.isEmpty {
-                InkDashedEmpty(
-                    title: "No sessions yet",
-                    detail: "Press \(AppSettings.shared.chord.display) — or Start on Home — for your first take. Transcripts land here when you stop."
-                )
-                .padding(.horizontal, Ink.pageSide)
-                Spacer()
+                emptyState
             } else {
-                HStack(alignment: .top, spacing: 0) {
-                    listColumn
-                    Rectangle()
-                        .fill(Ink.hairline)
-                        .frame(width: 1)
-                    detailColumn
-                }
-                .frame(maxHeight: .infinity)
+                populated
             }
         }
         .inkPageChrome()
         .onAppear {
             reload()
-            if selectedID == nil {
-                selectedID = sessions.first?.id
-            }
+            syncSelection()
+        }
+        .onChange(of: query) { _, _ in syncSelection() }
+        .onChange(of: sessions.count) { _, _ in syncSelection() }
+    }
+
+    private var emptyState: some View {
+        SettingsPageStack(
+            title: "History",
+            subtitle: "Takes land here when you stop a session."
+        ) {
+            InkDashedEmpty(
+                title: "No sessions yet",
+                detail: "Press \(AppSettings.shared.chord.display) — or Start on Home — for your first take. Transcripts land here when you stop."
+            )
         }
     }
 
-    private var listColumn: some View {
-        VStack(spacing: 10) {
+    private var populated: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                Text("History")
+                    .font(Ink.pageTitleFont)
+                    .foregroundStyle(Ink.label)
+                Text("\(sessions.count) session\(sessions.count == 1 ? "" : "s") on disk.")
+                    .font(Ink.bodyFont)
+                    .foregroundStyle(Ink.secondary)
+                searchField
+            }
+            .padding(.top, Ink.pageTop)
+            .padding(.horizontal, Ink.pageSide)
+            .padding(.bottom, Ink.space3)
+            .frame(maxWidth: Ink.maxContentWidth, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
+
+            HStack(alignment: .top, spacing: 0) {
+                listColumn
+                Rectangle()
+                    .fill(Ink.label)
+                    .frame(width: 1)
+                detailColumn
+            }
+            .frame(maxWidth: Ink.maxContentWidth)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(maxHeight: .infinity)
+            .padding(.horizontal, Ink.pageSide)
+            .padding(.bottom, Ink.pageBottom)
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: Ink.space2) {
+            Text("⌕")
+                .font(Ink.labelFont)
+                .foregroundStyle(Ink.secondary)
             TextField("Search transcripts", text: $query)
                 .textFieldStyle(.plain)
-                .inkFieldStyle()
-                .padding(.horizontal, 12)
+                .font(Ink.bodyFont)
+                .foregroundStyle(Ink.label)
+        }
+        .inkFieldStyle()
+    }
+
+    private var listColumn: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Sessions".uppercased())
+                    .font(Ink.headingFont)
+                    .foregroundStyle(Ink.secondary)
+                Spacer()
+                Text("\(matches.count)")
+                    .font(Ink.headingFont)
+                    .foregroundStyle(Ink.secondary)
+            }
+            .padding(.horizontal, Ink.rowHPad)
+            .padding(.vertical, Ink.space2)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Ink.label).frame(height: 1)
+            }
+
             if matches.isEmpty {
                 Text("No matches")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(12)
+                    .padding(Ink.rowHPad)
             } else {
                 DTScrollView {
-                    LazyVStack(spacing: Ink.space2) {
+                    LazyVStack(spacing: 0) {
                         ForEach(matches) { session in
                             historyRow(session)
+                            Rectangle()
+                                .fill(Ink.hairline)
+                                .frame(height: 1)
                         }
                     }
-                    .padding(.horizontal, Ink.space3)
-                    .padding(.bottom, Ink.space3)
                 }
             }
         }
         .frame(width: 300)
         .frame(maxHeight: .infinity, alignment: .top)
-        .padding(.top, 4)
+        .overlay(
+            Rectangle()
+                .strokeBorder(Ink.label, lineWidth: 1)
+        )
     }
 
     private func historyRow(_ session: SessionSummary) -> some View {
@@ -88,12 +142,11 @@ struct HistoryPage: View {
         return Button {
             selectedID = session.id
         } label: {
-            HStack(spacing: 0) {
-                Rectangle()
-                    .fill(isSelected ? Ink.accent : Color.clear)
-                    .frame(width: 3)
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
+            HStack(alignment: .top, spacing: Ink.space3) {
+                InkRadio(selected: isSelected)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                    HStack(alignment: .firstTextBaseline) {
                         Text(title(for: session))
                             .font(Ink.rowTitleFont)
                             .foregroundStyle(Ink.label)
@@ -107,68 +160,86 @@ struct HistoryPage: View {
                         .foregroundStyle(Ink.secondary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                    HStack(spacing: 6) {
-                        InkBadge(text: "\(session.words) words")
+                    HStack(spacing: Ink.space2) {
+                        InkBadge(text: "\(session.words) w")
                         InkBadge(text: "\(session.tiles) tiles")
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
             }
-            .background(
-                (isSelected ? Ink.accentSoft : Ink.card),
-                in: RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                    .strokeBorder(isSelected ? Ink.accent.opacity(0.35) : Ink.hairline, lineWidth: 1)
-            )
+            .padding(.horizontal, Ink.rowHPad)
+            .padding(.vertical, Ink.space3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? Ink.fill : Color.clear)
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(isSelected ? Ink.label : Color.clear)
+                    .frame(width: 2)
+            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
     }
 
     private var detailColumn: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        Group {
             if let selected {
-                InkCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(longTitle(for: selected))
-                                    .font(Ink.labelFont)
-                                    .foregroundStyle(Ink.label)
-                                Text(detail(for: selected))
-                                    .font(Ink.captionFont)
-                                    .foregroundStyle(Ink.secondary)
-                            }
-                            Spacer()
-                            HStack(spacing: 8) {
-                                Button("Copy") { copy(selected) }
-                                    .buttonStyle(InkSecondaryButtonStyle())
-                                Button("Show") {
-                                    NSWorkspace.shared.activateFileViewerSelecting([selected.url])
-                                }
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .top, spacing: Ink.space3) {
+                        VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                            Text(longTitle(for: selected))
+                                .font(Ink.labelFont)
+                                .foregroundStyle(Ink.label)
+                            Text(detail(for: selected))
+                                .font(Ink.captionFont)
+                                .foregroundStyle(Ink.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        HStack(spacing: Ink.space2) {
+                            Button("Copy") { copy(selected) }
                                 .buttonStyle(InkSecondaryButtonStyle())
+                            Button("Show") {
+                                NSWorkspace.shared.activateFileViewerSelecting([selected.url])
                             }
+                            .buttonStyle(InkSecondaryButtonStyle())
                         }
-                        InkDivider(leading: 0)
-                        DTScrollView {
-                            Text(selected.transcript.isEmpty ? "No speech in this session." : selected.transcript)
-                                .font(Ink.bodyFont)
-                                .foregroundStyle(selected.transcript.isEmpty ? Ink.secondary : Ink.label)
-                                .textSelection(.enabled)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(minHeight: 200)
                     }
-                    .padding(18)
+                    .padding(Ink.cardPad)
+                    .overlay(alignment: .bottom) {
+                        Rectangle().fill(Ink.label).frame(height: 1)
+                    }
+
+                    DTScrollView {
+                        Text(selected.transcript.isEmpty ? "No speech in this session." : selected.transcript)
+                            .font(Ink.bodyFont)
+                            .foregroundStyle(selected.transcript.isEmpty ? Ink.secondary : Ink.label)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                            .padding(Ink.cardPad)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .overlay(
+                    Rectangle()
+                        .strokeBorder(Ink.label, lineWidth: 1)
+                )
+            } else {
+                InkDashedEmpty(
+                    title: "Select a session",
+                    detail: "Pick a take from the list to read the transcript."
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            Spacer(minLength: 0)
         }
-        .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.leading, Ink.space3)
+    }
+
+    private func syncSelection() {
+        let ids = matches.map(\.id)
+        if let selectedID, ids.contains(selectedID) { return }
+        self.selectedID = ids.first
     }
 
     private func title(for session: SessionSummary) -> String {
