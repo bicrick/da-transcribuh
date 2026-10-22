@@ -26,6 +26,7 @@ enum ShapeRenderer {
 
     /// Paints `base` and then the shapes. `pointSize` is the display size in points;
     /// shape coordinates are top-left, y down, in that space.
+    /// Returns `base` unchanged when there is nothing to paint (no full-size copy).
     static func composite(
         base: CGImage,
         shapes: [AnnotationShape],
@@ -35,6 +36,10 @@ enum ShapeRenderer {
         let pixelHeight = base.height
         guard pixelWidth > 0, pixelHeight > 0, pointSize.width > 0, pointSize.height > 0 else {
             return nil
+        }
+        let significant = shapes.filter { $0.isSignificant() }
+        if significant.isEmpty {
+            return base
         }
         guard let context = CGContext(
             data: nil,
@@ -55,7 +60,7 @@ enum ShapeRenderer {
             x: CGFloat(pixelWidth) / pointSize.width,
             y: -CGFloat(pixelHeight) / pointSize.height
         )
-        draw(shapes: shapes, draft: nil, textEdit: nil, caretOn: false, in: context)
+        draw(shapes: significant, draft: nil, textEdit: nil, caretOn: false, in: context)
         context.restoreGState()
         return context.makeImage()
     }

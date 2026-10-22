@@ -39,6 +39,21 @@ final class ShapeRendererTests: XCTestCase {
         XCTAssertEqual(shape.tool, .text)
     }
 
+    func testEmptyCompositeReturnsTheBaseWithoutCopying() throws {
+        let base = solid(width: 32, height: 24, red: 0.2, green: 0.3, blue: 0.4)
+        let insignificant = AnnotationShape(
+            id: UUID(),
+            tool: .pen,
+            color: .red,
+            points: [CGPoint(x: 1, y: 1), CGPoint(x: 2, y: 1)],
+            text: nil
+        )
+        let image = try XCTUnwrap(
+            ShapeRenderer.composite(base: base, shapes: [insignificant], pointSize: CGSize(width: 32, height: 24))
+        )
+        XCTAssertTrue(image === base, "Clean snips must not allocate a full-display composite bitmap")
+    }
+
     func testRectangleBakesIntoTheTopLeftOfTheBitmap() throws {
         // The stroke is 6pt of solid ink. Keep it near the top and clear of the corners.
         let base = solid(width: 160, height: 100, red: 0.45, green: 0.45, blue: 0.45)

@@ -137,15 +137,35 @@ enum SessionPaths {
 }
 
 enum PNG {
+    /// Synchronous ImageIO encode + write. Prefer `writeAsync` on the capture hot path
+    /// so MainActor is not blocked by PNG compression.
     static func write(_ image: CGImage, to url: URL) throws {
-        let folder = url.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
-            throw ExportError("Couldn't open \(url.lastPathComponent) for writing.")
+        try CapturePerf.interval(.encode) {
+            let folder = url.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+                throw ExportError("Couldn't open \(url.lastPathComponent) for writing.")
+            }
+            CGImageDestinationAddImage(destination, image, nil)
+            guard CGImageDestinationFinalize(destination) else {
+                throw ExportError("Couldn't write \(url.lastPathComponent).")
+            }
         }
-        CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else {
-            throw ExportError("Couldn't write \(url.lastPathComponent).")
+    }
+
+    /// Encode and write on a utility-QoS queue (never the audio real-time path).
+    static func writeAsync(_ image: CGImage, to url: URL) async throws {
+        try await CapturePerf.intervalAsync(.write) {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                DispatchQueue.global(qos: .utility).async {
+                    do {
+                        try write(image, to: url)
+                        continuation.resume()
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
         }
     }
 }
@@ -238,17 +258,50 @@ enum SessionWriter {
         var sheetURL: URL?
         let images = groups.map(\.image)
         let offsets = groups.map(\.committedAt)
-        if let sheet = ContactSheet.render(
-            images: images,
-            commitOffsets: offsets,
-            showCaptions: SessionMarkdown.containsSpeech(sections)
-        ) {
+        let showCaptions = SessionMarkdown.containsSpeech(sections)
+        if let sheet = CapturePerf.interval(.thumbnail, {
+            ContactSheet.render(
+                images: images,
+                commitOffsets: offsets,
+                showCaptions: showCaptions
+            )
+        }) {
             let url = directory.appendingPathComponent("sheet.png")
             try PNG.write(sheet, to: url)
             sheetURL = url
         }
 
         return Saved(directory: directory, notes: notes, pasteText: pasteText, sheetURL: sheetURL)
+    }
+
+    /// Session finalize + contact-sheet thumbnail off MainActor (utility QoS).
+    static func writeAsync(
+        directory: URL,
+        started: Date,
+        ended: Date,
+        groups: [ExportGroup],
+        words: [TimedWord],
+        model: String?,
+        transcriptionError: String?
+    ) async throws -> Saved {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Saved, Error>) in
+            DispatchQueue.global(qos: .utility).async {
+                do {
+                    let saved = try write(
+                        directory: directory,
+                        started: started,
+                        ended: ended,
+                        groups: groups,
+                        words: words,
+                        model: model,
+                        transcriptionError: transcriptionError
+                    )
+                    continuation.resume(returning: saved)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 }
 
