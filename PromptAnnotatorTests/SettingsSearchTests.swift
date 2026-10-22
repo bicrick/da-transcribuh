@@ -19,6 +19,16 @@ final class SettingsSearchTests: XCTestCase {
         XCTAssertEqual(hits.first?.kind, .setting)
     }
 
+    func testThemeAndIslandJumpToAppearance() {
+        let theme = SettingsSearch.search(query: "System, Light, Dark", sessions: [], modelTitles: [])
+        XCTAssertEqual(theme.first?.page, .appearance)
+        XCTAssertEqual(theme.first?.highlightTitle, "Theme")
+
+        let island = SettingsSearch.search(query: "Recording window", sessions: [], modelTitles: [])
+        XCTAssertEqual(island.first?.page, .appearance)
+        XCTAssertEqual(island.first?.highlightTitle, "Recording window")
+    }
+
     func testModelTitleMatches() {
         let hits = SettingsSearch.search(
             query: "Balanced",

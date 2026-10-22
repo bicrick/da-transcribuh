@@ -2,8 +2,8 @@ import SwiftUI
 
 enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
     case home
+    case appearance
     case history
-    case recording
     case configuration
     case sound
     case model
@@ -14,8 +14,8 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .home: return "Home"
+        case .appearance: return "Appearance"
         case .history: return "History"
-        case .recording: return "Recording"
         // Compact folder-tab label.
         case .configuration: return "General"
         case .sound: return "Sound"
@@ -36,8 +36,8 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
     var symbol: String {
         switch self {
         case .home: return "house"
+        case .appearance: return "paintpalette"
         case .history: return "clock"
-        case .recording: return "record.circle"
         case .configuration: return "gearshape"
         case .sound: return "speaker.wave.2"
         case .model: return "waveform"

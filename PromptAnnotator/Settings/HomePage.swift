@@ -14,21 +14,14 @@ struct HomePage: View {
     @State private var getStartedComplete = HomeGetStartedStore.isComplete()
     @State private var hoveredRecentID: String?
 
+    /// Bento gutters — airy but tighter than sectionGap so cells read as one composition.
+    private var cellGap: CGFloat { Ink.space3 }
+
     var body: some View {
         DTScrollView {
             VStack(alignment: .leading, spacing: Ink.sectionGap) {
                 hero
-                stats
-                if showGetStarted {
-                    SettingsSection(title: "Get started") {
-                        checklist
-                    }
-                } else {
-                    thisWeek
-                    recentSection
-                }
-                statusLine
-                tips
+                bentoBody
             }
             .padding(.top, Ink.pageTop)
             .padding(.horizontal, Ink.pageSide)
@@ -43,14 +36,11 @@ struct HomePage: View {
         }
         .onChange(of: sessions.count) { _, _ in syncGetStartedFlag() }
         .onReceive(permissions.objectWillChange) { _ in
-            // Refresh after permission flips so completion can persist once.
             DispatchQueue.main.async { syncGetStartedFlag() }
         }
     }
 
-    private var showGetStarted: Bool {
-        !getStartedComplete
-    }
+    private var showGetStarted: Bool { !getStartedComplete }
 
     private func syncGetStartedFlag() {
         guard !getStartedComplete else { return }
@@ -60,7 +50,7 @@ struct HomePage: View {
         }
     }
 
-    // MARK: - Hero / stats (unchanged layout)
+    // MARK: - Hero (unchanged)
 
     private var hero: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -112,7 +102,24 @@ struct HomePage: View {
         }
     }
 
-    private var stats: some View {
+    // MARK: - Bento body
+
+    private var bentoBody: some View {
+        VStack(alignment: .leading, spacing: cellGap) {
+            statsRow
+            if showGetStarted {
+                HomeBentoCell(title: "GET STARTED") {
+                    checklist
+                }
+            } else {
+                recentAndWeekRow
+            }
+            actionsAndStatusRow
+        }
+    }
+
+    /// Row 1: four equal stat cells. Narrow → 2×2.
+    private var statsRow: some View {
         let numbers = SessionLibrary.stats(from: sessions)
         let items: [(Int, String)] = [
             (numbers.sessions, numbers.sessions == 1 ? "Session" : "Sessions"),
@@ -120,175 +127,247 @@ struct HomePage: View {
             (numbers.words, numbers.words == 1 ? "Word" : "Words"),
             (numbers.minutes, numbers.minutes == 1 ? "Minute" : "Minutes"),
         ]
-        return HStack(alignment: .top, spacing: Ink.gridGap) {
-            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                VStack(alignment: .leading, spacing: Ink.space2) {
-                    Text(item.0.formatted(.number.grouping(.automatic)))
-                        .font(Ink.numberFont)
-                        .monospacedDigit()
-                        .foregroundStyle(Ink.label)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Text(item.1.uppercased())
-                        .font(Ink.headingFont)
-                        .foregroundStyle(Ink.secondary)
-                    Rectangle()
-                        .fill(Ink.statRule)
-                        .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 4)
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: cellGap) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    statCell(value: item.0, label: item.1)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            VStack(spacing: cellGap) {
+                HStack(alignment: .top, spacing: cellGap) {
+                    statCell(value: items[0].0, label: items[0].1)
+                    statCell(value: items[1].0, label: items[1].1)
+                }
+                HStack(alignment: .top, spacing: cellGap) {
+                    statCell(value: items[2].0, label: items[2].1)
+                    statCell(value: items[3].0, label: items[3].1)
+                }
             }
         }
     }
 
-    // MARK: - Get started (incomplete only)
-
-    private var checklist: some View {
-        let items = checklistItems
-        let done = items.filter(\.done).count
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: Ink.space3) {
-                Text("\(done) of \(items.count) done".uppercased())
-                    .font(Ink.headingFont)
+    private func statCell(value: Int, label: String) -> some View {
+        HomeBentoCell(title: label.uppercased(), compact: true) {
+            VStack(alignment: .leading, spacing: Ink.space2) {
+                Text(value.formatted(.number.grouping(.automatic)))
+                    .font(Ink.numberFont)
+                    .monospacedDigit()
                     .foregroundStyle(Ink.label)
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(Ink.window)
-                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1.5))
-                        Rectangle()
-                            .fill(Ink.paintLime)
-                            .frame(width: max(0, geo.size.width * (items.isEmpty ? 0 : CGFloat(done) / CGFloat(items.count))))
-                            .overlay(alignment: .trailing) {
-                                Rectangle().fill(Ink.label).frame(width: 1)
-                            }
-                    }
-                }
-                .frame(height: 8)
-            }
-            .padding(.bottom, Ink.space3)
-
-            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                HStack(alignment: .top, spacing: Ink.space3) {
-                    InkCheck(done: item.done)
-                        .padding(.top, 1)
-                    VStack(alignment: .leading, spacing: Ink.titleDescGap) {
-                        Text(item.title)
-                            .font(Ink.labelFont)
-                            .foregroundStyle(Ink.label)
-                        Text(item.detail)
-                            .font(Ink.captionFont)
-                            .foregroundStyle(Ink.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    Spacer(minLength: 0)
-                    if let trail = item.trail {
-                        trail
-                    }
-                }
-                .padding(.vertical, Ink.space3)
-                .overlay(alignment: .bottom) {
-                    Rectangle().fill(Ink.hairline).frame(height: 1)
-                }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
+                Rectangle()
+                    .fill(Ink.statRule)
+                    .frame(width: 28, height: 3)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - This week
-
-    private var thisWeek: some View {
-        let counts = SessionLibrary.weeklyWordCounts(from: sessions)
-        let maxCount = max(counts.max() ?? 0, 1)
-        let initials = weekDayInitials()
-        return VStack(alignment: .leading, spacing: Ink.space2) {
-            Text("THIS WEEK")
-                .font(Ink.headingFont)
-                .foregroundStyle(Ink.label)
-            HStack(alignment: .bottom, spacing: Ink.space2) {
-                ForEach(0..<7, id: \.self) { index in
-                    let value = counts[index]
-                    let isToday = index == 6
-                    VStack(spacing: Ink.space1) {
-                        RoundedRectangle(cornerRadius: 1, style: .continuous)
-                            .fill(isToday ? Ink.paintRed : Ink.label)
-                            .frame(
-                                width: 10,
-                                height: max(4, CGFloat(value) / CGFloat(maxCount) * 36)
-                            )
-                            .opacity(value == 0 && !isToday ? 0.25 : (isToday ? 1 : 0.7))
-                        Text(initials[index])
-                            .font(Ink.captionFont)
-                            .foregroundStyle(isToday ? Ink.label : Ink.tertiary)
-                    }
+    /// Row 2: RECENT (~2/3) + THIS WEEK (~1/3). Narrow → stack.
+    private var recentAndWeekRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: cellGap) {
+                recentCell
                     .frame(maxWidth: .infinity)
-                    .accessibilityLabel("\(initials[index]), \(value) words")
-                }
+                thisWeekCell
+                    .frame(width: 220)
             }
-            .frame(height: 56, alignment: .bottom)
+            VStack(alignment: .leading, spacing: cellGap) {
+                recentCell
+                thisWeekCell
+            }
         }
     }
 
-    private func weekDayInitials(now: Date = Date(), calendar: Calendar = .current) -> [String] {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEEE" // single-letter weekday
-        let today = calendar.startOfDay(for: now)
-        return (0..<7).map { offset in
-            let day = calendar.date(byAdding: .day, value: offset - 6, to: today) ?? today
-            return formatter.string(from: day).uppercased()
-        }
-    }
-
-    // MARK: - Recent
-
-    private var recentSection: some View {
+    private var recentCell: some View {
         let rows = SessionLibrary.recent(sessions, limit: 4)
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("RECENT")
-                    .font(Ink.headingFont)
-                    .foregroundStyle(Ink.label)
-                Spacer(minLength: Ink.space2)
-                Button("All in History →") {
-                    onOpenHistory(nil)
-                }
-                .buttonStyle(.plain)
-                .font(Ink.captionFont)
-                .foregroundStyle(Ink.secondary)
-                .accessibilityLabel("All in History")
-            }
-            .padding(.bottom, Ink.space2)
-            .overlay(alignment: .bottom) {
-                Rectangle().fill(Ink.hairline).frame(height: 1)
-            }
-
+        return HomeBentoCell(
+            title: "RECENT",
+            trailing: AnyView(
+                Button("All in History →") { onOpenHistory(nil) }
+                    .buttonStyle(.plain)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+            )
+        ) {
             if rows.isEmpty {
                 Text("No sessions yet — press Start for your first take.")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
-                    .padding(.vertical, Ink.space3)
+                    .padding(.vertical, Ink.space2)
             } else {
-                ForEach(rows) { summary in
-                    recentRow(summary)
+                VStack(spacing: 0) {
+                    ForEach(rows) { summary in
+                        recentRow(summary)
+                    }
                 }
             }
         }
     }
 
+    private var thisWeekCell: some View {
+        let counts = SessionLibrary.weeklyWordCounts(from: sessions)
+        let total = counts.reduce(0, +)
+        let maxCount = max(counts.max() ?? 0, 1)
+        let best = counts.max() ?? 0
+        let initials = weekDayInitials()
+        return HomeBentoCell(
+            title: "THIS WEEK",
+            trailing: AnyView(
+                Text("\(total.formatted(.number.grouping(.automatic))) words")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .monospacedDigit()
+            )
+        ) {
+            VStack(alignment: .leading, spacing: Ink.space3) {
+                HStack(alignment: .bottom, spacing: 6) {
+                    ForEach(0..<7, id: \.self) { index in
+                        let value = counts[index]
+                        let isToday = index == 6
+                        VStack(spacing: 4) {
+                            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                                .fill(isToday ? Ink.paintRed : Ink.label)
+                                .frame(
+                                    width: 12,
+                                    height: max(4, CGFloat(value) / CGFloat(maxCount) * 48)
+                                )
+                                .opacity(value == 0 && !isToday ? 0.22 : (isToday ? 1 : 0.75))
+                            Text(initials[index])
+                                .font(Ink.captionFont)
+                                .foregroundStyle(isToday ? Ink.label : Ink.tertiary)
+                        }
+                        .frame(width: 14)
+                        .accessibilityLabel("\(initials[index]), \(value) words")
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if best > 0 {
+                    Text("Best day · \(best.formatted(.number.grouping(.automatic))) words")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.tertiary)
+                } else {
+                    Text("No words this week yet")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.tertiary)
+                }
+            }
+        }
+    }
+
+    /// Row 3: two action cells; status caption lives under the capture cell (least clutter).
+    private var actionsAndStatusRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: cellGap) {
+                captureActionCell
+                    .frame(maxWidth: .infinity)
+                folderActionCell
+                    .frame(maxWidth: .infinity)
+            }
+            VStack(alignment: .leading, spacing: cellGap) {
+                captureActionCell
+                folderActionCell
+            }
+        }
+    }
+
+    private var captureActionCell: some View {
+        HomeBentoCell(title: "CAPTURE") {
+            VStack(alignment: .leading, spacing: Ink.space2) {
+                actionGlyph("viewfinder")
+                Text("Talk, or drag to capture")
+                    .font(Ink.labelFont)
+                    .foregroundStyle(Ink.label)
+                Text("Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                statusCaption
+                    .padding(.top, Ink.space2)
+            }
+        }
+    }
+
+    private var folderActionCell: some View {
+        HomeBentoCell(title: "FOLDER") {
+            VStack(alignment: .leading, spacing: Ink.space2) {
+                actionGlyph("folder.fill")
+                Text("Sessions folder")
+                    .font(Ink.labelFont)
+                    .foregroundStyle(Ink.label)
+                Text(SessionStore.displayPath())
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Show") {
+                    if let root = try? SessionPaths.sessionsRoot() {
+                        NSWorkspace.shared.open(root)
+                    }
+                }
+                .buttonStyle(InkSecondaryButtonStyle())
+                .padding(.top, Ink.space1)
+            }
+        }
+    }
+
+    private func actionGlyph(_ symbol: String) -> some View {
+        ZStack {
+            Rectangle()
+                .fill(Ink.tileFace)
+            Rectangle()
+                .strokeBorder(Ink.controlBorder, lineWidth: 1.5)
+            Image(systemName: symbol)
+                .font(.system(size: Ink.tipSymbolPointSize, weight: .black))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(Ink.onTile)
+        }
+        .frame(width: Ink.tipIconSize, height: Ink.tipIconSize)
+    }
+
+    private var statusCaption: some View {
+        Group {
+            if let issue = homeStatusIssue {
+                HStack(alignment: .center, spacing: Ink.space2) {
+                    Circle()
+                        .fill(Ink.paintRed)
+                        .frame(width: 7, height: 7)
+                    Text(issue.message)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.label)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: Ink.space1)
+                    Button(issue.actionTitle) { issue.action() }
+                        .buttonStyle(InkSecondaryButtonStyle())
+                }
+            } else {
+                Text(homeStatusOK)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.tertiary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Recent row
+
     private func recentRow(_ summary: SessionSummary) -> some View {
         let hovering = hoveredRecentID == summary.id
-        return HStack(alignment: .center, spacing: Ink.space3) {
+        return HStack(alignment: .center, spacing: Ink.space2) {
             Button {
                 onOpenHistory(summary.id)
             } label: {
-                HStack(alignment: .center, spacing: Ink.space3) {
+                HStack(alignment: .center, spacing: Ink.space2) {
                     Text(SessionLibrary.recentWhen(summary.started))
-                        .font(Ink.labelFont)
+                        .font(Ink.captionFont)
                         .foregroundStyle(Ink.secondary)
                         .monospacedDigit()
-                        .frame(width: 52, alignment: .leading)
+                        .frame(width: 44, alignment: .leading)
                         .lineLimit(1)
 
                     Text(summary.preview.isEmpty ? "No speech" : summary.preview)
@@ -301,7 +380,7 @@ struct HomePage: View {
                         .font(Ink.captionFont)
                         .foregroundStyle(Ink.secondary)
                         .monospacedDigit()
-                        .frame(width: 40, alignment: .trailing)
+                        .frame(width: 36, alignment: .trailing)
                 }
                 .contentShape(Rectangle())
             }
@@ -314,7 +393,7 @@ struct HomePage: View {
 
             recentThumb(summary)
         }
-        .padding(.vertical, Ink.space3)
+        .padding(.vertical, Ink.space2)
         .onHover { over in
             if over {
                 hoveredRecentID = summary.id
@@ -342,9 +421,7 @@ struct HomePage: View {
                 .clipped()
                 .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
         } else {
-            Rectangle()
-                .fill(Color.clear)
-                .frame(width: side, height: side)
+            Color.clear.frame(width: side, height: side)
         }
     }
 
@@ -359,40 +436,20 @@ struct HomePage: View {
         SessionClipboard.copy(image: image, transcript: summary.transcript)
     }
 
-    // MARK: - Status line
-
-    private var statusLine: some View {
-        let issue = homeStatusIssue
-        return HStack(alignment: .center, spacing: Ink.space2) {
-            if let issue {
-                Circle()
-                    .fill(Ink.paintRed)
-                    .frame(width: 8, height: 8)
-                Text(issue.message)
-                    .font(Ink.captionFont)
-                    .foregroundStyle(Ink.label)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: Ink.space2)
-                Button(issue.actionTitle) { issue.action() }
-                    .buttonStyle(InkSecondaryButtonStyle())
-            } else {
-                Text(homeStatusOK)
-                    .font(Ink.captionFont)
-                    .foregroundStyle(Ink.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-            }
+    private func weekDayInitials(now: Date = Date(), calendar: Calendar = .current) -> [String] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEEE"
+        let today = calendar.startOfDay(for: now)
+        return (0..<7).map { offset in
+            let day = calendar.date(byAdding: .day, value: offset - 6, to: today) ?? today
+            return formatter.string(from: day).uppercased()
         }
-        .padding(.vertical, Ink.space2)
-        .accessibilityElement(children: .combine)
     }
 
+    // MARK: - Status helpers
+
     private var homeStatusOK: String {
-        let model = modelStatusLabel
-        let mic = micDisplayName
-        return "\(model) · \(mic) · Permissions OK"
+        "\(modelStatusLabel) · \(micDisplayName) · Permissions OK"
     }
 
     private var modelStatusLabel: String {
@@ -457,66 +514,59 @@ struct HomePage: View {
         return nil
     }
 
-    // MARK: - Tips (unchanged)
+    // MARK: - Get started checklist
 
-    private var tips: some View {
-        HStack(alignment: .top, spacing: Ink.gridGap) {
-            tipColumn(
-                glyph: "viewfinder",
-                title: "Talk, or drag to capture",
-                detail: "Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.",
-                trailing: nil
-            )
-            tipColumn(
-                glyph: "folder.fill",
-                title: "Sessions folder",
-                detail: SessionStore.displayPath(),
-                trailing: AnyView(
-                    Button("Show") {
-                        if let root = try? SessionPaths.sessionsRoot() {
-                            NSWorkspace.shared.open(root)
-                        }
+    private var checklist: some View {
+        let items = checklistItems
+        let done = items.filter(\.done).count
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: Ink.space3) {
+                Text("\(done) of \(items.count) done".uppercased())
+                    .font(Ink.headingFont)
+                    .foregroundStyle(Ink.label)
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Ink.window)
+                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1.5))
+                        Rectangle()
+                            .fill(Ink.paintLime)
+                            .frame(width: max(0, geo.size.width * (items.isEmpty ? 0 : CGFloat(done) / CGFloat(items.count))))
+                            .overlay(alignment: .trailing) {
+                                Rectangle().fill(Ink.label).frame(width: 1)
+                            }
                     }
-                    .buttonStyle(InkSecondaryButtonStyle())
-                )
-            )
-        }
-    }
-
-    private func tipColumn(
-        glyph: String,
-        title: String,
-        detail: String,
-        trailing: AnyView?
-    ) -> some View {
-        VStack(alignment: .leading, spacing: Ink.space2) {
-            ZStack {
-                Rectangle()
-                    .fill(Ink.tileFace)
-                Rectangle()
-                    .strokeBorder(Ink.controlBorder, lineWidth: 1.5)
-                Image(systemName: glyph)
-                    .font(.system(size: Ink.tipSymbolPointSize, weight: .black))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(Ink.onTile)
+                }
+                .frame(height: 8)
             }
-            .frame(width: Ink.tipIconSize, height: Ink.tipIconSize)
-            Text(title)
-                .font(Ink.labelFont)
-                .foregroundStyle(Ink.label)
-            Text(detail)
-                .font(Ink.captionFont)
-                .foregroundStyle(Ink.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if let trailing {
-                trailing
+            .padding(.bottom, Ink.space3)
+
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                HStack(alignment: .top, spacing: Ink.space3) {
+                    InkCheck(done: item.done)
+                        .padding(.top, 1)
+                    VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                        Text(item.title)
+                            .font(Ink.labelFont)
+                            .foregroundStyle(Ink.label)
+                        Text(item.detail)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    Spacer(minLength: 0)
+                    if let trail = item.trail {
+                        trail
+                    }
+                }
+                .padding(.vertical, Ink.space3)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(Ink.hairline).frame(height: 1)
+                }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
-
-    // MARK: - Checklist data
 
     private struct ChecklistItem {
         var done: Bool
@@ -610,6 +660,45 @@ struct HomePage: View {
             return "Turn on \(missing). If a switch is already on, turn it off and on, then reopen."
         }
         return "Screen Recording, Microphone, and Accessibility are on."
+    }
+}
+
+// MARK: - Bento cell
+
+/// Paint/Ink bordered cell: `Ink.front` face, 1pt label border, subtle bevel offset.
+private struct HomeBentoCell<Content: View>: View {
+    var title: String
+    var trailing: AnyView? = nil
+    var compact: Bool = false
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? Ink.space2 : Ink.space3) {
+            HStack(alignment: .firstTextBaseline, spacing: Ink.space2) {
+                Text(title)
+                    .font(Ink.headingFont)
+                    .foregroundStyle(Ink.label)
+                Spacer(minLength: 0)
+                if let trailing {
+                    trailing
+                }
+            }
+            content()
+        }
+        .padding(compact ? Ink.space3 : Ink.space4)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(Ink.front)
+        .overlay(
+            Rectangle()
+                .strokeBorder(Ink.label, lineWidth: 1)
+        )
+        .background(
+            Rectangle()
+                .fill(Ink.bevel)
+                .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
+        )
+        .padding(.trailing, Ink.buttonShadow)
+        .padding(.bottom, Ink.buttonShadow)
     }
 }
 

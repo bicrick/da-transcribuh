@@ -123,8 +123,8 @@ struct SettingsRoot: View {
                 focusSearch: $focusHistorySearch,
                 selectedID: $selectHistoryID
             )
-        case .recording:
-            RecordingPage(settings: settings, session: session)
+        case .appearance:
+            AppearancePage(settings: settings, session: session)
         case .configuration:
             ConfigurationPage(settings: settings)
         case .sound:

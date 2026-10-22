@@ -1,15 +1,33 @@
 import AppKit
 import SwiftUI
 
-struct RecordingPage: View {
+/// Theme + recording chrome. Absorbs the old Recording page (island style +
+/// Shift-drag defaults) so look lives in one tab; recording shortcuts stay in General.
+struct AppearancePage: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var session: SessionController
 
     var body: some View {
         SettingsPageStack(
-            title: "Recording",
-            subtitle: "Island style and Shift-drag defaults. Shortcuts live in General."
+            title: "Appearance",
+            subtitle: "Theme, floating island, and Shift-drag defaults. Recording shortcuts live in General."
         ) {
+            SettingsSection(
+                title: "Theme",
+                footer: "Also cycles from the menu bar as theme: …"
+            ) {
+                InkCard {
+                    InkAppearanceSegment(
+                        selection: Binding(
+                            get: { settings.appearance },
+                            set: { settings.setAppearance($0) }
+                        )
+                    )
+                    .padding(.horizontal, Ink.rowHPad)
+                    .padding(.vertical, Ink.rowVPad)
+                }
+            }
+
             SettingsSection(
                 title: "Recording window",
                 footer: "The menu bar shows the same shortcut under Start Session."
