@@ -138,3 +138,46 @@ extension HotkeyChord {
         self.init(keyCode: UInt32(event.keyCode), carbonModifiers: carbon)
     }
 }
+
+/// Shared capture outcome for the recording Start/Stop chord (Home + General).
+/// One path into `AppSettings.setChord` so both UIs stay in sync.
+enum RecordingChordCapture {
+    enum Outcome: Equatable {
+        case cancelled
+        case restoredDefault(success: Bool)
+        case rejected(String)
+        case saved(success: Bool)
+    }
+
+    /// Esc cancels; Delete / Forward Delete restores ⌃⌥Space; otherwise validate + `setChord`.
+    @MainActor
+    static func applyToggleEvent(_ event: NSEvent, settings: AppSettings) -> Outcome {
+        let bare = event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty
+        if bare, event.keyCode == 53 { // Esc
+            return .cancelled
+        }
+        if bare, event.keyCode == 51 || event.keyCode == 117 { // Delete / Fwd Del
+            let ok = settings.setChord(.default)
+            return .restoredDefault(success: ok)
+        }
+        let chord = HotkeyChord(event: event)
+        if let rejection = chord.rejection {
+            return .rejected(rejection)
+        }
+        let ok = settings.setChord(chord)
+        return .saved(success: ok)
+    }
+
+    static func message(for outcome: Outcome) -> String? {
+        switch outcome {
+        case .cancelled:
+            return nil
+        case .restoredDefault(let success):
+            return success ? nil : "macOS would not register the default shortcut."
+        case .rejected(let reason):
+            return reason
+        case .saved(let success):
+            return success ? nil : "That shortcut is already used, or macOS would not register it."
+        }
+    }
+}

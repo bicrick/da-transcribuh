@@ -1,23 +1,23 @@
 import SwiftUI
 
-/// Manila-folder divider tabs across the top of Settings — replaces the toolbox sidebar.
+/// Chrome-style folder tabs across the top of Settings.
 ///
 /// Intrinsic height only. Do not put flexible `Color`/`Spacer` children that can grow
 /// vertically inside the shelf HStack — a bare `Color.clear.frame(width:)` greedily
 /// takes the VStack’s leftover height and the shelf fill paints a huge empty band.
 ///
-/// Selected tab merges into the page: fill is `Ink.front`, the shelf hairline is
-/// interrupted under it, and the tab sits 1pt lower so side borders flow into the
-/// content edge with no seam (light + graphite).
+/// Selected tab merges into the page (`Ink.front` fill). The shelf rule and the
+/// selected tab outline are one continuous 1pt stroke: rule → up left foot/side →
+/// across the top → down right → rule. Unselected tabs share one height/baseline
+/// and sit on the rule.
 struct SettingsFolderTabs: View {
     @Binding var selection: SettingsPage
     var onSearch: (() -> Void)? = nil
 
     private var tabHeight: CGFloat { Ink.folderTabHeight }
-    private let unselectedInset: CGFloat = 3
-    /// Top pad + selected tab face. Keep the shelf from ever stretching.
+    /// Top pad + tab face. Keep the shelf from ever stretching.
     private var shelfHeight: CGFloat { Ink.space2 + tabHeight }
-    /// How far the selected tab bleeds over the shelf hairline into the page.
+    /// How far the selected fill bleeds over the shelf line into the page (fill only).
     private let selectedBleed: CGFloat = 1
 
     @State private var selectedFrame: CGRect = .null
@@ -26,12 +26,12 @@ struct SettingsFolderTabs: View {
         HStack(alignment: .bottom, spacing: 0) {
             ForEach(Array(SettingsPage.tabGroups.enumerated()), id: \.offset) { groupIndex, group in
                 if groupIndex > 0 {
-                    // Fixed-size gap — never a flexible Color (expands vertically).
                     Color.clear
                         .frame(width: Ink.tabGroupGap, height: 1)
                 }
                 ForEach(Array(group.enumerated()), id: \.element.id) { tabIndex, page in
                     if tabIndex > 0 {
+                        // Tight gap — feet stay distinct without trapezoid flare tricks.
                         Color.clear
                             .frame(width: 2, height: 1)
                     }
@@ -50,12 +50,16 @@ struct SettingsFolderTabs: View {
         .fixedSize(horizontal: false, vertical: true)
         .frame(height: shelfHeight, alignment: .bottom)
         .coordinateSpace(name: ShelfSpace.name)
-        // Shelf fill + hairline with a gap under the selected tab (drawn behind tabs).
         .background {
             ZStack(alignment: .bottom) {
                 Ink.fill
-                ShelfHairline(gap: selectedFrame)
-                    .frame(height: 1)
+                // Single path: full-width rule joined to the selected tab outline,
+                // stroked in the selected tab’s accent (animates on tab change).
+                SelectedTabShelfStroke(gap: selectedFrame)
+                    .stroke(selection.tabAccent, lineWidth: 1)
+                    .frame(height: shelfHeight)
+                    .allowsHitTesting(false)
+                    .animation(.easeInOut(duration: 0.15), value: selection)
             }
         }
         .onPreferenceChange(SelectedTabFrameKey.self) { frame in
@@ -80,28 +84,41 @@ struct SettingsFolderTabs: View {
             }
             .foregroundStyle(selected ? Ink.label : Ink.secondary)
             .padding(.horizontal, Ink.space3)
-            .frame(height: selected ? tabHeight : tabHeight - unselectedInset)
+            // Room for Chrome feet so the shape isn’t clipped.
+            .padding(.horizontal, FolderTabShape.foot)
+            .frame(height: tabHeight)
             .background {
-                // Selected = page face so it merges with content below.
-                FolderTabShape(selected: selected)
+                FolderTabShape(closeBottom: !selected)
                     .fill(selected ? Ink.front : Ink.fill)
             }
             .overlay {
-                FolderTabShape(selected: selected)
-                    .stroke(Ink.label, lineWidth: 1)
+                // Unselected only — selected outline is the accent shelf stroke.
+                if !selected {
+                    FolderTabShape(closeBottom: true)
+                        .stroke(Ink.hairline, lineWidth: 1)
+                }
             }
             .overlay(alignment: .top) {
-                // Per-tab Paint accent: full stripe when selected; quiet tick when not.
-                Rectangle()
-                    .fill(page.tabAccent)
-                    .frame(height: selected ? 2 : 1)
-                    .padding(.horizontal, selected ? 10 : 14)
-                    .padding(.top, selected ? 1 : 2)
-                    .opacity(selected ? 1 : 0.45)
+                // Selected: colored outline is enough — no inner stripe.
+                // Unselected: quiet tick so tabs stay identifiable before selection.
+                if !selected {
+                    Rectangle()
+                        .fill(page.tabAccent)
+                        .frame(height: 1)
+                        .padding(.horizontal, FolderTabShape.foot + FolderTabShape.corner)
+                        .padding(.top, 3)
+                        .opacity(0.45)
+                }
             }
-            .padding(.bottom, selected ? 0 : unselectedInset)
-            // Bleed 1pt over the hairline so fill + side strokes meet the page with no seam.
-            .offset(y: selected ? selectedBleed : 0)
+            // Fill bleed only — stroke stays on the shelf baseline via the shared path.
+            .background(alignment: .bottom) {
+                if selected {
+                    Ink.front
+                        .frame(height: selectedBleed)
+                        .offset(y: selectedBleed)
+                        .padding(.horizontal, FolderTabShape.foot)
+                }
+            }
             .background {
                 if selected {
                     GeometryReader { geo in
@@ -121,7 +138,7 @@ struct SettingsFolderTabs: View {
     }
 }
 
-// MARK: - Shelf hairline (gap under selected tab)
+// MARK: - Shelf space + selected frame
 
 private enum ShelfSpace {
     static let name = "settings.folderTabShelf"
@@ -137,65 +154,125 @@ private struct SelectedTabFrameKey: PreferenceKey {
     }
 }
 
-/// Continuous shelf rule with a clean gap exactly under the selected tab frame.
-private struct ShelfHairline: View {
+/// One continuous path: left rule → selected Chrome-tab outline → right rule.
+/// Pixel-aligned (centerline on .5). Stroke color comes from the caller (selected accent).
+private struct SelectedTabShelfStroke: Shape {
     var gap: CGRect
 
-    var body: some View {
-        Canvas { context, size in
-            let y = size.height - 0.5
-            var path = Path()
-            if gap.isNull || gap.isEmpty || gap.width <= 0 {
-                path.move(to: CGPoint(x: 0, y: y))
-                path.addLine(to: CGPoint(x: size.width, y: y))
-            } else {
-                let left = max(0, gap.minX)
-                let right = min(size.width, gap.maxX)
-                if left > 0 {
-                    path.move(to: CGPoint(x: 0, y: y))
-                    path.addLine(to: CGPoint(x: left, y: y))
-                }
-                if right < size.width {
-                    path.move(to: CGPoint(x: right, y: y))
-                    path.addLine(to: CGPoint(x: size.width, y: y))
-                }
-            }
-            context.stroke(path, with: .color(Ink.hairline), lineWidth: 1)
+    func path(in rect: CGRect) -> Path {
+        let y = rect.maxY - 0.5
+        var path = Path()
+
+        if gap.isNull || gap.isEmpty || gap.width <= 2 * FolderTabShape.foot {
+            path.move(to: CGPoint(x: rect.minX, y: y))
+            path.addLine(to: CGPoint(x: rect.maxX, y: y))
+            return path
         }
-        .allowsHitTesting(false)
+
+        let tab = CGRect(
+            x: gap.minX,
+            y: gap.minY,
+            width: gap.width,
+            height: max(0, y + 0.5 - gap.minY)
+        )
+        path.move(to: CGPoint(x: rect.minX, y: y))
+        path.addLine(to: CGPoint(x: tab.minX, y: y))
+        FolderTabShape.appendOpenOutline(to: &path, in: tab, shelfY: y, moveToStart: false)
+        path.addLine(to: CGPoint(x: rect.maxX, y: y))
+        return path
     }
 }
 
-// MARK: - Tab silhouette
+// MARK: - Chrome-style tab silhouette
 
-/// Raised folder tab: angled shoulders, flat top. Selected omits the bottom edge so
-/// the face merges with the page (no seam under the selected tab).
+/// Chrome-like tab: fixed geometry for every label width.
+/// Rounded top corners (`corner`) and concave outward feet (`foot`) at the shelf.
+/// Rect bounds include the feet; the rectangular body sits between `foot` and `width - foot`.
 struct FolderTabShape: Shape {
-    var selected: Bool
+    /// Rounded top-corner radius (pt). Identical for every tab.
+    static let corner: CGFloat = 6
+    /// Concave foot radius where the tab meets the shelf (pt).
+    static let foot: CGFloat = 6
+
+    /// When true, close along the shelf baseline (unselected). Selected leaves bottom open.
+    var closeBottom: Bool
 
     func path(in rect: CGRect) -> Path {
-        let r: CGFloat = 3
-        let flare: CGFloat = 5
         var path = Path()
-        // Start bottom-left (under the shelf when selected).
-        path.move(to: CGPoint(x: 0, y: rect.maxY))
-        path.addLine(to: CGPoint(x: flare, y: r))
-        path.addQuadCurve(
-            to: CGPoint(x: flare + r, y: 0),
-            control: CGPoint(x: flare, y: 0)
-        )
-        path.addLine(to: CGPoint(x: rect.maxX - flare - r, y: 0))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX - flare, y: r),
-            control: CGPoint(x: rect.maxX - flare, y: 0)
-        )
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        if !selected {
-            path.addLine(to: CGPoint(x: 0, y: rect.maxY))
+        Self.appendOpenOutline(to: &path, in: rect, shelfY: rect.maxY, moveToStart: true)
+        if closeBottom {
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
             path.closeSubpath()
         }
-        // Selected: leave bottom open so the stroke doesn’t draw a seam.
         return path
+    }
+
+    /// Open outline starting at the left foot tip on `shelfY` and ending at the right foot tip.
+    /// Shared by fill shapes and the continuous shelf stroke so joints match exactly.
+    /// When `moveToStart` is false, the caller must already be at the left foot tip.
+    static func appendOpenOutline(
+        to path: inout Path,
+        in rect: CGRect,
+        shelfY: CGFloat,
+        moveToStart: Bool = true
+    ) {
+        let r = corner
+        let f = foot
+        let bodyLeft = rect.minX + f
+        let bodyRight = rect.maxX - f
+        let top = rect.minY
+        // Keep feet from collapsing on very narrow tabs.
+        let safeR = min(r, max(0, (bodyRight - bodyLeft) / 2), max(0, (shelfY - top) / 2))
+
+        if moveToStart {
+            path.move(to: CGPoint(x: rect.minX, y: shelfY))
+        }
+
+        // Concave left foot: circle centered at bodyLeft on the shelf.
+        // Arc from west (foot tip) to north (up the body wall).
+        path.addArc(
+            center: CGPoint(x: bodyLeft, y: shelfY),
+            radius: f,
+            startAngle: .degrees(180),
+            endAngle: .degrees(270),
+            clockwise: false
+        )
+
+        // Left wall up to the top corner.
+        path.addLine(to: CGPoint(x: bodyLeft, y: top + safeR))
+
+        // Top-left rounded corner.
+        path.addArc(
+            center: CGPoint(x: bodyLeft + safeR, y: top + safeR),
+            radius: safeR,
+            startAngle: .degrees(180),
+            endAngle: .degrees(270),
+            clockwise: false
+        )
+
+        // Flat top.
+        path.addLine(to: CGPoint(x: bodyRight - safeR, y: top))
+
+        // Top-right rounded corner.
+        path.addArc(
+            center: CGPoint(x: bodyRight - safeR, y: top + safeR),
+            radius: safeR,
+            startAngle: .degrees(270),
+            endAngle: .degrees(0),
+            clockwise: false
+        )
+
+        // Right wall down to the foot.
+        path.addLine(to: CGPoint(x: bodyRight, y: shelfY - f))
+
+        // Concave right foot: north → east onto the shelf.
+        path.addArc(
+            center: CGPoint(x: bodyRight, y: shelfY),
+            radius: f,
+            startAngle: .degrees(270),
+            endAngle: .degrees(0),
+            clockwise: false
+        )
     }
 }
 
@@ -224,16 +301,17 @@ extension SettingsPage {
         }
     }
 
-    /// Quiet Paint accent for the folder-tab top stripe (moved off Home stats).
+    /// Paint accent for the continuous selected shelf stroke (and quiet unselected ticks).
+    /// Lifted slightly in dark so the 1pt path stays readable on graphite.
     var tabAccent: Color {
         switch self {
-        case .home: return Ink.paintRed
-        case .appearance: return Ink.paintOrange
-        case .history: return Ink.paintBlue
-        case .model: return Ink.paintMagenta
-        case .configuration: return Ink.paintGreen
-        case .sound: return Ink.paintTeal
-        case .performance: return Ink.paintPink
+        case .home: return Ink.tabStrokeRed
+        case .appearance: return Ink.tabStrokePurple
+        case .history: return Ink.tabStrokeBlue
+        case .model: return Ink.tabStrokeOrange
+        case .configuration: return Ink.tabStrokeGreen
+        case .sound: return Ink.tabStrokeTeal
+        case .performance: return Ink.tabStrokePink
         }
     }
 }

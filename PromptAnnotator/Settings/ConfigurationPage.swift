@@ -321,24 +321,27 @@ struct ConfigurationPage: View {
     private func apply(_ event: NSEvent) {
         let target = capture
         capture = nil
-        let bareEscape = event.keyCode == 53 && event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty
-        if bareEscape {
-            if target == .cancel {
-                _ = settings.setCancelChord(nil)
-            }
-            message = nil
-            return
-        }
-        let chord = HotkeyChord(event: event)
-        if let rejection = chord.rejection {
-            message = rejection
-            return
-        }
         switch target {
         case .toggle:
-            message = settings.setChord(chord) ? nil : "That shortcut is already used, or macOS would not register it."
+            message = RecordingChordCapture.message(
+                for: RecordingChordCapture.applyToggleEvent(event, settings: settings)
+            )
         case .cancel:
-            message = settings.setCancelChord(chord) ? nil : "That shortcut is already used, or macOS would not register it."
+            let bareEscape = event.keyCode == 53
+                && event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty
+            if bareEscape {
+                _ = settings.setCancelChord(nil)
+                message = nil
+                return
+            }
+            let chord = HotkeyChord(event: event)
+            if let rejection = chord.rejection {
+                message = rejection
+                return
+            }
+            message = settings.setCancelChord(chord)
+                ? nil
+                : "That shortcut is already used, or macOS would not register it."
         case nil:
             break
         }
