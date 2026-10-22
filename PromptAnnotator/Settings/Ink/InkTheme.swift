@@ -99,6 +99,8 @@ enum Ink {
 
     /// Folder-tab shelf height (selected face).
     static let folderTabHeight: CGFloat = 30
+    /// Subtle gap between Session / Speech / App tab clusters (~6–8pt).
+    static let tabGroupGap: CGFloat = 8
     /// Tip row: monochrome glyph square.
     static let tipIconSize: CGFloat = 48
     static let tipSymbolPointSize: CGFloat = 22
