@@ -1145,9 +1145,10 @@ final class SessionController: ObservableObject {
         let countChanged = count != captureCount
         captureCount = count
         if countChanged, phase == .recording {
+            let animate = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
             islandChrome.setTargets(
                 IslandSlots.recording(style: AppSettings.shared.islandStyle, captures: count),
-                animated: true
+                animated: animate
             )
         }
     }
@@ -1198,9 +1199,10 @@ final class SessionController: ObservableObject {
             chrome.beginIslandReveal()
         }
         islandChrome.setPresence(.recording)
+        let animateSlots = !fade && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         islandChrome.setTargets(
             IslandSlots.recording(style: style, captures: captureCount),
-            animated: !fade
+            animated: animateSlots
         )
         chrome.revealIsland(size: islandPanelSize(), fadeIn: fade)
         if showsToolbar {

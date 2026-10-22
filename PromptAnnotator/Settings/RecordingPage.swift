@@ -100,32 +100,36 @@ struct RecordingPage: View {
         }
         switch style {
         case .classic:
-            HStack(spacing: Ink.space1 + 1) {
+            HStack(spacing: Ink.space1) {
                 Rectangle()
                     .fill(Ink.record)
-                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
                     .frame(width: 6, height: 6)
-                WaveformBars(levels: preview, slotWidth: 64, slotHeight: 16)
+                Text("0:12")
+                    .font(Ink.microFont)
+                    .foregroundStyle(Ink.secondary)
+                WaveformBars(levels: preview, slotWidth: 56, slotHeight: 14)
                 Text("1")
-                    .font(Ink.badgeFont)
+                    .font(Ink.microFont)
                     .foregroundStyle(Ink.label)
                 Image(systemName: "photo")
-                    .font(Ink.microFont)
+                    .font(.system(size: 8, weight: .black))
                     .foregroundStyle(Ink.secondary)
             }
         case .compact:
-            HStack(spacing: Ink.space1 + 1) {
+            HStack(spacing: 3) {
                 Rectangle()
                     .fill(Ink.record)
-                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
-                    .frame(width: 6, height: 6)
-                WaveformBars(levels: preview, slotWidth: 72, slotHeight: 16)
+                    .frame(width: 5, height: 5)
                 Text("0:12")
-                    .font(Ink.captionFont)
+                    .font(.system(size: 8, weight: .regular, design: .monospaced))
                     .foregroundStyle(Ink.secondary)
+                WaveformBars(levels: preview, slotWidth: 44, slotHeight: 11)
+                Text("1")
+                    .font(.system(size: 8, weight: .regular, design: .monospaced))
+                    .foregroundStyle(Ink.label)
             }
         case .minimal:
-            WaveformBars(levels: preview, slotWidth: 96, slotHeight: 16)
+            WaveformBars(levels: preview, slotWidth: 96, slotHeight: 14)
         case .hidden:
             Image(systemName: "eye.slash")
                 .font(Ink.labelFont)

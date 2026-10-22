@@ -55,14 +55,15 @@ enum IslandStyle: String, CaseIterable, Identifiable, Codable {
 
     var detail: String {
         switch self {
-        case .classic: return "Waveform in the middle"
-        case .compact: return "Dot, waveform, and time"
+        case .classic: return "Record square, timer, and waveform — the everyday size"
+        case .compact: return "Same layout, tighter height and type"
         case .minimal: return "Waveform only"
         case .hidden: return "No bar while you record"
         }
     }
 
-    /// Older builds stored Mini for the smaller full bar.
+    /// Older builds stored Mini for the smaller full bar; empty / unknown → Default (classic).
+    /// Classic users keep the key and pick up the new default metrics automatically.
     static func stored(_ raw: String) -> IslandStyle {
         if raw == "mini" { return .compact }
         return IslandStyle(rawValue: raw) ?? .classic

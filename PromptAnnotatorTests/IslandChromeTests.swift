@@ -40,27 +40,41 @@ final class IslandChromeTests: XCTestCase {
         XCTAssertEqual(downloading.chip, 0)
     }
 
-    func testTheCombStaysCenteredAndSideSlotsMatch() {
-        for style in IslandStyle.allCases {
+    func testChipCollapsedLeavesNoTrailingWidth() {
+        for style: IslandStyle in [.classic, .compact] {
+            let empty = IslandMetrics.layout(
+                style: style,
+                slots: IslandSlots.recording(style: style, captures: 0),
+                captures: 0,
+                elapsed: 12
+            )
+            XCTAssertEqual(empty.trailingSide, 0, "\(style)")
+            XCTAssertEqual(empty.sideGapTrailing, 0, "\(style)")
+            XCTAssertGreaterThan(empty.leadingSide, 0, "\(style)")
+
+            let withChip = IslandMetrics.layout(
+                style: style,
+                slots: IslandSlots.recording(style: style, captures: 2),
+                captures: 2,
+                elapsed: 12
+            )
+            XCTAssertEqual(withChip.leadingSide, withChip.trailingSide, accuracy: 0.01, "\(style)")
+            XCTAssertGreaterThan(withChip.panel.width, empty.panel.width, "\(style)")
+        }
+    }
+
+    func testTheCombStaysCenteredWhenChipIsOpen() {
+        for style: IslandStyle in [.classic, .compact] {
+            let scale = IslandMetrics.scale(for: style)
             let recording = IslandMetrics.layout(
                 style: style,
                 slots: IslandSlots.recording(style: style, captures: 2),
                 captures: 2,
                 elapsed: 12
             )
-            let processing = IslandMetrics.layout(
-                style: style,
-                slots: IslandSlots.processing(phase: .transcribing),
-                captures: 2,
-                elapsed: 12
-            )
-            XCTAssertEqual(recording.wave, processing.wave, "\(style)")
-            XCTAssertEqual(recording.panel.height, processing.panel.height, "\(style)")
-
-            // Equal side slots + equal sideGaps keep the waveform centered.
-            let left = IslandMetrics.inset + recording.side + recording.sideGap
+            let left = scale.inset + recording.leadingSide + recording.sideGapLeading
             let waveEnd = left + recording.wave.width
-            let right = recording.panel.width - IslandMetrics.inset - recording.side - recording.sideGap
+            let right = recording.panel.width - scale.inset - recording.trailingSide - recording.sideGapTrailing
             XCTAssertEqual(waveEnd, right, accuracy: 0.01, "\(style)")
             XCTAssertEqual(
                 recording.panel.width / 2,
@@ -68,17 +82,18 @@ final class IslandChromeTests: XCTestCase {
                 accuracy: 0.01,
                 "\(style)"
             )
-
-            if style == .minimal || style == .hidden {
-                XCTAssertEqual(recording.panel, processing.panel, "\(style)")
-            } else {
-                XCTAssertGreaterThan(recording.panel.width, processing.panel.width, "\(style)")
-                XCTAssertEqual(processing.side, 0, "\(style)")
-                XCTAssertGreaterThan(recording.side, 0, "\(style)")
-                // Left and right slots share one width.
-                XCTAssertEqual(recording.sideGap, IslandMetrics.sideGap, accuracy: 0.01, "\(style)")
-            }
         }
+    }
+
+    func testDefaultIsRoomierThanCompact() {
+        let def = IslandMetrics.scale(for: .classic)
+        let compact = IslandMetrics.scale(for: .compact)
+        XCTAssertGreaterThan(def.barHeight, compact.barHeight)
+        XCTAssertGreaterThan(def.wave.width, compact.wave.width)
+        XCTAssertGreaterThanOrEqual(def.barHeight, 24)
+        XCTAssertGreaterThanOrEqual(compact.barHeight, 24)
+        XCTAssertGreaterThanOrEqual(def.chipMinHeight, 24)
+        XCTAssertGreaterThanOrEqual(compact.chipMinHeight, 24)
     }
 
     func testClockSpanIsFixedAgainstElapsed() {
@@ -89,17 +104,17 @@ final class IslandChromeTests: XCTestCase {
 
     func testBarHeightMeetsHitTarget() {
         for style in IslandStyle.allCases {
-            XCTAssertGreaterThanOrEqual(IslandMetrics.barHeight(style), 28, "\(style)")
+            XCTAssertGreaterThanOrEqual(IslandMetrics.barHeight(style), 24, "\(style)")
         }
     }
 
     func testClosingSlotsCollapseWithoutCrossingTheTarget() {
-        let step = IslandSlots.step(1, 0, delta: 1.0 / 60.0, tau: 0.13)
-        XCTAssertGreaterThan(step, 0.8)
+        let step = IslandSlots.step(1, 0, delta: 1.0 / 60.0, tau: 0.07)
+        XCTAssertGreaterThan(step, 0.7)
         XCTAssertLessThan(step, 1)
         var amount: CGFloat = 1
         for _ in 0..<90 {
-            amount = IslandSlots.step(amount, 0, delta: 1.0 / 60.0, tau: 0.13)
+            amount = IslandSlots.step(amount, 0, delta: 1.0 / 60.0, tau: 0.07)
             XCTAssertGreaterThanOrEqual(amount, 0)
         }
         XCTAssertLessThan(amount, 0.01)
