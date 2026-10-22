@@ -9,8 +9,12 @@ final class ClipboardHistoryPanelController {
     private var panel: ChromePanel?
     private var host: NSHostingView<ClipboardHistoryView>?
     private let store = ClipboardHistoryStore.shared
-    private var outsideMonitor: Any?
+    private var outsideGlobalMonitor: Any?
+    private var outsideLocalMonitor: Any?
     private var resignObserver: NSObjectProtocol?
+    private var resignHideWork: DispatchWorkItem?
+    /// Bumped on each `show()` so a stale resign-hide cannot close a fresh panel.
+    private var showGeneration: UInt64 = 0
 
     var isVisible: Bool {
         panel?.isVisible == true
@@ -29,6 +33,9 @@ final class ClipboardHistoryPanelController {
     }
 
     func show() {
+        resignHideWork?.cancel()
+        resignHideWork = nil
+        showGeneration &+= 1
         let root = ClipboardHistoryView(
             store: store,
             onPick: { [weak self] item, paste in
@@ -74,13 +81,17 @@ final class ClipboardHistoryPanelController {
         let chrome = CGSize(width: size.width + Ink.bevelOffset, height: size.height + Ink.bevelOffset)
         place(panel: panel, size: chrome, visual: size)
         panel.alphaValue = 0.95
+        // Nonactivating panel can still be key so arrows/Enter work with search off.
         panel.orderFrontRegardless()
+        panel.makeKey()
         panel.makeFirstResponder(host)
         installOutsideClickMonitor()
         installResignObserver()
     }
 
     func hide() {
+        resignHideWork?.cancel()
+        resignHideWork = nil
         removeOutsideClickMonitor()
         removeResignObserver()
         ClipboardPreviewPanelController.shared.hide()
@@ -89,52 +100,75 @@ final class ClipboardHistoryPanelController {
 
     private func installOutsideClickMonitor() {
         removeOutsideClickMonitor()
-        outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+        // Global: other apps. Local: same-app clicks (preview / Settings) skipped by global.
+        outsideGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.handleOutsideClick(event)
+                self?.dismissIfClickOutside()
             }
+        }
+        outsideLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            MainActor.assumeIsolated {
+                self?.dismissIfClickOutside()
+            }
+            return event
         }
     }
 
-    private func handleOutsideClick(_ event: NSEvent) {
+    private func dismissIfClickOutside() {
         guard isVisible, let panel else { return }
-        let point = event.locationInWindow
-        // Global monitor: location is in screen coords for mouse events.
         let screenPoint = NSEvent.mouseLocation
         let listHit = panel.frame.contains(screenPoint)
         let previewHit = ClipboardPreviewPanelController.shared.frame?.contains(screenPoint) == true
         if !listHit && !previewHit {
             hide()
         }
-        _ = point
     }
 
     private func removeOutsideClickMonitor() {
-        if let outsideMonitor {
-            NSEvent.removeMonitor(outsideMonitor)
-            self.outsideMonitor = nil
+        if let outsideGlobalMonitor {
+            NSEvent.removeMonitor(outsideGlobalMonitor)
+            self.outsideGlobalMonitor = nil
+        }
+        if let outsideLocalMonitor {
+            NSEvent.removeMonitor(outsideLocalMonitor)
+            self.outsideLocalMonitor = nil
         }
     }
 
     private func installResignObserver() {
         removeResignObserver()
+        let generation = showGeneration
         resignObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didResignKeyNotification,
             object: panel,
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                // Delay so a click that activates another app still closes us.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                guard let self else { return }
+                self.resignHideWork?.cancel()
+                let work = DispatchWorkItem { [weak self] in
                     MainActor.assumeIsolated {
-                        guard let self, self.isVisible else { return }
-                        if self.panel?.isKeyWindow != true {
-                            self.hide()
-                        }
+                        guard let self else { return }
+                        guard self.isVisible, self.showGeneration == generation else { return }
+                        if self.shouldKeepOpenAfterResign() { return }
+                        self.hide()
                     }
                 }
+                self.resignHideWork = work
+                // Delay so a click that activates another app still closes us.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
             }
         }
+    }
+
+    /// Keep the list open when focus moves to our preview, or the pointer is still on chrome.
+    private func shouldKeepOpenAfterResign() -> Bool {
+        if panel?.isKeyWindow == true { return true }
+        if ClipboardPreviewPanelController.shared.isKeyWindow { return true }
+        let mouse = NSEvent.mouseLocation
+        if panel?.frame.contains(mouse) == true { return true }
+        if ClipboardPreviewPanelController.shared.frame?.contains(mouse) == true { return true }
+        return false
     }
 
     private func removeResignObserver() {

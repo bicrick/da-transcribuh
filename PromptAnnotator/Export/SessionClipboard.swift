@@ -134,6 +134,13 @@ enum SessionClipboard {
 
     @discardableResult
     static func writeTranscript(_ text: String, to board: NSPasteboard) -> Bool {
+        writeClipboardText(text, plainOnly: true, to: board)
+    }
+
+    /// Stages history text for paste-back. When `plainOnly` is false, also
+    /// declares RTF so destinations that prefer rich paste get a typed payload.
+    @discardableResult
+    static func writeClipboardText(_ text: String, plainOnly: Bool, to board: NSPasteboard) -> Bool {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         if board === NSPasteboard.general {
             MainActor.assumeIsolated { ClipboardHistoryStore.shared.beginOwnWrite() }
@@ -144,6 +151,22 @@ enum SessionClipboard {
             }
         }
         board.clearContents()
+        if plainOnly {
+            return board.setString(text, forType: .string)
+        }
+        let attr = NSAttributedString(
+            string: text,
+            attributes: [.font: NSFont.systemFont(ofSize: 13)]
+        )
+        if let rtf = try? attr.data(
+            from: NSRange(location: 0, length: attr.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        ) {
+            board.declareTypes([.string, .rtf], owner: nil)
+            board.setString(text, forType: .string)
+            board.setData(rtf, forType: .rtf)
+            return true
+        }
         return board.setString(text, forType: .string)
     }
 

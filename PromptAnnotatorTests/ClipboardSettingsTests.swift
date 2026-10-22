@@ -144,4 +144,40 @@ final class ClipboardSettingsTests: XCTestCase {
         XCTAssertFalse(hits.isEmpty)
         XCTAssertTrue(hits.allSatisfy { $0.page == .clipboard })
     }
+
+    func testPasteWithoutFormattingStagesPlainOnly() {
+        let board = NSPasteboard(name: NSPasteboard.Name("PromptAnnotatorClipboardPlainTest"))
+        XCTAssertTrue(
+            SessionClipboard.writeClipboardText("hello format", plainOnly: true, to: board)
+        )
+        XCTAssertEqual(board.string(forType: .string), "hello format")
+        XCTAssertNil(board.data(forType: .rtf))
+
+        XCTAssertTrue(
+            SessionClipboard.writeClipboardText("hello format", plainOnly: false, to: board)
+        )
+        XCTAssertEqual(board.string(forType: .string), "hello format")
+        XCTAssertNotNil(board.data(forType: .rtf))
+    }
+
+    func testPinKeyMetadataSurvivesStoreRoundTrip() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("clip-pinkey-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let store = ClipboardHistoryStore(folder: folder)
+        _ = store.ingest(
+            kind: .text, source: .pasteboard, text: "pinned",
+            imagePNG: nil, filePaths: nil, fingerprint: "pk"
+        )
+        guard let item = store.items.first else {
+            return XCTFail("missing item")
+        }
+        store.togglePin(item.id)
+        store.updatePinMetadata(id: item.id, title: "Hot", key: "b")
+        XCTAssertEqual(store.items.first?.pinKey, "B")
+
+        let reloaded = ClipboardHistoryStore(folder: folder)
+        XCTAssertEqual(reloaded.items.first?.pinKey, "B")
+        XCTAssertEqual(reloaded.items.first?.pinTitle, "Hot")
+    }
 }

@@ -99,9 +99,11 @@ final class ClipboardHistoryController {
         switch item.kind {
         case .text:
             let text = item.text ?? ""
-            // Plain string always — “without formatting” is the default staging path.
-            _ = settings.clipboardPasteWithoutFormatting
-            wrote = SessionClipboard.writeTranscript(text, to: .general)
+            wrote = SessionClipboard.writeClipboardText(
+                text,
+                plainOnly: settings.clipboardPasteWithoutFormatting,
+                to: .general
+            )
         case .image:
             if let image = store.image(for: item),
                let tiff = image.tiffRepresentation,

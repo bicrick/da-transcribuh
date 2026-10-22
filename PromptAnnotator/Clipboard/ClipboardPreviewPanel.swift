@@ -10,6 +10,7 @@ final class ClipboardPreviewPanelController {
     private var host: NSHostingView<ClipboardPreviewPopover>?
 
     var frame: NSRect? { panel?.frame }
+    var isKeyWindow: Bool { panel?.isKeyWindow == true }
 
     func show(item: ClipboardItem, image: NSImage?, beside listFrame: NSRect) {
         let root = ClipboardPreviewPopover(item: item, image: image)

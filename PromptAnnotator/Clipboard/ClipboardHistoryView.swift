@@ -68,6 +68,7 @@ struct ClipboardHistoryView: View {
             onReturn: { option in confirm(paste: !option) },
             onEscape: handleEscape,
             onDigit: pickDigit,
+            onPinKey: pickPinKey,
             onPin: pinSelected,
             onDelete: deleteSelected,
             onClear: { store.clearHistory(keepingPinned: true) },
@@ -276,6 +277,16 @@ struct ClipboardHistoryView: View {
         onPick(rows[n - 1], true)
     }
 
+    /// ⌥{pinKey} pastes the pinned item that advertises that shortcut.
+    private func pickPinKey(_ key: String) -> Bool {
+        let needle = key.uppercased()
+        guard let item = rows.first(where: { $0.pinKey?.uppercased() == needle }) else {
+            return false
+        }
+        onPick(item, true)
+        return true
+    }
+
     private func pinSelected() {
         guard let id = selection else { return }
         store.togglePin(id)
@@ -380,6 +391,8 @@ private struct KeyboardMonitor: NSViewRepresentable {
     var onReturn: (_ option: Bool) -> Void
     var onEscape: () -> Void
     var onDigit: (Int) -> Void
+    /// Returns true when an ⌥{char} pin shortcut was consumed.
+    var onPinKey: (String) -> Bool
     var onPin: () -> Void
     var onDelete: () -> Void
     var onClear: () -> Void
@@ -457,6 +470,12 @@ private struct KeyboardMonitor: NSViewRepresentable {
             }
             if mods.contains(.option), (event.keyCode == 51 || event.keyCode == 117) {
                 handlers.onDelete()
+                return true
+            }
+            // Custom pin keys (⌥B etc.) after reserved ⌥P / ⌥⌫.
+            if mods.contains(.option), !mods.contains(.command),
+               let ch = event.charactersIgnoringModifiers, ch.count == 1,
+               handlers.onPinKey(ch) {
                 return true
             }
             switch event.keyCode {
