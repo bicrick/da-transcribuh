@@ -19,11 +19,15 @@ enum OnboardingStep: Int, CaseIterable {
         case .ready: return "Ready"
         }
     }
+
+    var eyebrow: String {
+        "Step \(rawValue + 1) of \(OnboardingStep.allCases.count)"
+    }
 }
 
 enum OnboardingMetrics {
     static let width: CGFloat = 560
-    static let height: CGFloat = 700
+    static let height: CGFloat = 720
 }
 
 struct OnboardingFlow: View {
@@ -40,45 +44,22 @@ struct OnboardingFlow: View {
     var onFinish: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 14) {
-                AppLogo(side: 56)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Mutter")
-                        .font(.system(size: 20, weight: .semibold))
-                    Text(AppVersion.label)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Text(step.title)
-                .font(.system(size: 15, weight: .semibold))
+        VStack(spacing: 0) {
             ScrollView {
-                stepBody
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .center, spacing: 18) {
+                    InkEyebrow(text: step.eyebrow)
+                    stepBody
+                }
+                .padding(.top, 36)
+                .padding(.horizontal, 36)
+                .padding(.bottom, 20)
+                .frame(maxWidth: .infinity)
             }
-            HStack {
-                Text("\(step.rawValue + 1) of \(OnboardingStep.allCases.count)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if step != .welcome {
-                    Button("Back") { retreat() }
-                        .disabled(practiceRunning || transfer.isWorking)
-                }
-                if step != .ready {
-                    Button("Skip setup") { finishSetup() }
-                        .disabled(practiceRunning || transfer.isWorking)
-                }
-                Button(primaryTitle) {
-                    primaryAction()
-                }
-                .disabled(primaryDisabled)
-                .keyboardShortcut(.defaultAction)
-            }
+            footer
         }
-        .padding(28)
         .frame(width: OnboardingMetrics.width, height: OnboardingMetrics.height)
+        .background(Ink.window)
+        .tint(Ink.accent)
         .background(ShortcutCapture(active: $listening) { event in
             applyShortcut(event)
         })
@@ -91,6 +72,41 @@ struct OnboardingFlow: View {
         }
     }
 
+    private var footer: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Ink.hairline)
+                .frame(height: 1)
+            HStack(spacing: 12) {
+                InkStepDots(current: step.rawValue, total: OnboardingStep.allCases.count)
+                Text("\(step.rawValue + 1) of \(OnboardingStep.allCases.count)")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                Spacer(minLength: 8)
+                if step != .ready {
+                    Button("Skip setup") { finishSetup() }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Ink.secondary)
+                        .disabled(practiceRunning || transfer.isWorking)
+                }
+                if step != .welcome {
+                    Button("Back") { retreat() }
+                        .buttonStyle(InkSecondaryButtonStyle())
+                        .disabled(practiceRunning || transfer.isWorking)
+                }
+                Button(primaryTitle) {
+                    primaryAction()
+                }
+                .buttonStyle(InkPrimaryButtonStyle(large: true, enabled: !primaryDisabled))
+                .disabled(primaryDisabled)
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
+        }
+        .background(Ink.card)
+    }
+
     private var primaryDisabled: Bool {
         if transfer.isWorking && step == .model { return true }
         if practiceRunning { return true }
@@ -101,57 +117,110 @@ struct OnboardingFlow: View {
     private var stepBody: some View {
         switch step {
         case .welcome:
-            Text("Talk, and capture the screen when you want the picture with the words. This beta is free and open source.")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            welcomeBody
         case .permissions:
-            permissionList
+            permissionsCard
         case .shortcut:
-            shortcutBody
+            shortcutCard
         case .model:
-            modelBody
+            modelCard
         case .practice:
-            practiceBody
+            practiceCard
         case .ready:
-            Text("The menu bar icon opens Mutter again. \(settings.chord.display) starts a session and stops it. While Mutter is saving or transcribing, the icon changes so you can see it working.")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            readyBody
         }
     }
 
-    private var permissionList: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            permissionRow(
-                title: "Microphone",
-                detail: "Hears your voice for the transcript.",
-                on: permissions.status.microphone,
-                recovery: Permissions.microphoneNeedsSettings()
-                    ? "Denied — use Turn On, enable Mutter, then Reopen."
-                    : nil
-            )
-            permissionRow(
-                title: "Screen Recording",
-                detail: "Captures the tiles you drag while talking.",
-                on: permissions.status.screen,
-                recovery: permissions.status.screen
-                    ? nil
-                    : "If the switch is already on, turn it off and on, then Reopen."
-            )
-            permissionRow(
-                title: "Accessibility",
-                detail: "Watches the shortcut and Shift for drawing.",
-                on: permissions.status.accessibility,
-                recovery: permissions.status.accessibility
-                    ? nil
-                    : "Mutter must appear in the list. Turn On prompts for that, then Reopen."
-            )
-            Text("After you change a switch in System Settings, Reopen so Mutter picks it up.")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+    private var welcomeBody: some View {
+        VStack(spacing: 20) {
+            InkCard {
+                InkWavePenMotif(inked: false)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 28)
+            }
+            HStack(spacing: 12) {
+                AppLogo(side: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Mutter")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(Ink.label)
+                    Text(AppVersion.label)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                }
+            }
+            Text(step.title)
+                .font(Ink.onboardingHeroFont)
+                .foregroundStyle(Ink.label)
+            Text("Talk, and capture the screen when you want the picture with the words. This beta is free and open source.")
+                .font(Ink.bodyFont)
+                .foregroundStyle(Ink.secondary)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack {
+                .frame(maxWidth: 420)
+        }
+    }
+
+    private var readyBody: some View {
+        VStack(spacing: 20) {
+            InkCard {
+                InkWavePenMotif(inked: true)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 28)
+            }
+            Text(step.title)
+                .font(Ink.onboardingHeroFont)
+                .foregroundStyle(Ink.label)
+            Text("The menu bar icon opens Mutter again. \(settings.chord.display) starts a session and stops it. While Mutter is saving or transcribing, the icon changes so you can see it working.")
+                .font(Ink.bodyFont)
+                .foregroundStyle(Ink.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 420)
+        }
+    }
+
+    private var permissionsCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(step.title)
+                .font(Ink.stepTitleFont)
+                .foregroundStyle(Ink.label)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            InkCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    permissionRow(
+                        title: "Microphone",
+                        detail: "Hears your voice for the transcript.",
+                        on: permissions.status.microphone,
+                        recovery: Permissions.microphoneNeedsSettings()
+                            ? "Denied — use Turn On, enable Mutter, then Reopen."
+                            : nil
+                    )
+                    InkDivider(leading: Ink.rowHPad)
+                    permissionRow(
+                        title: "Screen Recording",
+                        detail: "Captures the tiles you drag while talking.",
+                        on: permissions.status.screen,
+                        recovery: permissions.status.screen
+                            ? nil
+                            : "If the switch is already on, turn it off and on, then Reopen."
+                    )
+                    InkDivider(leading: Ink.rowHPad)
+                    permissionRow(
+                        title: "Accessibility",
+                        detail: "Watches the shortcut and Shift for drawing.",
+                        on: permissions.status.accessibility,
+                        recovery: permissions.status.accessibility
+                            ? nil
+                            : "Mutter must appear in the list. Turn On prompts for that, then Reopen."
+                    )
+                }
+            }
+            Text("After you change a switch in System Settings, Reopen so Mutter picks it up.")
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
                 Button("Turn On") {
                     Task {
                         _ = await Permissions.requestMicrophone()
@@ -159,141 +228,175 @@ struct OnboardingFlow: View {
                         permissions.refresh()
                     }
                 }
+                .buttonStyle(InkSecondaryButtonStyle())
                 Button("Reopen") {
                     Permissions.relaunch()
                 }
+                .buttonStyle(InkSecondaryButtonStyle())
             }
             if permissions.status.isReady {
                 Text("All three are on. Continue.")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Ink.success)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func permissionRow(title: String, detail: String, on: Bool, recovery: String?) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Image(systemName: on ? "checkmark.circle" : "circle")
-                    .foregroundStyle(.primary)
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                Spacer()
-                Text(on ? "On" : "Off")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            Text(detail)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let recovery, !on {
-                Text(recovery)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 12) {
+            InkCheck(done: on)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(title)
+                        .font(Ink.rowTitleFont)
+                        .foregroundStyle(Ink.label)
+                    Spacer()
+                    Text(on ? "On" : "Off")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                }
+                Text(detail)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if let recovery, !on {
+                    Text(recovery)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
+        .padding(.horizontal, Ink.rowHPad)
+        .padding(.vertical, 12)
     }
 
-    private var shortcutBody: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private var shortcutCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(step.title)
+                .font(Ink.stepTitleFont)
+                .foregroundStyle(Ink.label)
             Text("A tap starts. A second tap stops. The menu bar repeats this chord so you can find it later. Shift stays free, because Shift is how you draw.")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .font(Ink.bodyFont)
+                .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                ShortcutBadge(text: listening ? "Press shortcut" : settings.chord.display)
-                Button(listening ? "Listening" : "Change") {
-                    listening = true
-                    shortcutNote = nil
+            InkCard {
+                VStack(spacing: 16) {
+                    InkKeycapRow(keys: settings.chord.keycaps)
+                    HStack(spacing: 8) {
+                        Button(listening ? "Listening" : "Change") {
+                            listening = true
+                            shortcutNote = nil
+                        }
+                        .buttonStyle(InkSecondaryButtonStyle())
+                        .disabled(listening)
+                        Button("Use ⌃⌥Space") {
+                            listening = false
+                            shortcutNote = settings.setChord(.default) ? nil : "macOS would not register that shortcut."
+                        }
+                        .buttonStyle(InkSecondaryButtonStyle())
+                    }
                 }
-                .disabled(listening)
-                Button("Use ⌃⌥Space") {
-                    listening = false
-                    shortcutNote = settings.setChord(.default) ? nil : "macOS would not register that shortcut."
-                }
+                .frame(maxWidth: .infinity)
+                .padding(22)
             }
             Text("Hold the chord instead of tapping if you turn on push-to-talk later in Configuration.")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let shortcutNote {
-                Text(shortcutNote)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.red)
+                InkErrorBanner(message: shortcutNote)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var modelBody: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var modelCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(step.title)
+                .font(Ink.stepTitleFont)
+                .foregroundStyle(Ink.label)
             Text("Download an English model before the first session. Balanced is the one this app is built around. The first download can take a minute on a slow network.")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .font(Ink.bodyFont)
+                .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             SpeechModelPicker(settings: settings, transfer: transfer, showsDownloadButton: false)
             if transfer.isWorking, let fraction = transfer.fraction {
-                ProgressView(value: min(1, max(0, fraction)))
-                    .progressViewStyle(.linear)
-                Text("Downloading \(Int((fraction * 100).rounded()))%. Keep this window open.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    InkProgressBar(fraction: fraction)
+                    Text("Downloading \(Int((fraction * 100).rounded()))%. Keep this window open.")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                }
             } else if modelIsReady {
-                Text("Selected model is on this Mac. Continue when you are ready.")
+                Label("Selected model is on this Mac. Continue when you are ready.", systemImage: "checkmark.circle.fill")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Ink.success)
             } else {
                 Text("Press Download to fetch the selected model, then Continue.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var practiceBody: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            guideRow("1", "Talk for a few seconds, or stay quiet — both paths are fine.")
-            guideRow("2", "Drag a rectangle to capture the front window when you want a tile.")
-            guideRow("3", "Hold Shift to annotate. Release Shift to save that tile.")
+    private var practiceCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(step.title)
+                .font(Ink.stepTitleFont)
+                .foregroundStyle(Ink.label)
+            InkCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    guideRow("1", "Talk for a few seconds, or stay quiet — both paths are fine.")
+                    guideRow("2", "Drag a rectangle to capture the front window when you want a tile.")
+                    guideRow("3", "Hold Shift to annotate. Release Shift to save that tile.")
+                }
+                .padding(Ink.rowHPad)
+                .padding(.vertical, 14)
+            }
             Text("Try a short take now. Mutter stops after about five seconds and shows what happened.")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .font(Ink.bodyFont)
+                .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if !permissions.status.isReady {
                 Text("Permissions are still off. Go Back and turn them on, then Reopen if needed.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
             } else if !modelIsReady {
                 Text("The speech model is not on disk yet. Go Back and download it.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
             }
-            HStack {
+            HStack(spacing: 8) {
                 Button(practiceRunning ? practiceLiveTitle : "Try a 5-second session") {
                     startPractice()
                 }
+                .buttonStyle(InkPrimaryButtonStyle(large: true, enabled: !practiceRunning && !session.isBusy && practiceAllowed))
                 .disabled(practiceRunning || session.isBusy || !practiceAllowed)
                 if practiceRunning {
                     Button("Cancel") {
                         cancelPractice()
                     }
+                    .buttonStyle(InkSecondaryButtonStyle())
                 }
             }
             if let practiceOutcome {
                 Text(practiceOutcome)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else if practiceRunning, let live = session.menuStatusLine, !live.isEmpty {
                 Text(live)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
             }
             Text("You can skip this and try later from Home or the menu bar.")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var practiceAllowed: Bool {
@@ -335,11 +438,12 @@ struct OnboardingFlow: View {
     private func guideRow(_ number: String, _ text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(number)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Ink.accent)
                 .frame(width: 16, alignment: .leading)
             Text(text)
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .font(Ink.bodyFont)
+                .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -494,6 +598,7 @@ final class OnboardingPresenter {
         )
         window.title = "Welcome to Mutter"
         window.isReleasedWhenClosed = false
+        window.backgroundColor = Ink.windowNSColor
         window.contentView = host
         window.center()
         self.window = window

@@ -6,7 +6,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–12)
+## Final summary (Runs 1–13)
 
 ### What changed overall (kept)
 
@@ -19,10 +19,19 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 | Performance | Whisper `prewarm` (+450 ms defer); live window cap; PCM soft-cap + file merge; integer absolute sample counts; Copy Last Again |
 | Live window (Run 9–10) | Cap truncates the **end** (from `confirmedEnd`); holdback uses **window end**, not full buffer duration |
 | **BYOM (Run 12)** | Custom WhisperKit Core ML folder + HF repo/variant; optional OpenAI-compatible final engine (Keychain); `RoutingTranscriber`; fallback to default Whisper on failure |
+| **Ink restyle (Run 13)** | Settings + onboarding “Ink” theme (warm paper + logo red); shared design system; continuous waveform→pen motif; Advanced copy fix. Recording island/overlay untouched. |
 
 ### Reverted (Run 9, still gone)
 
 - **Quiet-room calibration** — fixed SpeechGate **0.28** (matches `main`). No dangling Swift/pbxproj refs.
+
+### Run 13 (Ink visual restyle)
+
+- Design tokens + components under `PromptAnnotator/Settings/Ink/`.
+- All Settings pages + sidebar + onboarding chrome restyled; bindings/behavior preserved.
+- Welcome/Ready illustration: waveform flows into pen as one continuous L→R ink line (no U-shaped smile).
+- Advanced: “Speech models are on the Models page.”
+- Tests: `InkThemeTests`.
 
 ### Run 12 (BYOM + Settings)
 
@@ -37,6 +46,7 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - MenuBarExtra SF Symbol swaps mid-session.
 - BYOM: huge custom models; stale security-scoped bookmarks; OpenAI schema drift; network on stop.
 - Unused `PushToTalk.isArmed` left from Run 9 (harmless; latch-only stop path).
+- Ink: NavigationSplitView sidebar selection styling may still show system highlight under custom row backgrounds — visual only.
 
 ---
 
@@ -46,7 +56,10 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ### P0 — must pass before recording
 
-- [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`, `SpeechModelTests` holdback, **`FontMetricsTests`**, **`BYOMTests`**).
+- [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`, `SpeechModelTests` holdback, **`FontMetricsTests`**, **`BYOMTests`**, **`InkThemeTests`**).
+- [ ] **Ink Settings**: Home / Models / History / Recording / Configuration / Sound / Performance in light + dark — accent tint, card chrome, no island restyle.
+- [ ] **Ink Onboarding**: STEP n OF 6 eyebrow, step dots, Skip / Back / primary order; Welcome+Ready waveform→pen is one continuous line (not a smile); Ready bars inked red.
+- [ ] Configuration Advanced reads “Speech models are on the Models page.”
 - [ ] **Hotkey toggle** (PTT off): start → speak → stop → transcript on clipboard / paste.
 - [ ] **Menu Start / Home Start with Push-to-Talk ON** — session must **stay recording** until Stop (must not auto-stop instantly).
 - [ ] **PTT hold**: press chord → speak → release → stops; brief press during mic prompt also stops (not stuck recording).
@@ -72,6 +85,39 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Optional: >10 min under PCM retain cap → file merge OK.
 - [ ] Display plug/unplug while marking; double Paste Image and Text once only.
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
+
+---
+
+## Run 13 — Ink visual restyle (Settings + onboarding)
+
+### Scope
+
+Implement approved “Ink” restyle from mockups (`mutter-mockups/restyle/`, `rs.py` / `screens.py` tokens). Settings window + onboarding only — **do not** restyle recording island/overlay. Compile-safe SwiftUI (macOS 14+), preserve all bindings.
+
+### Delivered
+
+| Piece | Notes |
+| --- | --- |
+| `InkTheme.swift` | Dynamic light/dark palette via `NSColor(name:dynamicProvider:)`; radii, spacing, type tokens |
+| `InkComponents.swift` | InkCard, InkTile, Keycap, SegmentMeter (MeterBar), StepDots, primary/secondary buttons, WavePenMotif, error banner, dashed empty |
+| Settings pages | Home hero + stats + checklist; Models engine cards + tile meters + HF side-by-side; History card rows; Recording/Sound 2×2 tiles; Performance memory meters; Configuration Ink chrome |
+| Sidebar / window | 220pt sidebar, accent selection tint, `Ink.window` background, app-wide `.tint(Ink.accent)` |
+| Onboarding | Eyebrow, StepDots, Skip → Back → primary; Welcome/Ready continuous waveform→pen (Ready inked) |
+| Copy | Advanced: “Speech models are on the Models page.” |
+| Tests | `InkThemeTests` (hex, tokens, onboarding steps, dynamic window color) |
+
+### Intentionally unchanged
+
+- Recording island / overlay / annotation chrome (still prior FontMetrics fix only).
+
+### Mac checklist (Ink-specific)
+
+1. Build Debug; run `InkThemeTests` + prior suites.
+2. Toggle System Settings appearance light/dark — Settings + onboarding track Ink palette.
+3. Home: Start/Stop + checklist progress still driven by permissions/model/sessions.
+4. Models: switch engines; select built-in tiles; HF Repo|Variant; custom empty dashed state; API-key warning when OpenAI engine lacks key.
+5. Onboarding Welcome/Ready: ink stroke is a single L→R path into the pen tip (no smile under the bars).
+6. Record a session — island looks as before (not Ink-restyled).
 
 ---
 

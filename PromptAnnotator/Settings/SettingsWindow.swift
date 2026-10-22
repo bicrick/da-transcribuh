@@ -18,18 +18,30 @@ struct SettingsRoot: View {
             VStack(spacing: 0) {
                 List(selection: $page) {
                     ForEach(SettingsPage.sidebarSections, id: \.title) { section in
-                        Section(section.title) {
+                        Section {
                             ForEach(section.pages) { item in
                                 Label(item.title, systemImage: item.symbol)
                                     .tag(item)
+                                    .listRowBackground(sidebarRowBackground(for: item))
                             }
+                        } header: {
+                            Text(section.title)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Ink.tertiary)
+                                .textCase(nil)
                         }
                     }
                 }
                 .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
                 footer
             }
-            .navigationSplitViewColumnWidth(min: 196, ideal: 212, max: 240)
+            .background(Ink.sidebar)
+            .navigationSplitViewColumnWidth(
+                min: Ink.sidebarWidth - 24,
+                ideal: Ink.sidebarWidth,
+                max: Ink.sidebarWidth + 20
+            )
         } detail: {
             switch page ?? .home {
             case .home:
@@ -49,6 +61,8 @@ struct SettingsRoot: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .tint(Ink.accent)
+        .background(Ink.window)
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSettingsShown)) { _ in
             reload()
@@ -59,20 +73,32 @@ struct SettingsRoot: View {
         }
     }
 
+    private func sidebarRowBackground(for item: SettingsPage) -> some View {
+        RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
+            .fill(page == item ? Ink.sidebarSelection : Color.clear)
+            .padding(.horizontal, 4)
+    }
+
     private var footer: some View {
         HStack(spacing: 8) {
             AppLogo(side: 22)
             VStack(alignment: .leading, spacing: 0) {
                 Text("Mutter")
                     .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Ink.label)
                 Text(AppVersion.label)
                     .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Ink.secondary)
             }
             Spacer()
         }
         .padding(.horizontal, SettingsMetrics.sidebarFooterPadding)
         .padding(.vertical, 10)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Ink.hairline)
+                .frame(height: 1)
+        }
     }
 
     private func reload() {
@@ -118,7 +144,7 @@ final class SettingsPresenter {
         window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none
         window.isReleasedWhenClosed = false
-        window.backgroundColor = .windowBackgroundColor
+        window.backgroundColor = Ink.windowNSColor
         window.contentView = host
         window.setContentSize(NSSize(width: 880, height: 600))
         window.minSize = NSSize(width: 760, height: 520)
@@ -134,6 +160,7 @@ final class SettingsPresenter {
 
     func applyChrome() {
         window?.level = AppSettings.shared.keepWindowOnTop ? .floating : .normal
+        window?.backgroundColor = Ink.windowNSColor
     }
 }
 

@@ -35,7 +35,6 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Sidebar grouping for a clearer native Settings layout.
     static var sidebarSections: [(title: String, pages: [SettingsPage])] {
         [
             ("Session", [.home, .history, .recording]),
@@ -45,40 +44,52 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-/// Shared metrics so Settings pages share spacing, width, and card chrome.
+/// Layout metrics — Ink tokens, kept under the SettingsMetrics name for call sites.
 enum SettingsMetrics {
-    static let pagePadding: CGFloat = 24
-    static let pageSpacing: CGFloat = 20
-    static let sectionSpacing: CGFloat = 8
-    static let rowPadding: CGFloat = 12
-    static let maxContentWidth: CGFloat = 640
-    static let cardCorner: CGFloat = 10
-    static let sidebarFooterPadding: CGFloat = 12
+    static let pagePadding: CGFloat = Ink.pageSide
+    static let pageTop: CGFloat = Ink.pageTop
+    static let pageSpacing: CGFloat = Ink.sectionGap
+    static let sectionSpacing: CGFloat = Ink.sectionInnerGap
+    static let rowPadding: CGFloat = Ink.rowHPad
+    static let maxContentWidth: CGFloat = Ink.maxContentWidth
+    static let cardCorner: CGFloat = Ink.cardRadius
+    static let sidebarFooterPadding: CGFloat = 16
+    static let sidebarWidth: CGFloat = Ink.sidebarWidth
 }
 
 struct SettingsPageStack<Content: View>: View {
     var title: String
+    var subtitle: String? = nil
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SettingsMetrics.pageSpacing) {
-                Text(title)
-                    .font(.system(size: 22, weight: .semibold))
+            VStack(alignment: .leading, spacing: Ink.sectionGap) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(Ink.pageTitleFont)
+                        .foregroundStyle(Ink.label)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(Ink.bodyFont)
+                            .foregroundStyle(Ink.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
                 content()
             }
-            .padding(SettingsMetrics.pagePadding)
-            .frame(maxWidth: SettingsMetrics.maxContentWidth, alignment: .leading)
+            .padding(.top, Ink.pageTop)
+            .padding(.horizontal, Ink.pageSide)
+            .padding(.bottom, Ink.pageBottom)
+            .frame(maxWidth: Ink.maxContentWidth, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .inkPageChrome()
     }
 }
 
-/// Section title + content with consistent spacing (Form-like grouping without a full Form rewrite).
 struct SettingsSection<Content: View>: View {
-    var title: String?
-    var footer: String?
+    var title: String? = nil
+    var footer: String? = nil
     @ViewBuilder var content: () -> Content
 
     init(
@@ -92,20 +103,17 @@ struct SettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SettingsMetrics.sectionSpacing) {
+        VStack(alignment: .leading, spacing: Ink.sectionInnerGap) {
             if let title {
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                    .tracking(0.3)
+                InkSectionHeader(title: title)
             }
             content()
             if let footer {
                 Text(footer)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 4)
             }
         }
     }
@@ -115,27 +123,13 @@ struct SettingsCard<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color(nsColor: .controlBackgroundColor),
-            in: RoundedRectangle(cornerRadius: SettingsMetrics.cardCorner, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: SettingsMetrics.cardCorner, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 1)
-        )
+        InkCard { content() }
     }
 }
 
 struct SettingsDivider: View {
     var body: some View {
-        Rectangle()
-            .fill(Color(nsColor: .separatorColor).opacity(0.55))
-            .frame(height: 1)
-            .padding(.leading, 46)
+        InkDivider(leading: 46)
     }
 }
 
@@ -145,11 +139,9 @@ struct ShortcutBadge: View {
     var body: some View {
         Text(text)
             .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Ink.label)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(
-                Color(nsColor: .quaternaryLabelColor).opacity(0.18),
-                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-            )
+            .background(Ink.fill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }

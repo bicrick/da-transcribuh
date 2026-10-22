@@ -79,24 +79,25 @@ struct ConfigurationPage: View {
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Push to talk")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(Ink.rowTitleFont)
+                            .foregroundStyle(Ink.label)
                         Text("Hold the recording shortcut. The menu bar command stays a tap.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
                     }
                 }
                 .toggleStyle(.switch)
                 .padding(12)
                 if let message {
                     Text(message)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.red)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.error)
                         .padding(.horizontal, 12)
                         .padding(.bottom, 4)
                 }
                 Text("The menu bar repeats this shortcut under Start Session. Shift stays free for drawing. Option-Space, Command-Space, and Option-Command-Space stay with the system. Press Escape while capturing Cancel to clear it.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 8)
                 HStack {
@@ -265,9 +266,9 @@ struct ConfigurationPage: View {
                     settingCopy("Capitalize the pasted transcript", "The first letter is capitalized. A leading tile number stays put.")
                 }
                 .toggleStyle(.switch)
-                Text("One English model ships with the app. There is no separate experimental model list.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                Text("Speech models are on the Models page.")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(12)
@@ -278,14 +279,15 @@ struct ConfigurationPage: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Ink.rowTitleFont)
+                    .foregroundStyle(Ink.label)
                 Text(detail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
             }
             Spacer(minLength: 8)
             Button(label, action: action)
-                .buttonStyle(.bordered)
+                .buttonStyle(InkSecondaryButtonStyle())
         }
         .padding(12)
     }
@@ -301,10 +303,11 @@ struct ConfigurationPage: View {
     private func settingCopy(_ title: String, _ detail: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(Ink.rowTitleFont)
+                .foregroundStyle(Ink.label)
             Text(detail)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

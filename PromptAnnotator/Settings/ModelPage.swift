@@ -24,10 +24,14 @@ struct ModelPage: View {
                 openAISection
             }
             if let statusMessage {
-                Text(statusMessage)
-                    .font(.system(size: 12))
-                    .foregroundStyle(statusIsError ? Color.red : Color.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if statusIsError {
+                    InkErrorBanner(message: statusMessage)
+                } else {
+                    Text(statusMessage)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .onAppear {
@@ -45,42 +49,37 @@ struct ModelPage: View {
                 ? "Live captions are off. Audio is sent to your server only when you stop."
                 : "Models run on this Mac. Live captions stay available while you record."
         ) {
-            SettingsCard {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(SpeechEngineKind.allCases) { engine in
-                        engineRow(engine)
-                        if engine != SpeechEngineKind.allCases.last {
-                            SettingsDivider()
-                        }
-                    }
+            HStack(alignment: .top, spacing: Ink.gridGap) {
+                ForEach(SpeechEngineKind.allCases) { engine in
+                    engineCard(engine)
                 }
             }
         }
     }
 
-    private func engineRow(_ engine: SpeechEngineKind) -> some View {
+    private func engineCard(_ engine: SpeechEngineKind) -> some View {
         let selected = settings.speechEngine == engine
         return Button {
             settings.setSpeechEngine(engine)
             clearStatus()
         } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                    .frame(width: 20)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(engine.title)
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(engine.detail)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+            InkTile(selected: selected) {
+                HStack(alignment: .top, spacing: 12) {
+                    InkRadio(selected: selected)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(engine.title)
+                            .font(Ink.rowTitleFont)
+                            .foregroundStyle(Ink.label)
+                            .multilineTextAlignment(.leading)
+                        Text(engine.detail)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
             }
-            .padding(SettingsMetrics.rowPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -102,31 +101,35 @@ struct ModelPage: View {
                 : "Selecting a model unloads the previous one and prepares the new weights."
         ) {
             if settings.customModels.isEmpty {
-                SettingsCard {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("No custom models yet")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Use a folder that contains MelSpectrogram, AudioEncoder, and TextDecoder Core ML bundles.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Button("Add Core ML folder…", action: addFolder)
-                    }
-                    .padding(SettingsMetrics.rowPadding)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                InkDashedEmpty(
+                    title: "No custom models yet",
+                    detail: "Use a folder that contains MelSpectrogram, AudioEncoder, and TextDecoder Core ML bundles.",
+                    actionTitle: "Add Core ML folder…",
+                    action: addFolder
+                )
             } else {
-                SettingsCard {
+                InkCard {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(settings.customModels.enumerated()), id: \.element.id) { index, model in
                             customRow(model)
                             if index < settings.customModels.count - 1 {
-                                SettingsDivider()
+                                InkDivider(leading: Ink.rowHPad)
                             }
                         }
-                        SettingsDivider()
-                        Button("Add Core ML folder…", action: addFolder)
-                            .padding(SettingsMetrics.rowPadding)
+                        InkDivider(leading: 0)
+                        Button {
+                            addFolder()
+                        } label: {
+                            Label("Add Core ML folder…", systemImage: "folder.badge.plus")
+                                .font(Ink.bodyFont)
+                                .foregroundStyle(Ink.label)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, Ink.rowHPad)
+                                .padding(.vertical, Ink.rowVPad)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(transfer.isWorking)
                     }
                 }
             }
@@ -147,23 +150,23 @@ struct ModelPage: View {
                 }
             } label: {
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                        .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                        .frame(width: 20)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(model.name)
-                            .font(.system(size: 13, weight: .semibold))
+                    InkRadio(selected: selected)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(model.name)
+                                .font(Ink.rowTitleFont)
+                                .foregroundStyle(Ink.label)
+                            InkBadge(text: model.source == .folder ? "Local folder" : "Hugging Face")
+                        }
                         Text(model.subtitle)
                             .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Ink.secondary)
                             .lineLimit(2)
-                        Text(model.source == .folder ? "Local folder" : "Hugging Face")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(SettingsMetrics.rowPadding)
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
@@ -175,9 +178,10 @@ struct ModelPage: View {
                 setStatus("Removed \(model.name).", error: false)
             } label: {
                 Image(systemName: "trash")
+                    .foregroundStyle(Ink.error)
             }
             .buttonStyle(.borderless)
-            .padding(.trailing, SettingsMetrics.rowPadding)
+            .padding(.trailing, Ink.rowHPad)
             .disabled(transfer.isWorking)
         }
     }
@@ -187,30 +191,35 @@ struct ModelPage: View {
             title: "Add from Hugging Face",
             footer: "Repo must host WhisperKit Core ML variants. Download starts when you add it, and again when you select it if files are missing."
         ) {
-            SettingsCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    labeledField("Repo", text: $hfRepo, prompt: "argmaxinc/whisperkit-coreml")
-                    labeledField("Variant", text: $hfVariant, prompt: "small.en_217MB")
-                    labeledField("Display name", text: $hfName, prompt: "Optional")
-                    HStack {
-                        Button("Add and download") {
+            InkCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: Ink.gridGap) {
+                        labeledField("Repo", text: $hfRepo, prompt: "argmaxinc/whisperkit-coreml")
+                        labeledField("Variant", text: $hfVariant, prompt: "small.en_217MB")
+                    }
+                    labeledField("Display name (optional)", text: $hfName, prompt: "Optional")
+                    HStack(spacing: 10) {
+                        Button {
                             addHuggingFace()
+                        } label: {
+                            Label("Add and download", systemImage: "arrow.down.circle")
                         }
+                        .buttonStyle(InkPrimaryButtonStyle(
+                            large: true,
+                            enabled: !transfer.isWorking && !hfVariant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ))
                         .disabled(transfer.isWorking || hfVariant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         if transfer.isWorking, let fraction = transfer.fraction {
-                            ProgressView(value: min(1, max(0, fraction)))
-                                .progressViewStyle(.linear)
+                            InkProgressBar(fraction: fraction)
                                 .frame(maxWidth: 160)
                         }
                     }
                     if let message = transfer.message {
-                        Text(message)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.red)
-                            .fixedSize(horizontal: false, vertical: true)
+                        InkErrorBanner(message: message)
                     }
                 }
-                .padding(SettingsMetrics.rowPadding)
+                .padding(Ink.rowHPad)
+                .padding(.vertical, 14)
             }
         }
     }
@@ -220,8 +229,8 @@ struct ModelPage: View {
             title: "Server",
             footer: "Mutter posts the session audio to {base}/v1/audio/transcriptions when you stop. The API key stays in the Keychain."
         ) {
-            SettingsCard {
-                VStack(alignment: .leading, spacing: 10) {
+            InkCard {
+                VStack(alignment: .leading, spacing: 12) {
                     labeledField("Base URL", text: Binding(
                         get: { settings.openAIBaseURL },
                         set: { settings.setOpenAIBaseURL($0) }
@@ -232,10 +241,11 @@ struct ModelPage: View {
                     ), prompt: "whisper-1")
                     VStack(alignment: .leading, spacing: 4) {
                         Text("API key")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
                         SecureField("sk-…", text: $openAIKeyDraft)
-                            .textFieldStyle(.roundedBorder)
+                            .textFieldStyle(.plain)
+                            .inkFieldStyle()
                             .onChange(of: openAIKeyDraft) { _, value in
                                 settings.setOpenAIAPIKey(value)
                             }
@@ -243,41 +253,47 @@ struct ModelPage: View {
                     if OpenAICompatibleTranscriber.isConfigured() {
                         Text("API key saved in Keychain.")
                             .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Ink.secondary)
                     } else {
-                        Text("Add an API key before recording with this engine.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.red)
+                        InkErrorBanner(message: "Add an API key before recording with this engine.")
                     }
                 }
-                .padding(SettingsMetrics.rowPadding)
+                .padding(Ink.rowHPad)
+                .padding(.vertical, 14)
             }
         }
     }
 
     private var diskSection: some View {
         SettingsSection(title: "On disk") {
-            SettingsCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Downloaded WhisperKit weights live here. Custom folders you add stay in place and are remembered with a bookmark.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack(alignment: .top, spacing: 10) {
+            InkCard {
+                HStack(alignment: .top, spacing: 12) {
+                    InkIconChip(systemName: "internaldrive")
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Downloaded WhisperKit weights live here. Custom folders you add stay in place and are remembered with a bookmark.")
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(WhisperKitTranscriber.modelsFolder().path)
                             .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Ink.secondary)
                             .lineLimit(2)
                             .textSelection(.enabled)
-                        Spacer(minLength: 8)
-                        Button("Show") {
-                            let folder = WhisperKitTranscriber.modelsFolder()
-                            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                            NSWorkspace.shared.open(folder)
-                        }
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Ink.field, in: RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous))
                     }
+                    Spacer(minLength: 8)
+                    Button("Show") {
+                        let folder = WhisperKitTranscriber.modelsFolder()
+                        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                        NSWorkspace.shared.open(folder)
+                    }
+                    .buttonStyle(InkSecondaryButtonStyle())
                 }
-                .padding(SettingsMetrics.rowPadding)
+                .padding(Ink.rowHPad)
+                .padding(.vertical, 14)
             }
         }
     }
@@ -285,11 +301,13 @@ struct ModelPage: View {
     private func labeledField(_ title: String, text: Binding<String>, prompt: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
             TextField(prompt, text: text)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .inkFieldStyle()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func addFolder() {

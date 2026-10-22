@@ -11,26 +11,27 @@ struct RecordingPage: View {
                 title: "Recording window",
                 footer: "Keyboard shortcuts and push to talk are in Configuration. The menu bar shows the same shortcut under Start Session."
             ) {
-                styleRow
+                styleGrid
             }
 
             SettingsSection(title: "Defaults") {
-                SettingsCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                InkCard {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("Drag captures the screen in front of you, including a window or a modal. These tools show while you hold Shift.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text("Tool")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
                         HStack(spacing: 6) {
                             ForEach(AnnotationTool.allCases, id: \.self) { tool in
                                 toolButton(tool)
                             }
                         }
                         Text("Color")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
                             .padding(.top, 4)
                         HStack(spacing: 8) {
                             ForEach(InkColor.palette, id: \.self) { color in
@@ -38,43 +39,38 @@ struct RecordingPage: View {
                             }
                         }
                     }
-                    .padding(SettingsMetrics.rowPadding)
+                    .padding(Ink.rowHPad)
+                    .padding(.vertical, 14)
                 }
             }
         }
     }
 
-    private var styleRow: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+    private var styleGrid: some View {
+        LazyVGrid(
+            columns: [GridItem(.flexible(), spacing: Ink.gridGap), GridItem(.flexible(), spacing: Ink.gridGap)],
+            spacing: Ink.gridGap
+        ) {
             ForEach(IslandStyle.allCases) { style in
                 Button {
                     settings.setIslandStyle(style)
                     session.refreshChrome()
                 } label: {
-                    VStack(spacing: 8) {
-                        styleGlyph(style)
-                            .frame(height: 28)
-                        Text(style.title)
-                            .font(.system(size: 12, weight: .medium))
-                        Text(style.detail)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .frame(height: 28)
+                    InkTile(selected: settings.islandStyle == style) {
+                        VStack(spacing: 10) {
+                            styleGlyph(style)
+                                .frame(height: 28)
+                            Text(style.title)
+                                .font(Ink.rowTitleFont)
+                                .foregroundStyle(Ink.label)
+                            Text(style.detail)
+                                .font(Ink.captionFont)
+                                .foregroundStyle(Ink.secondary)
+                                .multilineTextAlignment(.center)
+                                .frame(minHeight: 28)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    .padding(10)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        Color(nsColor: .controlBackgroundColor),
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(
-                                settings.islandStyle == style ? Color.primary : Color(nsColor: .separatorColor).opacity(0.7),
-                                lineWidth: settings.islandStyle == style ? 2 : 1
-                            )
-                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -89,26 +85,29 @@ struct RecordingPage: View {
         switch style {
         case .classic:
             HStack(spacing: 5) {
-                Circle().fill(Color.red).frame(width: 6, height: 6)
+                Circle().fill(Ink.accent).frame(width: 6, height: 6)
                 WaveformBars(levels: preview, slotWidth: 64, slotHeight: 16)
                 Text("1")
                     .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(Ink.label)
                 Image(systemName: "photo")
                     .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(Ink.secondary)
             }
         case .compact:
             HStack(spacing: 5) {
-                Circle().fill(Color.red).frame(width: 6, height: 6)
+                Circle().fill(Ink.accent).frame(width: 6, height: 6)
                 WaveformBars(levels: preview, slotWidth: 72, slotHeight: 16)
                 Text("0:12")
                     .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Ink.secondary)
             }
         case .minimal:
             WaveformBars(levels: preview, slotWidth: 96, slotHeight: 16)
         case .hidden:
             Image(systemName: "eye.slash")
                 .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Ink.secondary)
         }
     }
 
@@ -120,10 +119,14 @@ struct RecordingPage: View {
             Image(systemName: tool.symbolName)
                 .font(.system(size: 14, weight: .medium))
                 .frame(width: 32, height: 28)
-                .foregroundStyle(selected ? Color.primary : Color.secondary)
+                .foregroundStyle(selected ? Ink.accent : Ink.secondary)
                 .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(selected ? Color.primary.opacity(0.1) : Color.clear)
+                    RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
+                        .fill(selected ? Ink.accentSoft : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
+                        .strokeBorder(selected ? Ink.accent.opacity(0.4) : Ink.hairline, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
@@ -140,7 +143,7 @@ struct RecordingPage: View {
             Circle()
                 .fill(Color(red: color.swiftUIRed, green: color.swiftUIGreen, blue: color.swiftUIBlue))
                 .frame(width: 16, height: 16)
-                .overlay(Circle().strokeBorder(Color.primary.opacity(selected ? 0.9 : 0.25), lineWidth: selected ? 2 : 1))
+                .overlay(Circle().strokeBorder(Ink.label.opacity(selected ? 0.9 : 0.25), lineWidth: selected ? 2 : 1))
                 .padding(2)
         }
         .buttonStyle(.plain)
@@ -149,4 +152,3 @@ struct RecordingPage: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
-

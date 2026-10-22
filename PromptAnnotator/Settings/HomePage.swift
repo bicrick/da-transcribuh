@@ -9,106 +9,279 @@ struct HomePage: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SettingsMetrics.pageSpacing) {
-                header
+            VStack(alignment: .leading, spacing: 24) {
+                hero
                 stats
                 SettingsSection(title: "Get started") {
-                    SettingsCard {
-                        startRow
-                        SettingsDivider()
-                        permissionRow
-                        if sessions.isEmpty {
-                            SettingsDivider()
-                            firstSessionRow
-                        }
-                        SettingsDivider()
-                        drawRow
-                        SettingsDivider()
-                        folderRow
-                    }
+                    checklist
                 }
+                tips
             }
-            .padding(SettingsMetrics.pagePadding)
-            .frame(maxWidth: SettingsMetrics.maxContentWidth, alignment: .leading)
+            .padding(.top, Ink.pageTop)
+            .padding(.horizontal, Ink.pageSide)
+            .padding(.bottom, Ink.pageBottom)
+            .frame(maxWidth: Ink.maxContentWidth, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .inkPageChrome()
         .onAppear { permissions.refresh() }
     }
 
-    private var header: some View {
-        HStack(spacing: 16) {
-            AppLogo(side: 64)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Mutter")
-                    .font(.system(size: 22, weight: .semibold))
-                Text(AppVersion.label)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Text("Dictation in the menu bar. Capture the screen when you want the picture with the words.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+    private var hero: some View {
+        InkCard {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top, spacing: 16) {
+                    AppLogo(side: 56)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text("Mutter")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(Ink.label)
+                            InkBadge(text: AppVersion.label)
+                        }
+                        Text("Dictation in the menu bar. Capture the screen when you want the picture with the words.")
+                            .font(Ink.bodyFont)
+                            .foregroundStyle(Ink.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 22)
+
+                InkDivider(leading: 0)
+
+                HStack(alignment: .center, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
+                            statusDot
+                            Text(startRowTitle)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Ink.label)
+                        }
+                        Text(startRowDetail)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    InkKeycapRow(keys: settings.chord.keycaps)
+                    Button {
+                        session.toggle()
+                    } label: {
+                        Label(
+                            session.phase == .recording ? "Stop" : "Start",
+                            systemImage: session.phase == .recording ? "stop.circle.fill" : "record.circle"
+                        )
+                    }
+                    .buttonStyle(InkPrimaryButtonStyle(large: true, enabled: !session.isBusy))
+                    .disabled(session.isBusy)
+                    .accessibilityLabel(session.phase == .recording ? "Stop session" : "Start session")
+                    .accessibilityHint("Shortcut \(settings.chord.display)")
+                }
+                .padding(.horizontal, 22)
+                .padding(.bottom, 20)
             }
+            .background(
+                LinearGradient(
+                    colors: [Ink.accentSoft, Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
         }
+    }
+
+    private var statusDot: some View {
+        Circle()
+            .fill(session.isBusy || session.phase == .recording ? Ink.accent : Ink.success)
+            .frame(width: 8, height: 8)
+            .overlay(
+                Circle()
+                    .stroke(Ink.success.opacity(0.25), lineWidth: 3)
+                    .opacity(session.phase == .idle && !session.isBusy ? 1 : 0)
+            )
     }
 
     private var stats: some View {
         let numbers = SessionLibrary.stats(from: sessions)
-        return SettingsCard {
-            HStack(spacing: 0) {
-                stat(value: numbers.sessions, label: numbers.sessions == 1 ? "Session" : "Sessions")
-                stat(value: numbers.tiles, label: numbers.tiles == 1 ? "Tile" : "Tiles")
-                stat(value: numbers.words, label: numbers.words == 1 ? "Word" : "Words")
-                stat(value: numbers.minutes, label: numbers.minutes == 1 ? "Minute" : "Minutes")
+        return LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: Ink.gridGap), count: 4),
+            spacing: Ink.gridGap
+        ) {
+            statTile(icon: "mic", value: numbers.sessions, label: numbers.sessions == 1 ? "Session" : "Sessions")
+            statTile(icon: "photo", value: numbers.tiles, label: numbers.tiles == 1 ? "Tile" : "Tiles")
+            statTile(icon: "text.alignleft", value: numbers.words, label: numbers.words == 1 ? "Word" : "Words")
+            statTile(icon: "timer", value: numbers.minutes, label: numbers.minutes == 1 ? "Minute" : "Minutes")
+        }
+    }
+
+    private func statTile(icon: String, value: Int, label: String) -> some View {
+        InkTile {
+            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Ink.accent)
+                Text("\(value)")
+                    .font(Ink.statValueFont)
+                    .monospacedDigit()
+                    .foregroundStyle(Ink.label)
+                Text(label)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
             }
-            .padding(.vertical, 16)
         }
     }
 
-    private func stat(value: Int, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text("\(value)")
-                .font(.system(size: 22, weight: .semibold))
-                .monospacedDigit()
-            Text(label)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+    private var checklist: some View {
+        let items = checklistItems
+        let done = items.filter(\.done).count
+        return InkCard {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 12) {
+                    Text("\(done) of \(items.count) done")
+                        .font(Ink.rowTitleFont)
+                        .foregroundStyle(Ink.label)
+                    InkProgressBar(fraction: items.isEmpty ? 0 : Double(done) / Double(items.count))
+                }
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.vertical, 14)
+
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    InkDivider(leading: Ink.rowHPad)
+                    HStack(alignment: .top, spacing: 12) {
+                        InkCheck(done: item.done)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title)
+                                .font(Ink.rowTitleFont)
+                                .foregroundStyle(Ink.label)
+                            Text(item.detail)
+                                .font(Ink.captionFont)
+                                .foregroundStyle(Ink.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                        if let trail = item.trail {
+                            trail
+                        }
+                    }
+                    .padding(.horizontal, Ink.rowHPad)
+                    .padding(.vertical, 12)
+                }
+            }
         }
-        .frame(maxWidth: .infinity)
     }
 
-    private var startRow: some View {
-        HStack(spacing: 12) {
-            rowIcon(startRowSymbol)
+    private var tips: some View {
+        InkCard {
+            VStack(alignment: .leading, spacing: 0) {
+                tipRow(
+                    icon: "viewfinder",
+                    title: "Talk, or drag to capture",
+                    detail: "Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.",
+                    trailing: nil
+                )
+                InkDivider(leading: 58)
+                tipRow(
+                    icon: "folder",
+                    title: "Sessions folder",
+                    detail: SessionStore.displayPath(),
+                    trailing: AnyView(
+                        Button("Show") {
+                            if let root = try? SessionPaths.sessionsRoot() {
+                                NSWorkspace.shared.open(root)
+                            }
+                        }
+                        .buttonStyle(InkSecondaryButtonStyle())
+                    )
+                )
+            }
+        }
+    }
+
+    private func tipRow(icon: String, title: String, detail: String, trailing: AnyView?) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            InkIconChip(systemName: icon)
             VStack(alignment: .leading, spacing: 2) {
-                Text(startRowTitle)
-                    .font(.system(size: 13, weight: .semibold))
-                Text(startRowDetail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(Ink.rowTitleFont)
+                    .foregroundStyle(Ink.label)
+                Text(detail)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
-            ShortcutBadge(text: settings.chord.display)
-            Button(session.phase == .recording ? "Stop" : "Start") {
-                session.toggle()
+            if let trailing {
+                trailing
             }
-            .disabled(session.isBusy)
-            .accessibilityLabel(session.phase == .recording ? "Stop session" : "Start session")
-            .accessibilityHint("Shortcut \(settings.chord.display)")
         }
-        .padding(12)
-        .accessibilityElement(children: .contain)
+        .padding(.horizontal, Ink.rowHPad)
+        .padding(.vertical, 14)
     }
 
-    private var startRowSymbol: String {
-        switch session.phase {
-        case .recording:
-            return "record.circle.fill"
-        case .finishing, .downloading, .preparingModel, .transcribing:
-            return "ellipsis.circle"
-        case .idle:
-            return "record.circle"
+    private struct ChecklistItem {
+        var done: Bool
+        var title: String
+        var detail: String
+        var trail: AnyView?
+    }
+
+    private var checklistItems: [ChecklistItem] {
+        var items: [ChecklistItem] = [
+            ChecklistItem(
+                done: permissions.status.isReady,
+                title: "Permissions",
+                detail: permissionDetail,
+                trail: permissions.status.isReady ? nil : AnyView(
+                    HStack(spacing: 6) {
+                        Button("Turn On") {
+                            Task {
+                                _ = await Permissions.requestMicrophone()
+                                Permissions.revealSettings(for: Permissions.current())
+                                permissions.refresh()
+                            }
+                        }
+                        .buttonStyle(InkSecondaryButtonStyle())
+                        Button("Reopen") { Permissions.relaunch() }
+                            .buttonStyle(InkSecondaryButtonStyle())
+                    }
+                )
+            ),
+            ChecklistItem(
+                done: modelReady,
+                title: "Speech model",
+                detail: modelDetail,
+                trail: nil
+            ),
+            ChecklistItem(
+                done: !sessions.isEmpty,
+                title: sessions.isEmpty ? "First take" : "First take",
+                detail: sessions.isEmpty
+                    ? firstSessionDetail
+                    : "\(sessions.count) session\(sessions.count == 1 ? "" : "s") in History.",
+                trail: nil
+            ),
+        ]
+        return items
+    }
+
+    private var modelReady: Bool {
+        if settings.speechEngine == .openAICompatible {
+            return OpenAICompatibleTranscriber.isConfigured()
         }
+        return WhisperKitTranscriber.modelIsInstalled()
+    }
+
+    private var modelDetail: String {
+        if settings.speechEngine == .openAICompatible {
+            return OpenAICompatibleTranscriber.isConfigured()
+                ? "OpenAI-compatible server is configured."
+                : "Add a server API key on the Models page."
+        }
+        if WhisperKitTranscriber.modelIsInstalled() {
+            let choice = SpeechModelChoice.stored(settings.speechModel)
+            return "\(choice.title) (\(choice.variant)) is on this Mac."
+        }
+        return "Download a speech model on the Models page."
     }
 
     private var startRowTitle: String {
@@ -124,53 +297,7 @@ struct HomePage: View {
         if settings.pushToTalk {
             return "Hold \(settings.chord.display) to talk. Release to stop. The Start button stays a tap."
         }
-        if sessions.isEmpty {
-            return "First take: \(settings.chord.display) starts and stops. Words land on the clipboard."
-        }
         return "\(settings.chord.display) starts. The same shortcut stops."
-    }
-
-    private var permissionRow: some View {
-        HStack(spacing: 12) {
-            rowIcon(permissions.status.isReady ? "checkmark.circle" : "lock")
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Permissions")
-                    .font(.system(size: 13, weight: .semibold))
-                Text(permissionDetail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            if !permissions.status.isReady {
-                Button("Turn On") {
-                    Task {
-                        _ = await Permissions.requestMicrophone()
-                        Permissions.revealSettings(for: Permissions.current())
-                        permissions.refresh()
-                    }
-                }
-                .accessibilityHint("Opens System Settings for the permissions Mutter still needs")
-                Button("Reopen") {
-                    Permissions.relaunch()
-                }
-                .accessibilityHint("Quits and relaunches Mutter after you change permissions")
-            }
-        }
-        .padding(12)
-    }
-
-    private var firstSessionRow: some View {
-        HStack(spacing: 12) {
-            rowIcon("mic")
-            VStack(alignment: .leading, spacing: 2) {
-                Text("No sessions yet")
-                    .font(.system(size: 13, weight: .semibold))
-                Text(firstSessionDetail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(12)
     }
 
     private var firstSessionDetail: String {
@@ -181,7 +308,7 @@ struct HomePage: View {
             if !OpenAICompatibleTranscriber.isConfigured() {
                 return "Add a server API key on the Models page, then press Start or \(settings.chord.display)."
             }
-            return "Press Start or \(settings.chord.display), speak, then stop. The server writes the transcript when you stop."
+            return "Press Start or \(settings.chord.display), speak, then stop."
         }
         if !WhisperKitTranscriber.modelIsInstalled() {
             return "Download a speech model on the Models page, then press Start or \(settings.chord.display)."
@@ -194,47 +321,6 @@ struct HomePage: View {
             return "Turn on \(missing). If a switch is already on, turn it off and on, then reopen."
         }
         return "Screen Recording, Microphone, and Accessibility are on."
-    }
-
-    private var drawRow: some View {
-        HStack(spacing: 12) {
-            rowIcon("viewfinder")
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Talk, or drag to capture")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(12)
-    }
-
-    private var folderRow: some View {
-        HStack(spacing: 12) {
-            rowIcon("folder")
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Sessions folder")
-                    .font(.system(size: 13, weight: .semibold))
-                Text(SessionStore.displayPath())
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            Button("Show") {
-                if let root = try? SessionPaths.sessionsRoot() {
-                    NSWorkspace.shared.open(root)
-                }
-            }
-        }
-        .padding(12)
-    }
-
-    private func rowIcon(_ name: String) -> some View {
-        Image(systemName: name)
-            .font(.system(size: 15, weight: .medium))
-            .frame(width: 22)
-            .foregroundStyle(.primary)
     }
 }
 
