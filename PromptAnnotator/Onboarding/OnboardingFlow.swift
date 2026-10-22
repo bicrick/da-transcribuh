@@ -102,7 +102,7 @@ struct OnboardingFlow: View {
             HStack {
                 Spacer()
                 InkPaintSwatchStrip(size: 8, limit: 8)
-                    .padding(.trailing, 14)
+                    .padding(.trailing, Ink.space4)
                     .allowsHitTesting(false)
             }
         }

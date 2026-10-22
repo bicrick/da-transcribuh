@@ -527,7 +527,7 @@ struct InkMenuPicker<Selection: Hashable>: View {
                     .font(Ink.headingFont)
                     .foregroundStyle(Ink.label)
             }
-            .padding(.horizontal, 11)
+            .padding(.horizontal, Ink.space3)
             .frame(height: 24)
             .background(Ink.window, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
             .overlay(
@@ -676,7 +676,7 @@ struct InkSecondaryButtonStyle: ButtonStyle {
         configuration.label
             .font(Ink.buttonSmallFont)
             .foregroundStyle(Ink.label)
-            .padding(.horizontal, 11)
+            .padding(.horizontal, Ink.space3)
             .frame(height: 24)
             .background(Ink.window, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
             .overlay(
@@ -776,7 +776,7 @@ struct InkErrorBanner: View {
     var message: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: Ink.space3) {
             Text("!")
                 .font(Ink.headingFont)
                 .foregroundStyle(Ink.onAccent)
@@ -788,8 +788,8 @@ struct InkErrorBanner: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, Ink.space3)
+        .padding(.vertical, Ink.space2 + 1)
         .overlay(
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
                 .strokeBorder(Ink.label, lineWidth: 1)
@@ -804,7 +804,7 @@ struct InkDashedEmpty: View {
     var action: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Ink.space3) {
             Text(title)
                 .font(Ink.rowTitleFont)
                 .foregroundStyle(Ink.label)
@@ -837,14 +837,14 @@ struct DTStatusBar: View {
     var body: some View {
         HStack(spacing: 0) {
             InkPaintSwatchStrip(size: 8, limit: 4)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, Ink.space3)
                 .frame(height: Ink.statusBarHeight)
             Rectangle()
                 .fill(Ink.label)
                 .frame(width: 1, height: Ink.statusBarHeight)
 
             ForEach(Array(cells.enumerated()), id: \.offset) { index, cell in
-                HStack(spacing: 6) {
+                HStack(spacing: Ink.space2 - 2) {
                     if index == 0 {
                         Rectangle()
                             .fill(recording ? Ink.record : Ink.label)
@@ -855,7 +855,7 @@ struct DTStatusBar: View {
                         .font(Ink.statusFont)
                         .foregroundStyle(Ink.label)
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, Ink.space3)
                 .frame(height: Ink.statusBarHeight)
                 Rectangle()
                     .fill(Ink.label)
@@ -865,7 +865,7 @@ struct DTStatusBar: View {
             Text(trailing)
                 .font(Ink.statusFont)
                 .foregroundStyle(Ink.secondary)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, Ink.space3)
                 .frame(height: Ink.statusBarHeight)
         }
         .frame(height: Ink.statusBarHeight)

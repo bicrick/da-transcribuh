@@ -100,7 +100,7 @@ struct RecordingPage: View {
         }
         switch style {
         case .classic:
-            HStack(spacing: 5) {
+            HStack(spacing: Ink.space1 + 1) {
                 Rectangle()
                     .fill(Ink.record)
                     .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
@@ -114,7 +114,7 @@ struct RecordingPage: View {
                     .foregroundStyle(Ink.secondary)
             }
         case .compact:
-            HStack(spacing: 5) {
+            HStack(spacing: Ink.space1 + 1) {
                 Rectangle()
                     .fill(Ink.record)
                     .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))

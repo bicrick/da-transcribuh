@@ -10,11 +10,11 @@ struct DTTitleStrip: View {
         ZStack {
             HStack(spacing: 0) {
                 DTTrafficLights()
-                    .padding(.leading, 12)
+                    .padding(.leading, Ink.space3)
                     .zIndex(1)
                 Spacer(minLength: 0)
                 InkPaintSwatchStrip(size: 9, limit: 10)
-                    .padding(.trailing, 14)
+                    .padding(.trailing, Ink.space4)
                     .allowsHitTesting(false)
             }
 
@@ -86,7 +86,7 @@ struct DTTrafficLights: View {
     @State private var windowIsKey = true
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Ink.space2) {
             DTTrafficLight(kind: .close, isKey: windowIsKey)
             DTTrafficLight(kind: .miniaturize, isKey: windowIsKey)
             DTTrafficLight(kind: .zoom, isKey: windowIsKey)

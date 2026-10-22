@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 /// How open each piece of recording chrome is. Zero is gone, one is fully in the capsule.
+/// Left slot = record square + timer. Right slot = capture chip (or download %). No text label.
 struct IslandSlots: Equatable {
     var label: CGFloat = 0
     var dot: CGFloat = 0
@@ -11,10 +12,12 @@ struct IslandSlots: Equatable {
 
     static func recording(style: IslandStyle, captures: Int) -> IslandSlots {
         switch style {
-        case .classic:
-            return IslandSlots(label: 1, clock: 1, chip: captures > 0 ? 1 : 0)
-        case .compact:
-            return IslandSlots(dot: 1, clock: 1, chip: captures > 0 ? 1 : 0)
+        case .classic, .compact:
+            return IslandSlots(
+                dot: 1,
+                clock: 1,
+                chip: captures > 0 ? 1 : 0
+            )
         case .minimal, .hidden:
             return IslandSlots()
         }
@@ -66,25 +69,37 @@ enum IslandPresence: Equatable {
     case processing
 }
 
-/// Sizes for the capsule. The two side slots are always the same width, so the comb
-/// stays in the middle while a label or a count closes.
+/// Sizes for the capsule. Left and right side slots share one fixed width so the comb stays centered.
 struct IslandLayout: Equatable {
-    var panel = CGSize(width: 242, height: 46)
+    var panel = CGSize(width: 280, height: 54)
     var side: CGFloat = 0
-    var wave = CGSize(width: 210, height: 26)
-    var label: CGFloat = 0
-    var dot: CGFloat = 0
-    var leadingGap: CGFloat = 0
-    var trailingGap: CGFloat = 0
+    var wave = CGSize(width: 248, height: 32)
+    /// Gap between each side slot and the waveform (equal L/R).
+    var sideGap: CGFloat = 0
+    var record: CGFloat = 0
     var clock: CGFloat = 0
-    var clockChipGap: CGFloat = 0
+    var recordClockGap: CGFloat = 0
     var chip: CGFloat = 0
-    var chipPercentGap: CGFloat = 0
     var percent: CGFloat = 0
 }
 
 enum IslandMetrics {
-    static let inset: CGFloat = 16
+    /// Outer padding left/right — equal.
+    static let inset: CGFloat = 18
+    /// Padding between each side slot and the waveform — equal.
+    static let sideGap: CGFloat = 16
+    /// Gap between record square and timer inside the left slot.
+    static let recordClockGap: CGFloat = 8
+    static let recordSize: CGFloat = 10
+    static let clockFontSize: CGFloat = 14
+    static let chipFontSize: CGFloat = 14
+    static let chipIconSize: CGFloat = 12
+    /// Fixed monospaced timer width (covers `59:59` and `9:59:59`) — no jitter as digits change.
+    static let fixedClockSpan: CGFloat = {
+        let m = textWidth("59:59", size: clockFontSize)
+        let h = textWidth("9:59:59", size: clockFontSize)
+        return max(m, h) + 2
+    }()
 
     static func layout(
         style: IslandStyle,
@@ -92,93 +107,85 @@ enum IslandMetrics {
         captures: Int,
         elapsed: TimeInterval
     ) -> IslandLayout {
-        let gap: CGFloat = style == .classic ? 14 : 12
-        let label = labelSpan * slots.label
-        let dot = dotSpan * slots.dot
-        let leadingGap = gap * max(slots.label, slots.dot)
-        let leading = label + dot + leadingGap
+        _ = elapsed // timer uses fixed span — elapsed no longer changes geometry
+        let leadingNatural = recordSize + recordClockGap + fixedClockSpan
+        let trailingNatural = max(chipSpan(max(captures, 1)), percentSpan)
 
-        let clock = clockSpan(elapsed) * slots.clock
-        let chip = chipSpan(captures) * slots.chip
-        let percent = percentSpan * slots.percent
-        let clockChipGap = gap * min(slots.clock, slots.chip)
-        let chipPercentGap = gap * min(slots.percent, max(slots.clock, slots.chip))
-        let trailingGap = gap * max(slots.clock, slots.chip, slots.percent)
-        let trailing = trailingGap + clock + clockChipGap + chip + chipPercentGap + percent
+        let leadingOpen = max(slots.dot, slots.clock)
+        let trailingOpen = max(slots.chip, slots.percent)
+        let open = max(leadingOpen, trailingOpen)
 
-        let side = max(leading, trailing)
+        // Side width is the max of the two natural contents, scaled by overall open amount
+        // so the comb stays centered while chrome collapses to processing/hidden.
+        let sideFull = max(leadingNatural, trailingNatural)
+        let side = sideFull * open
+        let gap = sideGap * open
+
         let wave = CGSize(width: waveformWidth(style), height: waveformHeight(style))
         let panel = CGSize(
-            width: inset * 2 + side + wave.width + side,
+            width: inset * 2 + side + gap + wave.width + gap + side,
             height: barHeight(style)
         )
         return IslandLayout(
             panel: panel,
             side: side,
             wave: wave,
-            label: label,
-            dot: dot,
-            leadingGap: leadingGap,
-            trailingGap: trailingGap,
-            clock: clock,
-            clockChipGap: clockChipGap,
-            chip: chip,
-            chipPercentGap: chipPercentGap,
-            percent: percent
+            sideGap: gap,
+            record: recordSize * leadingOpen,
+            clock: fixedClockSpan * slots.clock,
+            recordClockGap: recordClockGap * slots.clock,
+            chip: chipSpan(captures) * slots.chip,
+            percent: percentSpan * slots.percent
         )
     }
 
     static func waveformWidth(_ style: IslandStyle) -> CGFloat {
         switch style {
         case .classic:
-            return 210
+            return 248
         case .compact:
-            return 156
+            return 188
         case .minimal, .hidden:
-            return 196
+            return 220
         }
     }
 
     static func waveformHeight(_ style: IslandStyle) -> CGFloat {
         switch style {
         case .classic, .hidden:
-            return 26
+            return 32
         case .compact:
-            return 20
+            return 26
         case .minimal:
-            return 22
+            return 28
         }
     }
 
     static func barHeight(_ style: IslandStyle) -> CGFloat {
         switch style {
         case .classic, .hidden:
-            return 46
+            return 54
         case .compact, .minimal:
-            return 40
+            return 48
         }
     }
 
+    /// Kept for SessionController tick — always fixed so the island does not reflow.
     static func clockSpan(_ elapsed: TimeInterval) -> CGFloat {
-        let text = textWidth(TimeFormat.clock(elapsed), size: 13, weight: .medium, mono: true)
-        return max(44, ceil(text) + 2)
+        _ = elapsed
+        return fixedClockSpan
     }
 
-    static let dotSpan: CGFloat = 8
-    static let percentSpan: CGFloat = 40
-
-    static var labelSpan: CGFloat {
-        let text = textWidth("Recording", size: 13, weight: .semibold, mono: false)
-        return ceil(dotSpan + 8 + text) + 4
-    }
+    static let percentSpan: CGFloat = 44
 
     static func chipSpan(_ count: Int) -> CGFloat {
-        let digits = textWidth("\(max(count, 1))", size: 13, weight: .semibold, mono: true)
-        return ceil(digits + 5 + 17 + 16) + 4
+        let digits = textWidth("\(max(count, 1))", size: chipFontSize)
+        // digit + gap + icon + horizontal pad (space2 * 2)
+        return ceil(digits + 6 + chipIconSize + Ink.space2 * 2) + 2
     }
 
-    private static func textWidth(_ text: String, size: CGFloat, weight: NSFont.Weight, mono: Bool) -> CGFloat {
-        FontMetrics.width(of: text, size: size, weight: weight, mono: mono)
+    private static func textWidth(_ text: String, size: CGFloat) -> CGFloat {
+        FontMetrics.width(of: text, size: size, weight: .regular, mono: true)
     }
 }
 

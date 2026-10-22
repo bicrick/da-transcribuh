@@ -31,7 +31,7 @@ appearance is system / light / dark from **general**, or mash `theme: …` in th
 
 the start/stop chord lives in **general** as paint keycaps — click, press a combo (modifier required, or a function key), it rebinds live. reset drops you back on ⌃⌥Space. home, the status bar, the menu panel, and onboarding all read the same stored shortcut.
 
-the recording island stays minimal: paint-red record square, “recording” label, cyan waveform, departure mono clock, and the screenshot-count chip. flat fill, thin hairline — no palette strip, no hard shadow. same layout and hit targets.
+the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform centered, screenshot-count chip on the right — equal side slots, equal gaps, equal outer padding. flat fill, thin hairline, no label text, no palette, no hard shadow. a touch taller so hit targets stay comfortable.
 
 <p align="center">
   <picture>
@@ -49,7 +49,7 @@ the recording island stays minimal: paint-red record square, “recording” lab
   </picture>
 </p>
 
-<p align="center"><em>recording island · minimal</em></p>
+<p align="center"><em>recording island · minimal · symmetric</em></p>
 
 <p align="center">
   <img src="assets/brand/mocks/icon-concepts.png" alt="da transcribuh app icon concepts" width="920">

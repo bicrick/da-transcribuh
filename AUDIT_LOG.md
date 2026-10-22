@@ -6,7 +6,13 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–28)
+## Final summary (Runs 1–29)
+
+### Run 29 — Symmetric island + spacing audit
+
+- Island: drop “Recording” label; left = record square + fixed-width timer, center = waveform, right = capture chip; equal side widths + equal sideGaps + equal insets; taller (~54pt classic), larger type/icons/bars; hit targets ≥28. `islandPanelSize()` = exact panel.
+- Spacing: normalize chrome/settings raw pads to `Ink.space*`; status bar 32; sidebar tile gap → `space3`; markup toolbar airier.
+- Mocks: `recording-paint-{light,dark}.png` regenerated; README look copy updated.
 
 ### Run 28 — Minimal recording island (Patrick feedback)
 

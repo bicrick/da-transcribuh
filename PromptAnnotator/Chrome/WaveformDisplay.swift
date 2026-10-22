@@ -21,8 +21,8 @@ final class WaveformDisplay: ObservableObject {
 /// The comb, redrawn on its own. Bar motion is not part of the island's spring.
 struct LiveWaveform: View {
     @ObservedObject var display: WaveformDisplay
-    var slotWidth: CGFloat = 210
-    var slotHeight: CGFloat = 26
+    var slotWidth: CGFloat = 248
+    var slotHeight: CGFloat = 32
     /// Single Paint ink for the comb — no per-bar palette cycling (keeps the frame cheap).
     var ink: Color = Ink.paintCyan
 

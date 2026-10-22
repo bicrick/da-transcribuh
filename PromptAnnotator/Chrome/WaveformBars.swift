@@ -9,8 +9,8 @@ enum WaveformSamples {
 /// Square-capped (no soft round caps) to match the Paint/terminal chrome.
 struct WaveformBars: View {
     var levels: [CGFloat]
-    var slotWidth: CGFloat = 210
-    var slotHeight: CGFloat = 26
+    var slotWidth: CGFloat = 248
+    var slotHeight: CGFloat = 32
     var ink: Color = Ink.label
 
     var body: some View {
@@ -18,14 +18,15 @@ struct WaveformBars: View {
             let bars = levels.isEmpty ? [CGFloat(0.1)] : levels
             let count = bars.count
             guard count > 0, size.width > 1, size.height > 1 else { return }
-            let gap = count > 24 ? CGFloat(1.15) : CGFloat(2)
-            let barWidth = max(1, (size.width - gap * CGFloat(count - 1)) / CGFloat(count))
+            // Slightly roomier bars for the taller island.
+            let gap = count > 24 ? CGFloat(1.35) : CGFloat(2.25)
+            let barWidth = max(1.25, (size.width - gap * CGFloat(count - 1)) / CGFloat(count))
             let used = barWidth * CGFloat(count) + gap * CGFloat(count - 1)
             let origin = (size.width - used) / 2
             for index in 0..<count {
                 let level = min(1, max(0, bars[index]))
                 // Keep height continuous (no per-frame snapping) — only the fill is hard-edged.
-                let height = max(2, 2 + level * (size.height - 2))
+                let height = max(2.5, 2.5 + level * (size.height - 2.5))
                 let rect = CGRect(
                     x: origin + CGFloat(index) * (barWidth + gap),
                     y: (size.height - height) / 2,

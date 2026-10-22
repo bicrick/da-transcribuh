@@ -108,12 +108,12 @@ enum Ink {
     static let sidebarTileSize: CGFloat = 72
     /// Equal left/right margin around a 72px tile in a 148px column.
     static let sidebarSideMargin: CGFloat = (sidebarWidth - sidebarTileSize) / 2
-    static let sidebarTilePad: CGFloat = 6
+    static let sidebarTilePad: CGFloat = space2 - 2
     static let sidebarIconSize: CGFloat = 28
     /// Chunky SF Symbol weight inside the colored chip.
     static let sidebarSymbolPointSize: CGFloat = 16
     static let sidebarIconLabelGap: CGFloat = 4
-    static let sidebarTileGap: CGFloat = 10
+    static let sidebarTileGap: CGFloat = space3
     static let sidebarSectionGap: CGFloat = 16
     static let sidebarFooterHeight: CGFloat = 80
     /// Tip row: readable icon in a Paint color square.
@@ -131,7 +131,7 @@ enum Ink {
     static let rowVPad: CGFloat = space3
     static let cardPad: CGFloat = space5
     static let gridGap: CGFloat = space4
-    static let statusBarHeight: CGFloat = 28
+    static let statusBarHeight: CGFloat = 32
     static let titleStripHeight: CGFloat = 40
     static let menuBarShadow: CGFloat = 4
     /// Thin, inset scroller — only obvious on hover.

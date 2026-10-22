@@ -42,8 +42,8 @@ struct HomePage: View {
                         Text(AppVersion.label)
                             .font(Ink.badgeFont)
                             .foregroundStyle(Ink.paintBlack)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, Ink.space2 - 2)
+                            .padding(.vertical, Ink.space1 / 2)
                             .background(Ink.paintYellow)
                             .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
                     }
