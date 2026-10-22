@@ -12,7 +12,9 @@ final class ClipboardHistoryController {
     private var hotKey: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     private let signature: OSType = 0x5041_6E6E // 'PAnn'
-    private let hotKeyID: UInt32 = 4
+    /// Carbon id under `'PAnn'`: record=1, paste=2, cancel=3, clipboard=4.
+    static let carbonHotKeyID: UInt32 = 4
+    private let hotKeyID: UInt32 = ClipboardHistoryController.carbonHotKeyID
 
     func install() {
         guard !Runtime.isUnitTest else { return }

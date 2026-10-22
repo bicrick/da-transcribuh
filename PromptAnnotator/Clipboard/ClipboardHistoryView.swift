@@ -79,11 +79,11 @@ struct ClipboardHistoryView: View {
         ))
     }
 
-    // MARK: - Header (app name + search)
+    // MARK: - Header (panel title + search)
 
     private var header: some View {
         HStack(spacing: Ink.space2) {
-            Text("da transcribuh")
+            Text("clipboard")
                 .font(Ink.mono(11))
                 .foregroundStyle(Ink.secondary)
                 .lineLimit(1)

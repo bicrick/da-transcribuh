@@ -64,7 +64,7 @@ Narrow floating non-activating panel (~360pt) near the pointer. Double-pane beve
 
 Metrics from `Popup` / list views (pre-macOS 26): window ~**450**pt wide, **itemHeight 22**, **horizontal/verticalPadding 5**, search field height **23**, `imageMaxHeight` default **40**.
 
-1. **Header** — muted app name **`da transcribuh`** (Maccy shows `Maccy`) left + square search field (Maccy’s rounded field → our square 2pt stroke): magnifier, placeholder **`type to search…`**, focused caret on open.
+1. **Header** — muted title **`clipboard`** (lowercase Departure Mono; Maccy shows `Maccy`) left + square search field (Maccy’s rounded field → our square 2pt stroke): magnifier, placeholder **`type to search…`**, focused caret on open.
 2. **List** — borderless, **no dividers between rows**. Pinned block on top with a single separator under pins (as Maccy’s PinsView + Divider). Then unpinned history.
 3. **Footer** (Maccy `showFooter`) — quiet menu rows, not key-hint chrome: **Clear** (`⌥⌘⌫`), **Preferences…** (`⌘,`), **Quit** (`⌘Q`). (Clear all is the alternate Clear with modifiers — same as Maccy.)
 

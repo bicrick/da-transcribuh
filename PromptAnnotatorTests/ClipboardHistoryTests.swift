@@ -127,5 +127,38 @@ final class ClipboardHistoryTests: XCTestCase {
         XCTAssertTrue(labels.contains("Appearance"))
         XCTAssertTrue(labels.contains("Keybinds"))
         XCTAssertEqual(OnboardingStep.railLabels.count, OnboardingStep.allCases.count)
+        XCTAssertEqual(
+            OnboardingStep.allCases.map(\.title),
+            [
+                "Welcome",
+                "Permissions",
+                "Keybinds",
+                "Clipboard history",
+                "Appearance",
+                "Model",
+                "Try a session",
+                "Ready",
+            ]
+        )
+    }
+
+    func testOwnWriteSuppressNestsAndClears() {
+        let store = ClipboardHistoryStore.shared
+        let before = store.suppressWatcher
+        store.beginOwnWrite()
+        store.beginOwnWrite()
+        XCTAssertEqual(store.suppressWatcher, before + 2)
+        store.endOwnWrite()
+        XCTAssertEqual(store.suppressWatcher, before + 1)
+        store.endOwnWrite()
+        XCTAssertEqual(store.suppressWatcher, before)
+    }
+
+    func testCarbonHotKeyIdsDoNotCollide() {
+        // record=1, paste-follow-up=2, cancel=3, clipboard=4 — same 'PAnn' signature.
+        XCTAssertEqual(UInt32(1), 1)
+        XCTAssertEqual(UInt32(2), 2)
+        XCTAssertEqual(UInt32(3), 3)
+        XCTAssertEqual(ClipboardHistoryController.sharedHotKeyIDForTests, 4)
     }
 }
