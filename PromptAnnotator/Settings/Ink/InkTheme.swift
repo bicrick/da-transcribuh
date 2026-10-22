@@ -1,57 +1,95 @@
 import AppKit
 import SwiftUI
 
-/// "da transcribuh" chrome — strict black/white, 1px lines, hard offset shadows.
+/// "da transcribuh" chrome — MS Paint retro: flat color accents, chunky outlines,
+/// hard offset shadows, Departure Mono labels. Backgrounds stay white/black.
 /// Kept under the `Ink` name so existing call sites stay compile-safe.
 enum Ink {
-    // MARK: - Dynamic colors (light / dark)
+    // MARK: - Dynamic surfaces (light / dark)
 
     static let window = color(light: "#FFFFFF", dark: "#000000")
     static let canvas = color(light: "#FFFFFF", dark: "#000000")
     static let label = color(light: "#000000", dark: "#FFFFFF")
     static let onAccent = color(light: "#FFFFFF", dark: "#000000")
-    /// Primary fill / border rule (was red accent).
+    /// Primary fill / border rule.
     static let accent = label
     static let accentSoft = fill
     static let sidebarSelection = label
-    static let hairline = color(light: "#DADADA", dark: "#333333")
+    static let hairline = color(light: "#C0C0C0", dark: "#333333")
     static let borderStrong = label
-    static let fill = color(light: "#F2F2F2", dark: "#141414")
+    static let fill = color(light: "#F0F0F0", dark: "#141414")
     static let track = hairline
     static let meter = label
     static let secondary = color(light: "#666666", dark: "#A0A0A0")
-    static let tertiary = color(light: "#A3A3A3", dark: "#5C5C5C")
+    static let tertiary = color(light: "#999999", dark: "#5C5C5C")
     static let field = window
     static let card = window
     static let keycap = window
-    static let sidebar = window
-    /// Classic MS Paint 16-color primaries — flat 8-bit fills only, used sparingly
-    /// (traffic lights, record dot, true success checks). Everything else stays B/W.
+    static let sidebar = color(light: "#F7F7F7", dark: "#0A0A0A")
+
+    // MARK: - Classic MS Paint flat swatches (Win95/98 era)
+
+    static let paintBlack = color(light: "#000000", dark: "#000000")
+    static let paintWhite = color(light: "#FFFFFF", dark: "#FFFFFF")
+    static let paintGray = color(light: "#7F7F7F", dark: "#7F7F7F")
+    static let paintSilver = color(light: "#C3C3C3", dark: "#C3C3C3")
     static let paintRed = color(light: "#ED1C24", dark: "#ED1C24")
     static let paintYellow = color(light: "#FFF200", dark: "#FFF200")
     static let paintGreen = color(light: "#22B14C", dark: "#22B14C")
     static let paintBlue = color(light: "#3F48CC", dark: "#3F48CC")
+    static let paintCyan = color(light: "#00A2E8", dark: "#00A2E8")
+    static let paintMagenta = color(light: "#A349A4", dark: "#A349A4")
+    static let paintOrange = color(light: "#FF7F27", dark: "#FF7F27")
+    static let paintBrown = color(light: "#B97A57", dark: "#B97A57")
+    static let paintLime = color(light: "#B5E61D", dark: "#B5E61D")
+    static let paintPink = color(light: "#FFAEC9", dark: "#FFAEC9")
+    static let paintNavy = color(light: "#1E3A8A", dark: "#1E3A8A")
+    static let paintTeal = color(light: "#008080", dark: "#008080")
+
+    /// Ordered toolbox / status-bar palette strip.
+    static var paintSwatches: [Color] {
+        [
+            paintBlack, paintGray, paintSilver, paintWhite,
+            paintRed, paintOrange, paintYellow, paintLime,
+            paintGreen, paintTeal, paintCyan, paintBlue,
+            paintNavy, paintMagenta, paintPink, paintBrown,
+        ]
+    }
+
+    /// Per-sidebar-page accent (icon / pressed fill hint).
+    static func toolAccent(for page: SettingsPage) -> Color {
+        switch page {
+        case .home: return paintBlue
+        case .history: return paintOrange
+        case .recording: return paintRed
+        case .model: return paintMagenta
+        case .configuration: return paintGray
+        case .sound: return paintCyan
+        case .performance: return paintGreen
+        }
+    }
+
     /// Recording-active marker (status / island).
     static let record = paintRed
     static let success = paintGreen
-    static let error = label
+    static let error = paintRed
 
     // MARK: - Radii / stroke
 
-    static let cardRadius: CGFloat = 3
-    static let tileRadius: CGFloat = 3
-    static let buttonRadius: CGFloat = 3
-    static let buttonLargeRadius: CGFloat = 3
+    static let cardRadius: CGFloat = 2
+    static let tileRadius: CGFloat = 2
+    static let buttonRadius: CGFloat = 2
+    static let buttonLargeRadius: CGFloat = 2
     static let fieldRadius: CGFloat = 2
-    static let sidebarRowRadius: CGFloat = 3
-    static let keycapRadius: CGFloat = 3
+    static let sidebarRowRadius: CGFloat = 2
+    static let keycapRadius: CGFloat = 2
     static let lineWidth: CGFloat = 1
     static let selectedBorder: CGFloat = 2
     static let hardShadow: CGFloat = 3
-    static let buttonShadow: CGFloat = 1
-    static let scrollerRadius: CGFloat = 2
+    static let buttonShadow: CGFloat = 2
+    static let scrollerRadius: CGFloat = 1
 
-    // MARK: - Spacing scale (4 / 8 / 12 / 16 / 24 / 32)
+    // MARK: - Spacing scale (airier Paint layout)
 
     static let space1: CGFloat = 4
     static let space2: CGFloat = 8
@@ -59,57 +97,55 @@ enum Ink {
     static let space4: CGFloat = 16
     static let space5: CGFloat = 24
     static let space6: CGFloat = 32
+    static let space7: CGFloat = 48
 
     // MARK: - Layout
 
-    /// Wide enough for square tiles with padded labels (“General”, “Recording”).
-    static let sidebarWidth: CGFloat = 128
-    static let sidebarTileSize: CGFloat = 84
-    /// Inner padding inside each sidebar tile (label must not touch the border).
-    static let sidebarTilePad: CGFloat = 8
-    static let sidebarIconLabelGap: CGFloat = 6
-    static let sidebarTileGap: CGFloat = 8
-    static let sidebarSectionGap: CGFloat = 12
-    /// Footer (mark + version) height — used as ScrollView bottom inset.
-    static let sidebarFooterHeight: CGFloat = 72
+    /// Paint toolbox column — roomy tiles, big icons.
+    static let sidebarWidth: CGFloat = 148
+    static let sidebarTileSize: CGFloat = 72
+    static let sidebarTilePad: CGFloat = 6
+    static let sidebarIconSize: CGFloat = 28
+    static let sidebarIconLabelGap: CGFloat = 4
+    static let sidebarTileGap: CGFloat = 10
+    static let sidebarSectionGap: CGFloat = 16
+    static let sidebarFooterHeight: CGFloat = 80
 
-    static let pageTop: CGFloat = 16
-    static let pageSide: CGFloat = 24
-    static let pageBottom: CGFloat = 24
-    /// Content column grows with the window; caps so lines stay readable.
-    static let maxContentWidth: CGFloat = 880
-    static let sectionGap: CGFloat = space5
-    static let sectionInnerGap: CGFloat = space2
-    static let titleDescGap: CGFloat = space1
+    static let pageTop: CGFloat = 28
+    static let pageSide: CGFloat = 36
+    static let pageBottom: CGFloat = 36
+    static let maxContentWidth: CGFloat = 920
+    static let sectionGap: CGFloat = space6
+    static let sectionInnerGap: CGFloat = space3
+    static let titleDescGap: CGFloat = space2
     static let rowHPad: CGFloat = space4
     static let rowVPad: CGFloat = space3
-    static let cardPad: CGFloat = space4
-    static let gridGap: CGFloat = space3
-    static let statusBarHeight: CGFloat = 24
-    static let titleStripHeight: CGFloat = 38
+    static let cardPad: CGFloat = space5
+    static let gridGap: CGFloat = space4
+    static let statusBarHeight: CGFloat = 28
+    static let titleStripHeight: CGFloat = 40
     static let menuBarShadow: CGFloat = 4
-    static let scrollerWidth: CGFloat = 8
-    static let scrollerThumbMin: CGFloat = 28
+    /// Thin, inset scroller — only obvious on hover.
+    static let scrollerWidth: CGFloat = 5
+    static let scrollerThumbMin: CGFloat = 24
+    static let scrollerInset: CGFloat = 3
 
     // MARK: - Type
     //
-    // Chrome (Departure Mono, PostScript `DepartureMono-Regular` via ATSApplicationFontsPath):
-    //   title / heading / label / number / buttons / keycaps / badges / sidebar / status
-    // Long copy (SF Mono): body / caption
-    // Prefer crisp pixel sizes: 11, 13, 16, 22.
+    // Chrome: Departure Mono (PostScript `DepartureMono-Regular`, also try family name).
+    // Body/caption: SF Mono via `.system(design: .monospaced)`.
+    // NEVER fall back to proportional sans for chrome / wordmark.
 
-    /// Departure Mono PostScript name (bundled OFL under `PromptAnnotator/Fonts/`).
+    /// Canonical PostScript name (fontTools nameID 6).
     static let monoName = "DepartureMono-Regular"
 
-    /// Primary tokens — retune here only.
     static let titleFont = mono(22)
     static let headingFont = mono(11)
     static let labelFont = mono(13)
-    static let numberFont = mono(22)
+    static let numberFont = mono(28)
     static let bodyFont = Font.system(size: 13, weight: .regular, design: .monospaced)
     static let captionFont = Font.system(size: 11, weight: .regular, design: .monospaced)
 
-    /// Role aliases (kept so existing call sites stay compile-safe).
     static let pageTitleFont = titleFont
     static let onboardingHeroFont = mono(22)
     static let stepTitleFont = titleFont
@@ -119,7 +155,7 @@ enum Ink {
     static let rowTitleFont = labelFont
     static let eyebrowFont = headingFont
     static let statusFont = mono(11)
-    static let wordmarkFont = mono(11)
+    static let wordmarkFont = mono(12)
     static let buttonFont = labelFont
     static let buttonSmallFont = mono(11)
     static let keycapFont = labelFont
@@ -131,19 +167,19 @@ enum Ink {
     static let menuBarMetaFont = captionFont
     static let microFont = mono(11)
 
+    /// Departure Mono for chrome. Falls back to **system monospaced only** — never proportional.
     static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        // Weight variants are not shipped; size is what matters for motifs.
-        // Graceful fallback if the bundled OTF failed to register.
         _ = weight
-        if NSFont(name: monoName, size: size) != nil {
-            return Font.custom(monoName, size: size)
+        for name in InkFontRegistrar.candidateNames {
+            if NSFont(name: name, size: size) != nil {
+                return Font.custom(name, size: size)
+            }
         }
         return Font.system(size: size, weight: .regular, design: .monospaced)
     }
 
-    /// True when Departure Mono resolved from the bundle (ATSApplicationFontsPath).
     static var monoIsRegistered: Bool {
-        NSFont(name: monoName, size: 12) != nil
+        InkFontRegistrar.isDepartureAvailable
     }
 
     static func systemMono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {

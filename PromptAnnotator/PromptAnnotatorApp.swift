@@ -32,6 +32,8 @@ struct PromptAnnotatorApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Fonts before any chrome paints — Departure Mono for every wordmark / label.
+        InkFontRegistrar.registerBundledFonts()
         guard !Runtime.isUnitTest else { return }
         AppSettings.shared.appearance.applyToApp()
         HotkeyCenter.shared.handler = {
