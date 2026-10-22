@@ -4,13 +4,15 @@ import XCTest
 final class IslandChromeTests: XCTestCase {
     func testRecordingChromeMatchesTheStyle() {
         let classic = IslandSlots.recording(style: .classic, captures: 0)
-        XCTAssertEqual(classic.label, 1)
+        XCTAssertEqual(classic.label, 0)
+        XCTAssertEqual(classic.dot, 1)
         XCTAssertEqual(classic.clock, 1)
-        XCTAssertEqual(classic.dot, 0)
         XCTAssertEqual(classic.chip, 0)
 
         let counted = IslandSlots.recording(style: .classic, captures: 2)
         XCTAssertEqual(counted.chip, 1)
+        XCTAssertEqual(counted.dot, 1)
+        XCTAssertEqual(counted.clock, 1)
 
         let compact = IslandSlots.recording(style: .compact, captures: 1)
         XCTAssertEqual(compact.dot, 1)
@@ -38,7 +40,7 @@ final class IslandChromeTests: XCTestCase {
         XCTAssertEqual(downloading.chip, 0)
     }
 
-    func testTheCombStaysCenteredAndDoesNotChangeFrame() {
+    func testTheCombStaysCenteredAndSideSlotsMatch() {
         for style in IslandStyle.allCases {
             let recording = IslandMetrics.layout(
                 style: style,
@@ -54,18 +56,40 @@ final class IslandChromeTests: XCTestCase {
             )
             XCTAssertEqual(recording.wave, processing.wave, "\(style)")
             XCTAssertEqual(recording.panel.height, processing.panel.height, "\(style)")
-            let left = IslandMetrics.inset + recording.side
+
+            // Equal side slots + equal sideGaps keep the waveform centered.
+            let left = IslandMetrics.inset + recording.side + recording.sideGap
             let waveEnd = left + recording.wave.width
-            let right = recording.panel.width - IslandMetrics.inset - recording.side
+            let right = recording.panel.width - IslandMetrics.inset - recording.side - recording.sideGap
             XCTAssertEqual(waveEnd, right, accuracy: 0.01, "\(style)")
-            XCTAssertEqual(recording.panel.width / 2, left + recording.wave.width / 2, accuracy: 0.01, "\(style)")
+            XCTAssertEqual(
+                recording.panel.width / 2,
+                left + recording.wave.width / 2,
+                accuracy: 0.01,
+                "\(style)"
+            )
+
             if style == .minimal || style == .hidden {
                 XCTAssertEqual(recording.panel, processing.panel, "\(style)")
             } else {
                 XCTAssertGreaterThan(recording.panel.width, processing.panel.width, "\(style)")
                 XCTAssertEqual(processing.side, 0, "\(style)")
                 XCTAssertGreaterThan(recording.side, 0, "\(style)")
+                // Left and right slots share one width.
+                XCTAssertEqual(recording.sideGap, IslandMetrics.sideGap, accuracy: 0.01, "\(style)")
             }
+        }
+    }
+
+    func testClockSpanIsFixedAgainstElapsed() {
+        XCTAssertEqual(IslandMetrics.clockSpan(0), IslandMetrics.fixedClockSpan)
+        XCTAssertEqual(IslandMetrics.clockSpan(12), IslandMetrics.fixedClockSpan)
+        XCTAssertEqual(IslandMetrics.clockSpan(3600 + 59), IslandMetrics.fixedClockSpan)
+    }
+
+    func testBarHeightMeetsHitTarget() {
+        for style in IslandStyle.allCases {
+            XCTAssertGreaterThanOrEqual(IslandMetrics.barHeight(style), 28, "\(style)")
         }
     }
 

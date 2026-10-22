@@ -25,9 +25,13 @@
 
 ## look
 
-black and white chrome with a tiny bit of classic ms paint. departure mono for labels and chrome, sf mono for longer copy. custom scroll bars. system / light / dark from general (or cycle `theme: …` in the menu bar). the recording island, waveform, and annotate toolbar match the same ink — not a leftover overlay.
+ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset shadows, and a toolbox sidebar. departure mono for every “da transcribuh” wordmark and chrome label (lowercase, block cursor only after the h — never italic). sf mono for longer copy. custom thin scrollers.
 
-paint shows up only where it helps: traffic-light dots when the window is key (`#ED1C24` / `#FFF200` / `#22B14C`), the record mark, and a green check when something’s actually done.
+appearance is system / light / dark from **general**, or mash `theme: …` in the menu bar to cycle. light stays white; dark is charcoal (~#1e1e1e), not crushed black — surfaces a step lighter, hairlines soft gray, text off-white. paint accents stay vivid.
+
+the start/stop chord lives in **general** as paint keycaps — click, press a combo (modifier required, or a function key), it rebinds live. reset drops you back on ⌃⌥Space. home, the status bar, the menu panel, and onboarding all read the same stored shortcut.
+
+the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform centered, screenshot-count chip on the right — equal side slots, equal gaps, equal outer padding. flat fill, thin hairline, no label text, no palette, no hard shadow. a touch taller so hit targets stay comfortable.
 
 <p align="center">
   <picture>
@@ -37,6 +41,21 @@ paint shows up only where it helps: traffic-light dots when the window is key (`
 </p>
 
 <p align="center"><em>settings home · light / dark follow your github theme</em></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/mocks/recording-paint-dark.png">
+    <img src="assets/brand/mocks/recording-paint-light.png" alt="da transcribuh recording island" width="640">
+  </picture>
+</p>
+
+<p align="center"><em>recording island · minimal · symmetric</em></p>
+
+<p align="center">
+  <img src="assets/brand/mocks/icon-concepts.png" alt="da transcribuh app icon concepts" width="920">
+</p>
+
+<p align="center"><em>icon concepts (not shipped) · recommend #1 dt-block square + red shadow</em></p>
 
 ## install
 
@@ -56,20 +75,20 @@ macos 14 or later. the first build fetches whisperkit.
 
 ## what it does
 
-- lives in the menu bar. press the shortcut, talk, press it again. words land on the clipboard (and paste into the front app when that makes sense).
+- lives in the menu bar. press the shortcut (yours, not stuck on ⌃⌥Space), talk, press it again. words land on the clipboard (and paste into the front app when that makes sense).
 - hold **shift** and drag to grab a piece of the screen. release shift to keep the tile. stop the session and you get the picture with the words.
 - sessions save under `~/Documents/PromptAnnotator/Sessions/` (folder name stays put so your history doesn’t vanish).
 - on-device speech via whisperkit. bring your own core ml folder or hugging face variant if you want. optional openai-compatible server for the final transcript only.
-- settings window with a tool-palette sidebar, status bar, and the appearance switcher above. models page for downloads and byom.
+- settings window with a tool-palette sidebar, status bar, paint keycap shortcut recorder in general, and the appearance switcher (or `theme: …` in the menu bar). models page for downloads and byom.
 
 ## shortcuts
 
 | | |
 | --- | --- |
-| start / stop | control-option-space (changeable) |
+| start / stop | ⌃⌥Space by default — click the paint keycaps in **general** to rebind (needs a modifier, or a function key). re-registers live. |
 | mark / capture | hold shift, drag, release |
 | paste image + text | control-option-v |
-| cancel take | optional; set one in configuration |
+| cancel take | optional; set one in general (escape clears it while listening) |
 
 ## permissions
 
@@ -112,6 +131,9 @@ final **dt block** art lives in [`assets/brand/`](assets/brand/):
 - `readme-banner.png` — hero (paint traffic lights on the session window mock)
 - `social-preview.png` (1280×640) — repo social preview; also mirrored as `social-preview-1280x640.png` / `@2x`
 - `screenshots/settings-home-light.png` / `settings-home-dark.png` — settings home mocks for the readme
+- `mocks/home-paint-light.png` / `home-paint-dark.png` — Paint-direction lock mocks
+- `mocks/recording-paint-light.png` / `recording-paint-dark.png` — recording island (minimal)
+- `mocks/icon-concepts.png` — app icon explorations (AppIcon not replaced); recommend #1 dt-block square + red shadow
 - `menubar-g-dt-block-16.png` / `menubar-g-dt-block-32.png` — template menu-bar glyph
 
 patrick: upload `assets/brand/social-preview.png` under the repo’s **settings → general → social preview** at launch (repo stays private until then). that part isn’t settable from here.

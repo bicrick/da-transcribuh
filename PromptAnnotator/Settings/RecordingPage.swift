@@ -8,15 +8,18 @@ struct RecordingPage: View {
     var body: some View {
         SettingsPageStack(
             title: "Recording",
-            subtitle: "Keyboard shortcuts and push to talk are in General. The menu bar shows the same shortcut under Start Session."
+            subtitle: "Island style and Shift-drag defaults. Shortcuts live in General."
         ) {
-            SettingsSection(title: "Recording window") {
+            SettingsSection(
+                title: "Recording window",
+                footer: "The menu bar shows the same shortcut under Start Session."
+            ) {
                 styleGrid
             }
 
             SettingsSection(
                 title: "Defaults",
-                footer: "Drag captures the screen in front of you, including a window or a modal. These tools show while you hold Shift."
+                footer: "These tools show while you hold Shift. Drag captures the front window or modal."
             ) {
                 InkCard {
                     VStack(alignment: .leading, spacing: 0) {
@@ -97,7 +100,7 @@ struct RecordingPage: View {
         }
         switch style {
         case .classic:
-            HStack(spacing: 5) {
+            HStack(spacing: Ink.space1 + 1) {
                 Rectangle()
                     .fill(Ink.record)
                     .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
@@ -111,7 +114,7 @@ struct RecordingPage: View {
                     .foregroundStyle(Ink.secondary)
             }
         case .compact:
-            HStack(spacing: 5) {
+            HStack(spacing: Ink.space1 + 1) {
                 Rectangle()
                     .fill(Ink.record)
                     .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))

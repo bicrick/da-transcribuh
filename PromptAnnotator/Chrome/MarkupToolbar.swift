@@ -4,7 +4,7 @@ struct MarkupToolbarView: View {
     @ObservedObject var session: SessionController
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: Ink.space1) {
             captureButton
             hairline
             ForEach(AnnotationTool.allCases, id: \.self) { tool in
@@ -30,15 +30,15 @@ struct MarkupToolbarView: View {
                 colorButton(color)
             }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 44)
+        .padding(.horizontal, Ink.space3)
+        .frame(height: 54)
         .fixedSize(horizontal: true, vertical: false)
         .background {
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
                 .fill(Ink.window)
                 .overlay(
                     RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                        .strokeBorder(Ink.label, lineWidth: 1)
+                        .strokeBorder(Ink.hairline, lineWidth: 1)
                 )
         }
     }
@@ -48,7 +48,7 @@ struct MarkupToolbarView: View {
         return PressSurface(action: { session.selectCapture() }) {
             Image(systemName: "viewfinder")
                 .font(Ink.labelFont)
-                .frame(width: 32, height: 28)
+                .frame(width: 36, height: 32)
                 .foregroundStyle(selected ? Ink.onAccent : Ink.label)
                 .background(
                     RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
@@ -64,7 +64,7 @@ struct MarkupToolbarView: View {
         return PressSurface(action: { session.select(tool: tool) }) {
             Image(systemName: tool.symbolName)
                 .font(Ink.labelFont)
-                .frame(width: 32, height: 28)
+                .frame(width: 36, height: 32)
                 .foregroundStyle(selected ? Ink.onAccent : Ink.label)
                 .background(
                     RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
@@ -79,7 +79,7 @@ struct MarkupToolbarView: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(Ink.buttonSmallFont)
-                .frame(width: 32, height: 28)
+                .frame(width: 36, height: 32)
                 .foregroundStyle(Ink.label.opacity(enabled ? 1 : 0.35))
         }
         .buttonStyle(.plain)
@@ -105,7 +105,7 @@ struct MarkupToolbarView: View {
                         .strokeBorder(Ink.label, lineWidth: selected ? 2 : 0)
                         .padding(-3)
                 )
-                .frame(width: 24, height: 28)
+                .frame(width: 28, height: 32)
         }
         .buttonStyle(.plain)
         .help(color.name.capitalized)
@@ -138,7 +138,7 @@ struct MarkupToolbarView: View {
     private var hairline: some View {
         Rectangle()
             .fill(Ink.label)
-            .frame(width: 1, height: 20)
-            .padding(.horizontal, 4)
+            .frame(width: 1, height: 22)
+            .padding(.horizontal, Ink.space1)
     }
 }

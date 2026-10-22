@@ -21,6 +21,8 @@ struct ShortcutCapture: NSViewRepresentable {
         private var capture = false
         private var monitor: Any?
 
+        override var acceptsFirstResponder: Bool { true }
+
         func setCapture(_ active: Bool) {
             capture = active
             sync()
@@ -29,6 +31,7 @@ struct ShortcutCapture: NSViewRepresentable {
         private func sync() {
             if capture, monitor == nil {
                 window?.makeFirstResponder(self)
+                // Local monitor only — removed in sync(false) and deinit; weak self avoids a cycle.
                 monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                     guard let self, self.capture else { return event }
                     self.onKey?(event)

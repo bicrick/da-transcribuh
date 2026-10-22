@@ -10,17 +10,15 @@ struct DTTitleStrip: View {
         ZStack {
             HStack(spacing: 0) {
                 DTTrafficLights()
-                    .padding(.leading, 12)
+                    .padding(.leading, Ink.space3)
                     .zIndex(1)
                 Spacer(minLength: 0)
-                DTDitherGrip()
-                    .frame(maxWidth: 160)
-                    .frame(height: 12)
-                    .padding(.trailing, 14)
+                InkPaintSwatchStrip(size: 9, limit: 10)
+                    .padding(.trailing, Ink.space4)
                     .allowsHitTesting(false)
             }
 
-            DTWordmark(size: 12)
+            DTWordmark(size: 13)
                 .allowsHitTesting(false)
         }
         .frame(height: Ink.titleStripHeight)
@@ -34,7 +32,7 @@ struct DTTitleStrip: View {
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Ink.label)
-                .frame(height: 1)
+                .frame(height: 2)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("da transcribuh window")
@@ -88,7 +86,7 @@ struct DTTrafficLights: View {
     @State private var windowIsKey = true
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Ink.space2) {
             DTTrafficLight(kind: .close, isKey: windowIsKey)
             DTTrafficLight(kind: .miniaturize, isKey: windowIsKey)
             DTTrafficLight(kind: .zoom, isKey: windowIsKey)

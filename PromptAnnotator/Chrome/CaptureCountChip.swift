@@ -1,26 +1,28 @@
 import SwiftUI
 
-/// The snapshot count that slides out beside the clock.
+/// Snapshot count beside the waveform — flat hairline chip, ≥28pt hit height.
 struct CaptureCountChip: View {
     var count: Int
     var ink: Color = Ink.label
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: Ink.space1 + 2) {
             Text("\(count)")
-                .font(Ink.labelFont)
+                .font(Ink.mono(IslandMetrics.chipFontSize))
                 .monospacedDigit()
                 .contentTransition(.numericText(value: Double(count)))
             Image(systemName: "photo")
-                .font(Ink.buttonSmallFont)
+                .font(.system(size: IslandMetrics.chipIconSize, weight: .black))
+                .symbolRenderingMode(.monochrome)
         }
         .foregroundStyle(ink)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Ink.window)
+        .padding(.horizontal, Ink.space2)
+        .padding(.vertical, Ink.space1 + 2)
+        .frame(minHeight: 28)
+        .background(Ink.window, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                .strokeBorder(ink, lineWidth: 1)
+                .strokeBorder(Ink.hairline, lineWidth: 1)
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(count) \(count == 1 ? "capture" : "captures")")

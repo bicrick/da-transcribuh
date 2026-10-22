@@ -212,6 +212,50 @@ struct InkKeycapRow: View {
     }
 }
 
+/// Paint keycap field — click, press a combo, it saves. Listening state pulses the border.
+struct InkShortcutRecorder: View {
+    var keys: [String]
+    var listening: Bool
+    var emptyLabel: String = "None"
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Group {
+                if listening {
+                    Text("press keys…")
+                        .font(Ink.mono(11))
+                        .foregroundStyle(Ink.secondary)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 26)
+                } else if keys.isEmpty {
+                    Text(emptyLabel)
+                        .font(Ink.mono(11))
+                        .foregroundStyle(Ink.secondary)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 26)
+                } else {
+                    InkKeycapRow(keys: keys, compact: true)
+                }
+            }
+            .padding(4)
+            .background(Ink.fill, in: RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
+                    .strokeBorder(listening ? Ink.paintCyan : Ink.label, lineWidth: listening ? 2 : 1.5)
+            )
+            .background(
+                RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
+                    .fill(Ink.label)
+                    .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(listening ? "Listening for shortcut" : keys.isEmpty ? emptyLabel : keys.joined(separator: " "))
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
 /// 10-segment block meter for Speed / Quality / Size.
 struct InkSegmentMeter: View {
     var label: String
@@ -259,7 +303,7 @@ struct InkProgressBar: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(2)
+        .padding(Ink.space1 / 2)
         .frame(height: 12)
         .overlay(
             RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -294,17 +338,35 @@ struct InkCheck: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .strokeBorder(Ink.label, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                .fill(done ? Ink.paintGreen : Ink.window)
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                .strokeBorder(Ink.label, lineWidth: 1.5)
             if done {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Ink.window)
                 Image(systemName: "checkmark")
-                    .font(Ink.microFont)
-                    .foregroundStyle(Ink.success)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Ink.paintBlack)
             }
         }
         .frame(width: 16, height: 16)
+    }
+}
+
+/// Classic Paint palette strip (status bar / title).
+struct InkPaintSwatchStrip: View {
+    var size: CGFloat = 8
+    var limit: Int = 10
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(Array(Ink.paintSwatches.prefix(limit).enumerated()), id: \.offset) { _, swatch in
+                Rectangle()
+                    .fill(swatch)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                    .frame(width: size, height: size)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -338,7 +400,7 @@ struct InkSwitch: View {
             RoundedRectangle(cornerRadius: 1, style: .continuous)
                 .fill(isOn ? Ink.onAccent : Ink.label)
                 .frame(width: 12, height: 12)
-                .padding(2)
+                .padding(Ink.space1 / 2)
         }
         .frame(width: 34, height: 18)
         .accessibilityHidden(true)
@@ -465,7 +527,7 @@ struct InkMenuPicker<Selection: Hashable>: View {
                     .font(Ink.headingFont)
                     .foregroundStyle(Ink.label)
             }
-            .padding(.horizontal, 11)
+            .padding(.horizontal, Ink.space3)
             .frame(height: 24)
             .background(Ink.window, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
             .overlay(
@@ -528,6 +590,65 @@ struct InkStepDots: View {
     }
 }
 
+/// Paint-style step rail for onboarding: filled past, inverted current, outlined ahead.
+struct InkStepRail: View {
+    var current: Int
+    var labels: [String]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
+                stepCell(index: index, label: label)
+                if index < labels.count - 1 {
+                    Rectangle()
+                        .fill(index < current ? Ink.label : Ink.hairline)
+                        .frame(height: 1)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(current + 1) of \(labels.count)")
+    }
+
+    private func stepCell(index: Int, label: String) -> some View {
+        let state: StepState = {
+            if index < current { return .done }
+            if index == current { return .current }
+            return .ahead
+        }()
+        return VStack(spacing: Ink.space1) {
+            ZStack {
+                Rectangle()
+                    .fill(state == .current ? Ink.label : Ink.window)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                if state == .done {
+                    Image(systemName: "checkmark")
+                        .font(Ink.microFont)
+                        .foregroundStyle(Ink.success)
+                } else {
+                    Text("\(index + 1)")
+                        .font(Ink.headingFont)
+                        .foregroundStyle(state == .current ? Ink.onAccent : Ink.label)
+                }
+            }
+            .frame(width: 22, height: 22)
+            Text(label.uppercased())
+                .font(Ink.headingFont)
+                .foregroundStyle(state == .ahead ? Ink.tertiary : Ink.label)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(width: 56)
+    }
+
+    private enum StepState {
+        case done
+        case current
+        case ahead
+    }
+}
+
 struct InkPrimaryButtonStyle: ButtonStyle {
     var large: Bool = true
     var enabled: Bool = true
@@ -555,7 +676,7 @@ struct InkSecondaryButtonStyle: ButtonStyle {
         configuration.label
             .font(Ink.buttonSmallFont)
             .foregroundStyle(Ink.label)
-            .padding(.horizontal, 11)
+            .padding(.horizontal, Ink.space3)
             .frame(height: 24)
             .background(Ink.window, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
             .overlay(
@@ -655,7 +776,7 @@ struct InkErrorBanner: View {
     var message: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: Ink.space3) {
             Text("!")
                 .font(Ink.headingFont)
                 .foregroundStyle(Ink.onAccent)
@@ -667,8 +788,8 @@ struct InkErrorBanner: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, Ink.space3)
+        .padding(.vertical, Ink.space2 + 1)
         .overlay(
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
                 .strokeBorder(Ink.label, lineWidth: 1)
@@ -683,7 +804,7 @@ struct InkDashedEmpty: View {
     var action: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Ink.space3) {
             Text(title)
                 .font(Ink.rowTitleFont)
                 .foregroundStyle(Ink.label)
@@ -696,7 +817,7 @@ struct InkDashedEmpty: View {
                     .buttonStyle(InkSecondaryButtonStyle())
             }
         }
-        .padding(16)
+        .padding(Ink.cardPad)
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
@@ -715,38 +836,42 @@ struct DTStatusBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
+            InkPaintSwatchStrip(size: 8, limit: 4)
+                .padding(.horizontal, Ink.space3)
+                .frame(height: Ink.statusBarHeight)
+            Rectangle()
+                .fill(Ink.label)
+                .frame(width: 1, height: Ink.statusBarHeight)
+
             ForEach(Array(cells.enumerated()), id: \.offset) { index, cell in
-                HStack(spacing: 6) {
+                HStack(spacing: Ink.space2 - 2) {
                     if index == 0 {
                         Rectangle()
                             .fill(recording ? Ink.record : Ink.label)
-                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: recording ? 1 : 0))
+                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
                             .frame(width: 7, height: 7)
                     }
                     Text(cell)
                         .font(Ink.statusFont)
                         .foregroundStyle(Ink.label)
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, Ink.space3)
                 .frame(height: Ink.statusBarHeight)
                 Rectangle()
-                    .fill(Ink.hairline)
+                    .fill(Ink.label)
                     .frame(width: 1, height: Ink.statusBarHeight)
             }
             Spacer(minLength: 0)
-            Rectangle()
-                .fill(Ink.hairline)
-                .frame(width: 1, height: Ink.statusBarHeight)
             Text(trailing)
                 .font(Ink.statusFont)
                 .foregroundStyle(Ink.secondary)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, Ink.space3)
                 .frame(height: Ink.statusBarHeight)
         }
         .frame(height: Ink.statusBarHeight)
         .frame(maxWidth: .infinity)
         .overlay(alignment: .top) {
-            Rectangle().fill(Ink.label).frame(height: 1)
+            Rectangle().fill(Ink.label).frame(height: 2)
         }
         .background(Ink.window)
     }

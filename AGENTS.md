@@ -6,7 +6,7 @@ Branch discipline: work on `overnight-audit` only. Never ship or merge `promo-vi
 
 Settings, onboarding, and the menu-bar panel share the **Ink** B/W design system (`PromptAnnotator/Settings/Ink/`).
 
-The **recording island**, **live waveform**, **markup/annotate toolbar**, and **selection overlay** are also B/W-reskinned to match that system (Run 20). Keep layout, sizes, animations, hit targets, and annotation ink colors intact — change visual treatment only (fills, 1px outlines, small radii, hard offset shadows, Departure Mono / SF Mono tokens). Do not add timers or heavy per-frame effects to the waveform/overlay path.
+The whole app is an **MS Paint** theme (Run 24+): toolbox sidebar, flat classic swatches, chunky outlines, hard shadows, Departure Mono chrome. The **recording island**, **waveform**, **markup toolbar**, and **selection overlay** share that language. Keep hit targets, animations, and annotation ink colors intact; do not add timers or heavy per-frame effects to the waveform/overlay path.
 
 ## Typography
 

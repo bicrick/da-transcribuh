@@ -53,11 +53,18 @@ enum FontMetrics {
         // reliable than `monospacedSystemFont` when a full monospaced face is missing.
         let candidates: [NSFont]
         if mono {
-            candidates = [
+            var list: [NSFont] = []
+            // Prefer bundled Departure Mono (same face as Ink chrome) when registered.
+            for name in InkFontRegistrar.candidateNames {
+                if let font = NSFont(name: name, size: size) {
+                    list.append(font)
+                }
+            }
+            list.append(contentsOf: [
                 NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight),
                 NSFont.monospacedSystemFont(ofSize: size, weight: weight),
-                NSFont.systemFont(ofSize: size, weight: weight),
-            ]
+            ])
+            candidates = list
         } else {
             candidates = [
                 NSFont.systemFont(ofSize: size, weight: weight),
@@ -66,7 +73,7 @@ enum FontMetrics {
         }
         for candidate in candidates {
             if let usable = usable(candidate) {
-                return usable
+                return mono ? InkFontRegistrar.upright(usable) : usable
             }
         }
         return nil

@@ -6,7 +6,54 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–23)
+## Final summary (Runs 1–29)
+
+### Run 29 — Symmetric island + spacing audit
+
+- Island: drop “Recording” label; left = record square + fixed-width timer, center = waveform, right = capture chip; equal side widths + equal sideGaps + equal insets; taller (~54pt classic), larger type/icons/bars; hit targets ≥28. `islandPanelSize()` = exact panel.
+- Spacing: normalize chrome/settings raw pads to `Ink.space*`; status bar 32; sidebar tile gap → `space3`; markup toolbar airier.
+- Mocks: `recording-paint-{light,dark}.png` regenerated; README look copy updated.
+
+### Run 28 — Minimal recording island (Patrick feedback)
+
+- Strip island décor: no mini palette, no hard offset shadow, thin `Ink.hairline` only. Keep red record square, “Recording”, cyan waveform, Departure Mono clock, capture chip (hairline, not orange).
+- `islandPanelSize()` returns exact panel size again (no shadow padding).
+- Markup toolbar: same flat + hairline (functional ink colors stay).
+- Mocks: `assets/brand/mocks/recording-paint-{light,dark}.png` regenerated. README look copy updated.
+
+### Run 27 — Final polish + compile-safety audit (no code changes)
+
+- Sweep `412fcd8`→`0be7413`: macOS 14 AppKit/SwiftUI only; AppKit-safe `upright()` (non-optional `withSymbolicTraits`); `onChange` two-param form; new files under `PBXFileSystemSynchronizedRootGroup`; Carbon re-register paths type-check; no `.italic()` in chrome; tests hit real symbols (charcoal window `#1E1E1E`, HotkeyChord F-keys, rail labels).
+- Brand: wordmarks lowercase + Departure Mono + block cursor after `h` only; charcoal surfaces `#1E1E1E`/`#232323` (palette `paintBlack` stays intentional); no pure-black window/sidebar.
+- README already matches (home + recording light/dark, icon concepts, shortcut recorder, appearance, charcoal). No re-render — `0be7413` recorder-label font change is not in those assets.
+- **Clean.** Tip stays on this commit after docs-only Run 27 note + PR #2 body refresh. Do not merge; social preview upload + optional `PRODUCT_NAME`/DMG rename remain open.
+
+### Run 26 — Overnight polish (island, shortcut, charcoal dark, icons)
+
+- **Recording island Paint:** red record square, cyan waveform comb, hard offset shadow inside `ChromePanel` mask, Departure Mono clock, mini palette strip, Paint capture chip. Mocks: `mocks/recording-paint-{light,dark}.png`.
+- **Shortcut recorder:** General already persisted + live-re-registered via Carbon; field is now Paint keycaps (`InkShortcutRecorder`). F-keys may omit modifiers. Home / status / menu / onboarding already read `settings.chord`.
+- **Dark mode softened:** window `#1E1E1E`, sidebar `#232323`, fill `#2B2B2B`, hairline `#3A3A3A`, text `#EDEDED`. Accents stay vivid.
+- **Icons:** `mocks/icon-concepts.png` (6 concepts; **recommend #1 dt-block + red shadow**). Sidebar/home use `InkDtMark` square — no nested squircle. Footer version upright Departure Mono. **AppIcon not replaced.**
+- README look section, screenshots, social preview, banner refreshed each visual chunk.
+- Compile-safety (Linux, no Xcode): no `.italic()`, no stale APIs, synchronized root group picks up `InkDtMark.swift`, island panel size grows only for shadow (layout metrics unchanged). Follow-up: AppKit `withSymbolicTraits` is **non-optional** — `upright()` no longer `guard let`s (UIKit-only pattern); `Ink.mono()` always wraps the upright `NSFont`.
+- Italic audit: sidebar footer, status bar, menu panel, onboarding version, About footers — Departure Mono upright; wordmark is lowercase + block cursor after the h only.
+
+### Run 25 — Departure Mono fix + full MS Paint reskin
+
+- **Font bug (P0):** `InkFontRegistrar` CTFontManager-registers every bundled `.otf` at launch; logs success/failure; `Ink.mono()` tries PostScript `DepartureMono-Regular` then family names, else **system monospaced only** (never proportional). `ATSApplicationFontsPath=Fonts` kept.
+- **Direction lock:** `assets/brand/mocks/home-paint-{light,dark}.png` — airy Home + Paint toolbox sidebar + palette strip.
+- **Paint chrome:** expanded 16-swatch palette, per-page tool accents, thicker outlines, airier spacing (`pageSide` 36, `sectionGap` 32, sidebar 148 / tile 72 / icon 28), thin hover scroller (5pt), solid paint-green checks, title + status palette strips.
+- **Home:** unboxed stats with color rules; hero with yellow version badge + red Start shadow; tip columns with color chips.
+- Menu panel wordmark + swatches; markup toolbar hard shadow; island 1.5px outline. README screenshots refreshed from mocks.
+
+### Run 24 — Layout elevation (terminal History, Paint onboarding rail, page headers)
+
+- After PR #1 merged to `main` (`412fcd8`). Branch fast-forwarded; this run opens a new PR.
+- **Shared:** `InkPageHeader`, `InkStepRail` (Paint step progress), SettingsSection captions flush under headers, Departure Mono `mono()` falls back to system mono if OTF missing.
+- **History:** full-width terminal log — WHEN / DUR / TILES / WORDS / TEXT / ACT columns, per-row Copy/Show, transcript pane below; `DTScrollView` for log + detail.
+- **Onboarding:** Paint step rail + shared page header; duplicate step titles removed.
+- **Recording / Sound / Models / General / Perf:** compact headers + one short section caption; same bindings.
+- Compile-safety: font PostScript `DepartureMono-Regular`, `ATSApplicationFontsPath=Fonts`, macOS 14 APIs only; `InkThemeTests` rail-label count.
 
 ### Run 23 — Remaining Settings pages + onboarding layout redesign
 
@@ -192,6 +239,22 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
 
 ---
+
+## Run 24 — Layout elevation + new PR
+
+See summary. Mac checklist:
+
+1. Build Debug + `InkThemeTests` (Departure Mono registers; rail labels = 6).
+2. History: column-aligned log; select row → transcript; Copy / Show on row and detail; search; empty state.
+3. Onboarding: Paint step rail advances; Skip / Back / Continue; model download; practice.
+4. General / Sound / Recording / Models / Perf: headers + captions; B/W toggles/menus/slider; no system blue.
+5. Narrow window (~820): History columns + text wrap without clipping.
+
+### Risky spots (Mac)
+- History nested `DTScrollView` (page + log + detail) — scroll ownership.
+- History ACT column width at minimum window.
+- Onboarding rail labels may truncate on localized builds (English only for now).
+- Font fallback path only visible if OTF fails to register.
 
 ## Run 23 — Remaining pages layout + compile-safety
 

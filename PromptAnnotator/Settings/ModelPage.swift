@@ -13,7 +13,10 @@ struct ModelPage: View {
     @State private var didLoadKey = false
 
     var body: some View {
-        SettingsPageStack(title: "Models") {
+        SettingsPageStack(
+            title: "Models",
+            subtitle: "On-device WhisperKit, your Core ML folders, or an OpenAI-compatible server for the final pass."
+        ) {
             engineSection
             if settings.speechEngine == .whisperKit {
                 builtInSection
@@ -189,7 +192,7 @@ struct ModelPage: View {
                 Text("Remove")
                     .font(Ink.buttonSmallFont)
                     .foregroundStyle(Ink.label)
-                    .padding(.horizontal, 11)
+                    .padding(.horizontal, Ink.space3)
                     .frame(height: 24)
                     .overlay(
                         RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
@@ -209,13 +212,13 @@ struct ModelPage: View {
             footer: "Repo must host WhisperKit Core ML variants. Download starts when you add it, and again when you select it if files are missing."
         ) {
             InkCard {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: Ink.space3) {
                     HStack(alignment: .top, spacing: Ink.gridGap) {
                         labeledField("Repo", text: $hfRepo, prompt: "argmaxinc/whisperkit-coreml")
                         labeledField("Variant", text: $hfVariant, prompt: "small.en_217MB")
                     }
                     labeledField("Display name (optional)", text: $hfName, prompt: "Optional")
-                    HStack(spacing: 10) {
+                    HStack(spacing: Ink.space3) {
                         Button {
                             addHuggingFace()
                         } label: {
@@ -247,7 +250,7 @@ struct ModelPage: View {
             footer: "da transcribuh posts the session audio to {base}/v1/audio/transcriptions when you stop. The API key stays in the Keychain."
         ) {
             InkCard {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: Ink.space3) {
                     labeledField("Base URL", text: Binding(
                         get: { settings.openAIBaseURL },
                         set: { settings.setOpenAIBaseURL($0) }
@@ -256,7 +259,7 @@ struct ModelPage: View {
                         get: { settings.openAIModel },
                         set: { settings.setOpenAIModel($0) }
                     ), prompt: "whisper-1")
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Ink.space1) {
                         Text("API key")
                             .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
@@ -313,7 +316,7 @@ struct ModelPage: View {
     }
 
     private func labeledField(_ title: String, text: Binding<String>, prompt: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Ink.space1) {
             Text(title)
                 .font(Ink.captionFont)
                 .foregroundStyle(Ink.secondary)

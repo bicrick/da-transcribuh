@@ -24,9 +24,9 @@ struct SettingsRoot: View {
                 }
                 .background(Ink.sidebar)
                 .navigationSplitViewColumnWidth(
-                    min: Ink.sidebarWidth - 8,
+                    min: Ink.sidebarWidth - 4,
                     ideal: Ink.sidebarWidth,
-                    max: Ink.sidebarWidth + 16
+                    max: Ink.sidebarWidth + 20
                 )
             } detail: {
                 VStack(spacing: 0) {
@@ -100,16 +100,10 @@ struct SettingsRoot: View {
 
     private var sidebarFooter: some View {
         VStack(spacing: Ink.space1) {
-            Image("AppMark")
-                .resizable()
-                .interpolation(.high)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .strokeBorder(Ink.label, lineWidth: 1)
-                )
+            InkDtMark(side: 28, shadow: Ink.paintRed)
             Text(AppVersion.label)
-                .font(Ink.captionFont)
+                // Departure Mono (no italic face) — upright chrome only.
+                .font(Ink.mono(10))
                 .foregroundStyle(Ink.secondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -128,33 +122,33 @@ struct SettingsRoot: View {
     }
 }
 
-/// Single-column tool-palette sidebar: square tiles (icon above label), selected = inverted.
+/// Paint toolbox sidebar — square tools with flat color chips, pressed when selected.
 struct SettingsSidebar: View {
     @Binding var selection: SettingsPage
 
     var body: some View {
-        DTScrollView(bottomInset: Ink.space2) {
+        DTScrollView(bottomInset: Ink.space2, railInset: Ink.sidebarScrollerInset) {
             VStack(alignment: .center, spacing: Ink.sidebarSectionGap) {
                 ForEach(SettingsPage.sidebarSections, id: \.title) { section in
                     VStack(alignment: .center, spacing: Ink.space2) {
                         Text(section.title.uppercased())
                             .font(Ink.sidebarSectionFont)
                             .foregroundStyle(Ink.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, Ink.space2)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
 
                         VStack(spacing: Ink.sidebarTileGap) {
                             ForEach(section.pages) { item in
                                 toolTile(item)
                             }
                         }
-                        .frame(maxWidth: .infinity)
                     }
                 }
             }
-            .padding(.horizontal, Ink.space3)
-            .padding(.top, Ink.space2)
-            .padding(.bottom, Ink.space2)
+            // Equal side margins so tiles sit centered; scroller lives in the right margin.
+            .padding(.horizontal, Ink.sidebarSideMargin)
+            .padding(.top, Ink.space3)
+            .padding(.bottom, Ink.space3)
             .frame(maxWidth: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -164,13 +158,24 @@ struct SettingsSidebar: View {
 
     private func toolTile(_ item: SettingsPage) -> some View {
         let selected = selection == item
+        let accent = Ink.toolAccent(for: item)
         return Button {
             selection = item
         } label: {
             VStack(spacing: Ink.sidebarIconLabelGap) {
-                Image(systemName: item.symbol)
-                    .font(Ink.labelFont)
-                    .foregroundStyle(selected ? Ink.onAccent : Ink.label)
+                RoundedRectangle(cornerRadius: 1, style: .continuous)
+                    .fill(accent)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 1, style: .continuous)
+                            .strokeBorder(selected ? Ink.onAccent : Ink.label, lineWidth: 1.5)
+                    )
+                    .overlay {
+                        Image(systemName: item.symbol)
+                            .font(.system(size: Ink.sidebarSymbolPointSize, weight: .black))
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundStyle(Ink.paintBlack)
+                    }
+                    .frame(width: Ink.sidebarIconSize, height: Ink.sidebarIconSize)
                 Text(item.title)
                     .font(Ink.sidebarTileLabelFont)
                     .foregroundStyle(selected ? Ink.onAccent : Ink.label)
@@ -186,12 +191,18 @@ struct SettingsSidebar: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
-                    .strokeBorder(Ink.label, lineWidth: 1)
+                    .strokeBorder(Ink.label, lineWidth: 1.5)
             )
+            .background(
+                RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
+                    .fill(Ink.label)
+                    .offset(x: selected ? 0 : Ink.buttonShadow, y: selected ? 0 : Ink.buttonShadow)
+            )
+            .offset(x: selected ? Ink.buttonShadow : 0, y: selected ? Ink.buttonShadow : 0)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
+        .padding(.bottom, Ink.buttonShadow)
         .accessibilityLabel(item.title)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
     }
@@ -241,8 +252,8 @@ final class SettingsPresenter {
         window.isReleasedWhenClosed = false
         window.backgroundColor = Ink.windowNSColor
         window.contentView = host
-        window.setContentSize(NSSize(width: 960, height: 660))
-        window.minSize = NSSize(width: 820, height: 560)
+        window.setContentSize(NSSize(width: 1000, height: 700))
+        window.minSize = NSSize(width: 880, height: 600)
         window.center()
         self.window = window
         applyChrome()

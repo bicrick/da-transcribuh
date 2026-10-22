@@ -14,33 +14,34 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(round(fill.greenComponent * 255), 242)
     }
 
-    func testLayoutTokensMatchBWSpec() {
-        XCTAssertEqual(Ink.cardRadius, 3)
-        XCTAssertEqual(Ink.tileRadius, 3)
-        XCTAssertEqual(Ink.buttonRadius, 3)
+    func testLayoutTokensMatchPaintSpec() {
+        XCTAssertEqual(Ink.cardRadius, 2)
+        XCTAssertEqual(Ink.tileRadius, 2)
+        XCTAssertEqual(Ink.buttonRadius, 2)
         XCTAssertEqual(Ink.fieldRadius, 2)
-        XCTAssertEqual(Ink.sidebarRowRadius, 3)
-        XCTAssertEqual(Ink.sidebarWidth, 128)
-        XCTAssertEqual(Ink.sidebarTileSize, 84)
-        XCTAssertEqual(Ink.sidebarTilePad, 8)
-        XCTAssertEqual(Ink.sidebarFooterHeight, 72)
-        XCTAssertEqual(Ink.pageTop, 16)
-        XCTAssertEqual(Ink.pageSide, 24)
-        XCTAssertEqual(Ink.maxContentWidth, 880)
-        XCTAssertEqual(Ink.sectionGap, 24)
-        XCTAssertEqual(Ink.gridGap, 12)
-        XCTAssertEqual(Ink.space1, 4)
-        XCTAssertEqual(Ink.space2, 8)
-        XCTAssertEqual(Ink.space3, 12)
-        XCTAssertEqual(Ink.space4, 16)
-        XCTAssertEqual(Ink.space5, 24)
-        XCTAssertEqual(Ink.space6, 32)
-        XCTAssertEqual(Ink.statusBarHeight, 24)
-        XCTAssertEqual(Ink.titleStripHeight, 38)
-        XCTAssertEqual(Ink.menuBarShadow, 4)
-        XCTAssertEqual(Ink.hardShadow, 3)
-        XCTAssertEqual(Ink.selectedBorder, 2)
-        XCTAssertEqual(Ink.scrollerWidth, 8)
+        XCTAssertEqual(Ink.sidebarRowRadius, 2)
+        XCTAssertEqual(Ink.sidebarWidth, 148)
+        XCTAssertEqual(Ink.sidebarTileSize, 72)
+        XCTAssertEqual(Ink.sidebarSideMargin, 38)
+        XCTAssertEqual(Ink.sidebarIconSize, 28)
+        XCTAssertEqual(Ink.sidebarSymbolPointSize, 16)
+        XCTAssertEqual(Ink.tipIconSize, 48)
+        XCTAssertEqual(Ink.tipSymbolPointSize, 22)
+        XCTAssertEqual(Ink.sidebarScrollerInset, 8)
+        XCTAssertEqual(Ink.sidebarFooterHeight, 80)
+        XCTAssertEqual(Ink.pageTop, 28)
+        XCTAssertEqual(Ink.pageSide, 36)
+        XCTAssertEqual(Ink.maxContentWidth, 920)
+        XCTAssertEqual(Ink.sectionGap, 32)
+        XCTAssertEqual(Ink.gridGap, 16)
+        XCTAssertEqual(Ink.space7, 48)
+        XCTAssertEqual(Ink.statusBarHeight, 32)
+        XCTAssertEqual(Ink.sidebarTileGap, Ink.space3)
+        XCTAssertEqual(Ink.titleStripHeight, 40)
+        XCTAssertEqual(Ink.scrollerWidth, 5)
+        XCTAssertEqual(Ink.paintSwatches.count, 16)
+        XCTAssertEqual(Ink.toolAccent(for: .home), Ink.paintBlue)
+        XCTAssertEqual(Ink.toolAccent(for: .recording), Ink.paintRed)
     }
 
     func testSettingsMetricsAliasInkTokens() {
@@ -58,6 +59,17 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.sectionTitleFont, Ink.headingFont)
         XCTAssertEqual(Ink.rowTitleFont, Ink.labelFont)
         XCTAssertEqual(Ink.statValueFont, Ink.numberFont)
+        XCTAssertEqual(Ink.menuBarMetaFont, Ink.statusFont)
+        // mono() must resolve even when the OTF is missing (system mono fallback).
+        _ = Ink.mono(13)
+        // Chrome fonts stay upright — never synthesize italic/oblique.
+        let resolved = InkFontRegistrar.resolveNSFont(size: 13)
+        XCTAssertFalse(resolved.fontDescriptor.symbolicTraits.contains(.italic))
+    }
+
+    func testOnboardingRailLabelsMatchStepCount() {
+        XCTAssertEqual(OnboardingStep.railLabels.count, OnboardingStep.allCases.count)
+        XCTAssertEqual(OnboardingStep.railLabels.count, 6)
     }
 
     func testPaintPaletteIsClassicFlat() {
@@ -113,7 +125,7 @@ final class InkThemeTests: XCTestCase {
             darkHex = hexRGB(resolved: Ink.windowNSColor)
         }
         XCTAssertEqual(lightHex.uppercased(), "FFFFFF")
-        XCTAssertEqual(darkHex.uppercased(), "000000")
+        XCTAssertEqual(darkHex.uppercased(), "1E1E1E")
         XCTAssertNotEqual(lightHex, darkHex)
     }
 

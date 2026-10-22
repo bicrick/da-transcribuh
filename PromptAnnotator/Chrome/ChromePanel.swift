@@ -15,7 +15,7 @@ final class ChromePanel: NSPanel {
         isMovable = false
         isOpaque = false
         backgroundColor = .clear
-        // Soft system shadow off — SwiftUI draws a hard 1px offset shadow instead.
+        // Soft system shadow off — island / toolbar draw their own thin hairline.
         hasShadow = false
         sharingType = .none
         isReleasedWhenClosed = false

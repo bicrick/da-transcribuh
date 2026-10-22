@@ -17,8 +17,14 @@ struct ConfigurationPage: View {
     }
 
     var body: some View {
-        SettingsPageStack(title: "General") {
-            SettingsSection(title: "Appearance") {
+        SettingsPageStack(
+            title: "General",
+            subtitle: "Appearance, shortcuts, launch behavior, and paste rules."
+        ) {
+            SettingsSection(
+                title: "Appearance",
+                footer: "Also cycles from the menu bar as theme: …"
+            ) {
                 appearanceCard
             }
             SettingsSection(title: "Keyboard shortcuts") {
@@ -55,20 +61,11 @@ struct ConfigurationPage: View {
 
     private var appearanceCard: some View {
         InkCard {
-            VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
-                    Text("Theme")
-                        .font(Ink.rowTitleFont)
-                        .foregroundStyle(Ink.label)
-                    Text("System follows macOS. Light and Dark lock Settings, the menu panel, and the recording island / annotate chrome.")
-                        .font(Ink.captionFont)
-                        .foregroundStyle(Ink.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, Ink.rowHPad)
-                .padding(.top, Ink.rowVPad)
-                .padding(.bottom, Ink.space3)
-
+            VStack(alignment: .leading, spacing: Ink.space3) {
+                Text("System follows macOS. Light and Dark lock Settings, the menu panel, and the recording island / annotate chrome.")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 InkAppearanceSegment(
                     selection: Binding(
                         get: { settings.appearance },
@@ -76,9 +73,9 @@ struct ConfigurationPage: View {
                     ),
                     onChange: { settings.setAppearance($0) }
                 )
-                .padding(.horizontal, Ink.rowHPad)
-                .padding(.bottom, Ink.rowVPad)
             }
+            .padding(.horizontal, Ink.rowHPad)
+            .padding(.vertical, Ink.rowVPad)
         }
     }
 
@@ -91,11 +88,13 @@ struct ConfigurationPage: View {
                         ? "Hold \(settings.chord.display) to talk. Release to stop."
                         : "\(settings.chord.display) starts a session. Press it again to stop."
                 ) {
-                    Button(capture == .toggle ? "Press shortcut" : settings.chord.display) {
+                    InkShortcutRecorder(
+                        keys: settings.chord.keycaps,
+                        listening: capture == .toggle
+                    ) {
                         capture = .toggle
                         message = nil
                     }
-                    .buttonStyle(InkSecondaryButtonStyle())
                 }
                 InkDivider(leading: 0)
                 InkSettingRow(
@@ -104,11 +103,14 @@ struct ConfigurationPage: View {
                         "\($0.display) drops the session without a transcript or screenshot."
                     } ?? "Optional. Set a shortcut to drop a take without saving."
                 ) {
-                    Button(capture == .cancel ? "Press shortcut" : (settings.cancelChord?.display ?? "None")) {
+                    InkShortcutRecorder(
+                        keys: settings.cancelChord?.keycaps ?? [],
+                        listening: capture == .cancel,
+                        emptyLabel: "None"
+                    ) {
                         capture = .cancel
                         message = nil
                     }
-                    .buttonStyle(InkSecondaryButtonStyle())
                 }
                 InkDivider(leading: 0)
                 InkToggleRow(
@@ -126,7 +128,7 @@ struct ConfigurationPage: View {
                         .padding(.horizontal, Ink.rowHPad)
                         .padding(.bottom, Ink.space2)
                 }
-                Text("The menu bar repeats this shortcut under Start Session. Shift stays free for drawing. Option-Space, Command-Space, and Option-Command-Space stay with the system. Press Escape while capturing Cancel to clear it.")
+                Text("Click the keycaps, press a new combo (needs a modifier, or a function key). It re-registers live — no relaunch. Shift stays free for drawing. Option-Space, Command-Space, and Option-Command-Space stay with the system. Escape while capturing Cancel clears it.")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
