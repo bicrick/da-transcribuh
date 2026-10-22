@@ -29,6 +29,8 @@ ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset s
 
 backgrounds stay white or black. color lives in the palette strip, tool chips, progress, meters, traffic lights, the record mark, and paint-green checks. airy margins, fewer boxed cards.
 
+the recording island matches home: paint-red record square, cyan waveform comb, hard offset shadow drawn inside the panel, departure mono clock, tiny palette strip. same footprint and hit targets — no new timers.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/brand/screenshots/settings-home-dark.png">
@@ -37,6 +39,15 @@ backgrounds stay white or black. color lives in the palette strip, tool chips, p
 </p>
 
 <p align="center"><em>settings home · light / dark follow your github theme</em></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/mocks/recording-paint-dark.png">
+    <img src="assets/brand/mocks/recording-paint-light.png" alt="da transcribuh recording island" width="640">
+  </picture>
+</p>
+
+<p align="center"><em>recording island · paint chrome</em></p>
 
 ## install
 
@@ -113,6 +124,7 @@ final **dt block** art lives in [`assets/brand/`](assets/brand/):
 - `social-preview.png` (1280×640) — repo social preview; also mirrored as `social-preview-1280x640.png` / `@2x`
 - `screenshots/settings-home-light.png` / `settings-home-dark.png` — settings home mocks for the readme
 - `mocks/home-paint-light.png` / `home-paint-dark.png` — Paint-direction lock mocks
+- `mocks/recording-paint-light.png` / `recording-paint-dark.png` — recording island Paint chrome
 - `menubar-g-dt-block-16.png` / `menubar-g-dt-block-32.png` — template menu-bar glyph
 
 patrick: upload `assets/brand/social-preview.png` under the repo’s **settings → general → social preview** at launch (repo stays private until then). that part isn’t settable from here.

@@ -23,9 +23,11 @@ struct LiveWaveform: View {
     @ObservedObject var display: WaveformDisplay
     var slotWidth: CGFloat = 210
     var slotHeight: CGFloat = 26
+    /// Single Paint ink for the comb — no per-bar palette cycling (keeps the frame cheap).
+    var ink: Color = Ink.paintCyan
 
     var body: some View {
-        WaveformBars(levels: display.levels, slotWidth: slotWidth, slotHeight: slotHeight)
+        WaveformBars(levels: display.levels, slotWidth: slotWidth, slotHeight: slotHeight, ink: ink)
             .transaction { transaction in
                 transaction.animation = nil
             }

@@ -26,20 +26,29 @@ struct RecordingIslandView: View {
             captures: session.captureCount,
             elapsed: session.elapsed
         )
+        // Hard offset shadow is drawn inside the panel (ChromePanel masksToBounds).
+        // Content footprint stays the same; shadow room is added in islandPanelSize().
         return HStack(spacing: 0) {
             leading(layout)
             LiveWaveform(
                 display: session.waveform,
                 slotWidth: layout.wave.width,
-                slotHeight: layout.wave.height
+                slotHeight: layout.wave.height,
+                ink: Ink.paintCyan
             )
             trailing(layout)
         }
         .padding(.horizontal, IslandMetrics.inset)
         .frame(width: layout.panel.width, height: layout.panel.height)
+        .overlay(alignment: .bottomLeading) {
+            miniPalette
+                .padding(.leading, IslandMetrics.inset)
+                .padding(.bottom, 3)
+        }
         .background {
-            // Solid Paint chrome (no vibrancy). Hard offset shadow omitted — ChromePanel
-            // masks to bounds; a chunky outline is enough without clipping.
+            RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
+                .fill(Ink.label)
+                .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
                 .fill(Ink.window)
                 .overlay(
@@ -47,9 +56,29 @@ struct RecordingIslandView: View {
                         .strokeBorder(Ink.label, lineWidth: 1.5)
                 )
         }
+        .padding(.trailing, Ink.buttonShadow)
+        .padding(.bottom, Ink.buttonShadow)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(islandAccessibilityLabel)
         .onAppear { pulse = true }
+    }
+
+    /// Tiny Paint swatch strip — decorative, no layout cost.
+    private var miniPalette: some View {
+        HStack(spacing: 1) {
+            miniSwatch(Ink.paintRed)
+            miniSwatch(Ink.paintYellow)
+            miniSwatch(Ink.paintLime)
+            miniSwatch(Ink.paintBlue)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func miniSwatch(_ color: Color) -> some View {
+        Rectangle()
+            .fill(color)
+            .frame(width: 5, height: 5)
+            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 0.5))
     }
 
     private var islandAccessibilityLabel: String {
@@ -113,7 +142,7 @@ struct RecordingIslandView: View {
 
     private func clock(_ layout: IslandLayout) -> some View {
         Text(TimeFormat.clock(session.elapsed))
-            .font(Ink.systemMono(13))
+            .font(Ink.mono(13))
             .foregroundStyle(Ink.secondary)
             .lineLimit(1)
             .fixedSize()
@@ -134,7 +163,7 @@ struct RecordingIslandView: View {
 
     private func percent(_ layout: IslandLayout) -> some View {
         Text(percentText)
-            .font(Ink.systemMono(11))
+            .font(Ink.mono(11))
             .foregroundStyle(Ink.secondary)
             .lineLimit(1)
             .fixedSize()
