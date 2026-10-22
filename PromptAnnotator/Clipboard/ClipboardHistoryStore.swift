@@ -11,6 +11,10 @@ final class ClipboardHistoryStore: ObservableObject {
     /// While > 0, the watcher ignores pasteboard changes (our own paste-back / staging).
     private(set) var suppressWatcher = 0
 
+    /// Fired when nested own-write suppress returns to 0 so the watcher can
+    /// sync `changeCount` (sync writes finish between timer ticks).
+    var onOwnWriteEnded: (() -> Void)?
+
     /// Test override for history limit (nil → AppSettings).
     var historyLimitOverride: Int?
 
@@ -34,7 +38,14 @@ final class ClipboardHistoryStore: ObservableObject {
     }
 
     func beginOwnWrite() { suppressWatcher += 1 }
-    func endOwnWrite() { suppressWatcher = max(0, suppressWatcher - 1) }
+
+    func endOwnWrite() {
+        let previous = suppressWatcher
+        suppressWatcher = max(0, suppressWatcher - 1)
+        if previous > 0, suppressWatcher == 0 {
+            onOwnWriteEnded?()
+        }
+    }
 
     var historyLimit: Int {
         historyLimitOverride ?? AppSettings.shared.clipboardHistoryLimit

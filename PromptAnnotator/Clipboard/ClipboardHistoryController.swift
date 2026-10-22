@@ -19,21 +19,41 @@ final class ClipboardHistoryController {
     func install() {
         guard !Runtime.isUnitTest else { return }
         watcher.isEnabled = { AppSettings.shared.clipboardHistoryEnabled }
+        store.onOwnWriteEnded = { [weak self] in
+            self?.watcher.acknowledgePasteboard()
+        }
         watcher.start()
-        installHotKey(AppSettings.shared.clipboardChord)
+        if AppSettings.shared.clipboardHistoryEnabled {
+            installHotKey(AppSettings.shared.clipboardChord)
+        }
     }
 
     func remove() {
         watcher.stop()
-        if let hotKey {
-            UnregisterEventHotKey(hotKey)
-            self.hotKey = nil
-        }
+        store.onOwnWriteEnded = nil
+        unregisterHotKey()
         if let eventHandler {
             RemoveEventHandler(eventHandler)
             self.eventHandler = nil
         }
         ClipboardHistoryPanelController.shared.hide()
+    }
+
+    /// Register or clear the Carbon hotkey when the feature toggle changes.
+    func applyEnabled(_ enabled: Bool) {
+        if enabled {
+            installHotKey(AppSettings.shared.clipboardChord)
+        } else {
+            unregisterHotKey()
+            ClipboardHistoryPanelController.shared.hide()
+        }
+    }
+
+    private func unregisterHotKey() {
+        if let hotKey {
+            UnregisterEventHotKey(hotKey)
+            self.hotKey = nil
+        }
     }
 
     @discardableResult
@@ -67,35 +87,40 @@ final class ClipboardHistoryController {
     }
 
     /// Write item to the pasteboard; optionally simulate ⌘V into the frontmost app.
-    func pick(_ item: ClipboardItem, paste: Bool) {
+    /// Returns whether the pasteboard write succeeded (paste is skipped on failure).
+    @discardableResult
+    func pick(_ item: ClipboardItem, paste: Bool) -> Bool {
         store.beginOwnWrite()
         defer { store.endOwnWrite() }
 
+        var wrote = false
         switch item.kind {
         case .text:
             let text = item.text ?? ""
-            _ = SessionClipboard.writeTranscript(text, to: .general)
+            wrote = SessionClipboard.writeTranscript(text, to: .general)
         case .image:
             if let image = store.image(for: item),
                let tiff = image.tiffRepresentation,
                let rep = NSBitmapImageRep(data: tiff),
                let png = rep.representation(using: .png, properties: [:]) {
-                _ = SessionClipboard.writeImage(png: png, tiff: tiff, to: .general)
+                wrote = SessionClipboard.writeImage(png: png, tiff: tiff, to: .general)
             }
         case .fileURL:
             let urls = (item.filePaths ?? []).map { URL(fileURLWithPath: $0) as NSURL }
             let board = NSPasteboard.general
             board.clearContents()
-            board.writeObjects(urls)
+            wrote = board.writeObjects(urls)
         }
 
-        if paste {
+        if paste, wrote {
             PasteFollowUp.shared.simulateCommandV()
         }
+        return wrote
     }
 
     /// Session transcript / screenshot ingest (tagged). Skips empty quiet takes.
     func ingestSession(transcript: String?, imagePNG: Data?) {
+        guard AppSettings.shared.clipboardHistoryEnabled else { return }
         if ClipboardEmptySession.shouldSkip(transcript: transcript, imagePNG: imagePNG) {
             return
         }
@@ -152,6 +177,10 @@ final class ClipboardHistoryController {
                 guard parameter == noErr else { return parameter }
                 let controller = Unmanaged<ClipboardHistoryController>.fromOpaque(userData).takeUnretainedValue()
                 guard pressed.signature == controller.signature, pressed.id == controller.hotKeyID else {
+                    return OSStatus(eventNotHandledErr)
+                }
+                // Don't swallow the chord when history is disabled.
+                guard AppSettings.shared.clipboardHistoryEnabled else {
                     return OSStatus(eventNotHandledErr)
                 }
                 DispatchQueue.main.async {

@@ -31,10 +31,16 @@ final class ClipboardWatcher {
         timer = nil
     }
 
+    /// Call when an own-write suppress nest ends so the next tick does not
+    /// re-capture the pasteboard we just wrote.
+    func acknowledgePasteboard() {
+        lastChangeCount = NSPasteboard.general.changeCount
+    }
+
     private func tick() {
         guard isEnabled() else { return }
         guard store.suppressWatcher == 0 else {
-            lastChangeCount = NSPasteboard.general.changeCount
+            acknowledgePasteboard()
             return
         }
         let board = NSPasteboard.general

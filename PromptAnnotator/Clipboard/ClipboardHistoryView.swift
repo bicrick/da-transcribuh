@@ -143,25 +143,27 @@ struct ClipboardHistoryView: View {
         let selected = item.id == selection
         let fg = selected ? Ink.window : Ink.label
         let bg = selected ? Ink.label : Color.clear
-        return Button {
+        // Click selects; double-click pastes (Enter / ⌘1–9 also paste) — Maccy plan.
+        return HStack(spacing: 6) {
+            rowBody(item, foreground: fg)
+            Spacer(minLength: 0)
+            if shortcutIndex < 9 {
+                Text("⌘\(shortcutIndex + 1)")
+                    .font(Ink.mono(10))
+                    .foregroundStyle(selected ? Ink.window.opacity(0.7) : Ink.secondary.opacity(0.7))
+            }
+        }
+        .padding(.horizontal, hPad + 4)
+        .frame(height: item.kind == .image ? max(rowHeight, imageMaxHeight + 4) : rowHeight)
+        .background(bg)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
             selection = item.id
             onPick(item, true)
-        } label: {
-            HStack(spacing: 6) {
-                rowBody(item, foreground: fg)
-                Spacer(minLength: 0)
-                if shortcutIndex < 9 {
-                    Text("⌘\(shortcutIndex + 1)")
-                        .font(Ink.mono(10))
-                        .foregroundStyle(selected ? Ink.window.opacity(0.7) : Ink.secondary.opacity(0.7))
-                }
-            }
-            .padding(.horizontal, hPad + 4)
-            .frame(height: item.kind == .image ? max(rowHeight, imageMaxHeight + 4) : rowHeight)
-            .background(bg)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .onTapGesture(count: 1) {
+            selection = item.id
+        }
         .onHover { hovering in
             if hovering {
                 hovered = item.id

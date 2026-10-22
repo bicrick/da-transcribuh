@@ -26,13 +26,17 @@ final class ClipboardHistoryPanelController {
         let root = ClipboardHistoryView(
             store: store,
             onPick: { [weak self] item, paste in
-                ClipboardHistoryController.shared.pick(item, paste: paste)
-                self?.hide()
+                let wrote = ClipboardHistoryController.shared.pick(item, paste: paste)
+                // Enter / paste closes; ⌥Enter copy-only keeps the panel open (Maccy).
+                if paste, wrote {
+                    self?.hide()
+                }
             },
             onClose: { [weak self] in self?.hide() }
         )
         if panel == nil {
             let panel = ChromePanel(radius: Ink.cardRadius)
+            panel.resignKeyOnMouseUp = false
             let host = NSHostingView(rootView: root)
             host.frame = NSRect(origin: .zero, size: ClipboardHistoryView.preferredSize)
             panel.contentView = host

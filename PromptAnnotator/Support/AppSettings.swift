@@ -217,6 +217,7 @@ final class AppSettings: ObservableObject {
     func setChord(_ chord: HotkeyChord) -> Bool {
         guard chord.canRegister else { return false }
         guard chord != cancelChord else { return false }
+        guard chord != clipboardChord else { return false }
         guard HotkeyCenter.shared.apply(chord) else { return false }
         self.chord = chord
         defaults.set(Int(chord.keyCode), forKey: Keys.chordKey)
@@ -227,6 +228,7 @@ final class AppSettings: ObservableObject {
     func setCancelChord(_ chord: HotkeyChord?) -> Bool {
         if let chord {
             guard chord.canRegister, chord != self.chord else { return false }
+            guard chord != clipboardChord else { return false }
         }
         guard HotkeyCenter.shared.applyCancel(chord) else { return false }
         cancelChord = chord
@@ -243,9 +245,7 @@ final class AppSettings: ObservableObject {
     func setClipboardHistoryEnabled(_ enabled: Bool) {
         clipboardHistoryEnabled = enabled
         persist(Keys.clipboardEnabled, enabled)
-        if !enabled {
-            ClipboardHistoryPanelController.shared.hide()
-        }
+        ClipboardHistoryController.shared.applyEnabled(enabled)
     }
 
     func setClipboardChord(_ chord: HotkeyChord) -> Bool {
