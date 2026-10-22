@@ -32,9 +32,17 @@ Nothing in chrome should paint darker than `#1A1A1C` except the bevel itself. Ro
 - Long body/caption copy: SF Mono via `.system(design: .monospaced)`
 - Retune only through `Ink` type tokens
 
+## Search
+
+⌘K opens a Departure Mono command palette (pages, settings, history transcripts, models). ⌘F on History focuses the inline transcript filter. Hits jump to the tab and pulse-highlight the row; history Enter copies the session.
+
 ## Appearance
 
 `AppAppearance` (System / Light / Dark) lives in General settings and cycles from the menu-bar panel (`theme: …`). Applies via `NSApp.appearance`. `Ink.windowNSColor` must stay in sync with `Ink.window`.
+
+## Traffic lights
+
+Custom strip calls `orderOut` / `miniaturize` / `zoom` directly. Never `performClose` while stock buttons are hidden — it no-ops. `DTSystemTrafficLights.hide` must `isHidden = true` on the theme-frame button container (alpha-only still steals hits).
 
 ## Deliberate exceptions
 

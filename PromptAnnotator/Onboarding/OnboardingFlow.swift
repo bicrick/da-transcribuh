@@ -594,6 +594,9 @@ final class OnboardingPresenter {
 
     private var window: NSWindow?
 
+    /// Exposed so shared chrome (traffic lights) can resolve the host window.
+    var attachedWindow: NSWindow? { window }
+
     func show() {
         window?.orderOut(nil)
         window = nil

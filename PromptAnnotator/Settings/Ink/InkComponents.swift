@@ -451,6 +451,7 @@ struct InkToggleRow: View {
     var detail: String?
     @Binding var isOn: Bool
     var enabled: Bool = true
+    @Environment(\.settingsHighlightTitle) private var highlightTitle
 
     var body: some View {
         Toggle(isOn: $isOn) {
@@ -472,6 +473,8 @@ struct InkToggleRow: View {
         .padding(.horizontal, Ink.rowHPad)
         .padding(.vertical, Ink.rowVPad)
         .opacity(enabled ? 1 : 0.55)
+        .background(highlightTitle == title ? Ink.paintYellow.opacity(0.55) : Color.clear)
+        .animation(.easeOut(duration: 0.2), value: highlightTitle)
     }
 }
 
@@ -587,6 +590,7 @@ struct InkSettingRow<Trailing: View>: View {
     var title: String
     var detail: String?
     @ViewBuilder var trailing: () -> Trailing
+    @Environment(\.settingsHighlightTitle) private var highlightTitle
 
     var body: some View {
         HStack(alignment: .center, spacing: Ink.space3) {
@@ -607,6 +611,8 @@ struct InkSettingRow<Trailing: View>: View {
         }
         .padding(.horizontal, Ink.rowHPad)
         .padding(.vertical, Ink.rowVPad)
+        .background(highlightTitle == title ? Ink.paintYellow.opacity(0.55) : Color.clear)
+        .animation(.easeOut(duration: 0.2), value: highlightTitle)
     }
 }
 

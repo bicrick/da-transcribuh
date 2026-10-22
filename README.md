@@ -72,7 +72,7 @@ macos 14 or later. the first build fetches whisperkit.
 - hold **shift** and drag to grab a piece of the screen. release shift to keep the tile. stop the session and you get the picture with the words.
 - sessions save under `~/Documents/PromptAnnotator/Sessions/` (folder name stays put so your history doesn’t vanish).
 - on-device speech via whisperkit. bring your own core ml folder or hugging face variant if you want. optional openai-compatible server for the final transcript only.
-- settings window with folder-tab navigation, status bar, paint keycap shortcut recorder in general, and the appearance switcher (or `theme: …` in the menu bar). models page for downloads and byom.
+- settings window with folder-tab navigation, ⌘K command-palette search, status bar, paint keycap shortcut recorder in general, and the appearance switcher (or `theme: …` in the menu bar). models page for downloads and byom.
 
 ## shortcuts
 

@@ -3,6 +3,7 @@ import SwiftUI
 /// Manila-folder divider tabs across the top of Settings — replaces the toolbox sidebar.
 struct SettingsFolderTabs: View {
     @Binding var selection: SettingsPage
+    var onSearch: (() -> Void)? = nil
 
     private var tabHeight: CGFloat { Ink.folderTabHeight }
     private let unselectedInset: CGFloat = 3
@@ -21,6 +22,10 @@ struct SettingsFolderTabs: View {
                 }
             }
             Spacer(minLength: Ink.space2)
+            if let onSearch {
+                SettingsSearchAffordance(action: onSearch)
+                    .padding(.bottom, 6)
+            }
         }
         .padding(.horizontal, Ink.pageSide)
         .padding(.top, Ink.space2)

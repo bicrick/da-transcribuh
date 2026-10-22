@@ -4,8 +4,10 @@ import SwiftUI
 struct HistoryPage: View {
     var sessions: [SessionSummary]
     var reload: () -> Void
-    @State private var query = ""
-    @State private var selectedID: String?
+    @Binding var query: String
+    @Binding var focusSearch: Bool
+    @Binding var selectedID: String?
+    @FocusState private var searchFocused: Bool
 
     /// Fixed terminal-log columns (Departure Mono digits align).
     private enum Col {
@@ -43,6 +45,13 @@ struct HistoryPage: View {
         }
         .onChange(of: query) { _, _ in syncSelection() }
         .onChange(of: sessions.count) { _, _ in syncSelection() }
+        .onChange(of: focusSearch) { _, wants in
+            if wants {
+                searchFocused = true
+                focusSearch = false
+            }
+        }
+        .onChange(of: selectedID) { _, _ in syncSelection() }
     }
 
     private var emptyState: some View {
@@ -85,6 +94,7 @@ struct HistoryPage: View {
                 .textFieldStyle(.plain)
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.label)
+                .focused($searchFocused)
         }
         .inkFieldStyle()
     }

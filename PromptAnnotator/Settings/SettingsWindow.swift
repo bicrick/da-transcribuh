@@ -12,31 +12,50 @@ struct SettingsRoot: View {
     @StateObject private var permissions = PermissionModel()
     @State private var page: SettingsPage = .home
     @State private var sessions: [SessionSummary] = []
+    @State private var showPalette = false
+    @State private var highlightTitle: String? = nil
+    @State private var historyQuery = ""
+    @State private var focusHistorySearch = false
+    @State private var selectHistoryID: String? = nil
 
     var body: some View {
-        VStack(spacing: 0) {
-            DTTitleStrip()
-
-            SettingsFolderTabs(selection: $page)
-
+        ZStack {
             VStack(spacing: 0) {
-                detail
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .toolbar(.hidden, for: .automatic)
-                DTStatusBar(
-                    cells: statusCells,
-                    trailing: AppVersion.label,
-                    recording: session.phase == .recording
-                )
+                DTTitleStrip()
+
+                SettingsFolderTabs(selection: $page) {
+                    showPalette = true
+                }
+
+                VStack(spacing: 0) {
+                    detail
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .toolbar(.hidden, for: .automatic)
+                        .environment(\.settingsHighlightTitle, highlightTitle)
+                    DTStatusBar(
+                        cells: statusCells,
+                        trailing: AppVersion.label,
+                        recording: session.phase == .recording
+                    )
+                }
+                .background(Ink.front)
+                .zIndex(0)
             }
-            .background(Ink.front)
-            // Content sits under the selected folder tab (no gap / no double hairline).
-            .zIndex(0)
+
+            if showPalette {
+                SettingsCommandPalette(
+                    isPresented: $showPalette,
+                    sessions: sessions,
+                    modelTitles: modelTitles,
+                    onSelect: handleSearchHit
+                )
+                .transition(.opacity)
+                .zIndex(20)
+            }
         }
         .tint(Ink.label)
         .background(Ink.window)
         .preferredColorScheme(settings.appearance.preferredColorScheme)
-        // Draw under the (hidden) system titlebar so our strip owns the top edge.
         .ignoresSafeArea(.container, edges: .top)
         .onAppear {
             settings.appearance.applyToApp()
@@ -51,8 +70,32 @@ struct SettingsRoot: View {
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSessionsChanged)) { _ in
             reload()
         }
-        .focusable()
-        .onMoveCommand(perform: handleMove)
+        .focusable(!showPalette)
+        .onMoveCommand { direction in
+            guard !showPalette else { return }
+            handleMove(direction)
+        }
+        .background(shortcutButtons)
+        .animation(.easeOut(duration: 0.12), value: showPalette)
+    }
+
+    /// Invisible buttons so ⌘K / ⌘F register even when a text field isn't focused.
+    private var shortcutButtons: some View {
+        Group {
+            Button("Search") { showPalette = true }
+                .keyboardShortcut("k", modifiers: .command)
+            Button("Find") {
+                if page == .history {
+                    focusHistorySearch = true
+                } else {
+                    showPalette = true
+                }
+            }
+            .keyboardShortcut("f", modifiers: .command)
+        }
+        .opacity(0)
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
     }
 
     @ViewBuilder
@@ -61,7 +104,13 @@ struct SettingsRoot: View {
         case .home:
             HomePage(session: session, settings: settings, permissions: permissions, sessions: sessions)
         case .history:
-            HistoryPage(sessions: sessions, reload: reload)
+            HistoryPage(
+                sessions: sessions,
+                reload: reload,
+                query: $historyQuery,
+                focusSearch: $focusHistorySearch,
+                selectedID: $selectHistoryID
+            )
         case .recording:
             RecordingPage(settings: settings, session: session)
         case .configuration:
@@ -73,6 +122,13 @@ struct SettingsRoot: View {
         case .performance:
             PerformancePage()
         }
+    }
+
+    private var modelTitles: [String] {
+        var titles = SpeechModelChoice.all.map(\.title)
+        titles += settings.customModels.map(\.name)
+        titles.append(settings.speechModel)
+        return titles
     }
 
     private var statusCells: [String] {
@@ -103,6 +159,46 @@ struct SettingsRoot: View {
         }
     }
 
+    private func handleSearchHit(_ hit: SettingsSearchHit) {
+        page = hit.page
+        switch hit.kind {
+        case .history:
+            if let id = hit.sessionID {
+                selectHistoryID = id
+                if let snippetNeedle = hit.snippet {
+                    // Prefer the original query's match — use preview/id fallback.
+                    historyQuery = extractNeedle(from: hit) ?? historyQuery
+                }
+                focusHistorySearch = false
+            }
+            // Enter on history: copy that session.
+            if let id = hit.sessionID, let session = sessions.first(where: { $0.id == id }) {
+                let image = NSImage(contentsOf: session.url.appendingPathComponent("sheet.png"))
+                SessionClipboard.copy(image: image, transcript: session.transcript)
+            }
+        case .setting, .model, .page:
+            if let title = hit.highlightTitle {
+                pulseHighlight(title)
+            }
+        }
+    }
+
+    private func extractNeedle(from hit: SettingsSearchHit) -> String? {
+        guard let snippet = hit.snippet, let range = hit.matchRange,
+              let swift = Range(range, in: snippet) else { return nil }
+        return String(snippet[swift])
+    }
+
+    private func pulseHighlight(_ title: String) {
+        highlightTitle = title
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            if highlightTitle == title {
+                highlightTitle = nil
+            }
+        }
+    }
+
     private func reload() {
         sessions = SessionLibrary.load()
     }
@@ -115,7 +211,7 @@ final class SettingsPresenter {
     private var window: NSWindow?
     private let shownKey = "home.shown"
 
-    /// Exposed for custom traffic lights (performClose / miniaturize / zoom).
+    /// Exposed for custom traffic lights (orderOut / miniaturize / zoom).
     var attachedWindow: NSWindow? { window }
 
     func showOnFirstLaunch() {
