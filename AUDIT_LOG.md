@@ -6,7 +6,16 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–25)
+## Final summary (Runs 1–26)
+
+### Run 26 — Overnight polish (island, shortcut, charcoal dark, icons)
+
+- **Recording island Paint:** red record square, cyan waveform comb, hard offset shadow inside `ChromePanel` mask, Departure Mono clock, mini palette strip, Paint capture chip. Mocks: `mocks/recording-paint-{light,dark}.png`.
+- **Shortcut recorder:** General already persisted + live-re-registered via Carbon; field is now Paint keycaps (`InkShortcutRecorder`). F-keys may omit modifiers. Home / status / menu / onboarding already read `settings.chord`.
+- **Dark mode softened:** window `#1E1E1E`, sidebar `#232323`, fill `#2B2B2B`, hairline `#3A3A3A`, text `#EDEDED`. Accents stay vivid.
+- **Icons:** `mocks/icon-concepts.png` (6 concepts; **recommend #1 dt-block + red shadow**). Sidebar/home use `InkDtMark` square — no nested squircle. Footer version upright Departure Mono. **AppIcon not replaced.**
+- README look section, screenshots, social preview, banner refreshed each visual chunk.
+- Compile-safety (Linux, no Xcode): no `.italic()`, no stale APIs, synchronized root group picks up `InkDtMark.swift`, island panel size grows only for shadow (layout metrics unchanged).
 
 ### Run 25 — Departure Mono fix + full MS Paint reskin
 
