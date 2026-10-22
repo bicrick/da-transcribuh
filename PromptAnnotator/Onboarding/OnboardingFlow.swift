@@ -45,15 +45,16 @@ struct OnboardingFlow: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            onboardingChrome
             DTScrollView {
-                VStack(alignment: .center, spacing: Ink.space4) {
+                VStack(alignment: .leading, spacing: Ink.sectionGap) {
                     InkEyebrow(text: step.eyebrow)
                     stepBody
                 }
-                .padding(.top, Ink.space6)
-                .padding(.horizontal, Ink.space6)
-                .padding(.bottom, Ink.space4)
-                .frame(maxWidth: .infinity)
+                .padding(.top, Ink.pageTop)
+                .padding(.horizontal, Ink.pageSide)
+                .padding(.bottom, Ink.pageBottom)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             footer
         }
@@ -73,20 +74,43 @@ struct OnboardingFlow: View {
         }
     }
 
+    /// Wordmark strip — same language as Settings, without SettingsPresenter traffic lights.
+    private var onboardingChrome: some View {
+        ZStack {
+            DTWordmark(size: 12)
+            HStack {
+                Spacer()
+                DTDitherGrip()
+                    .frame(width: 100, height: 12)
+                    .padding(.trailing, 14)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(height: Ink.titleStripHeight)
+        .frame(maxWidth: .infinity)
+        .background(Ink.window)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Ink.label)
+                .frame(height: 1)
+        }
+    }
+
     private var footer: some View {
         VStack(spacing: 0) {
             Rectangle()
-                .fill(Ink.hairline)
+                .fill(Ink.label)
                 .frame(height: 1)
-            HStack(spacing: 12) {
+            HStack(spacing: Ink.space3) {
                 InkStepDots(current: step.rawValue, total: OnboardingStep.allCases.count)
                 Text("\(step.rawValue + 1) of \(OnboardingStep.allCases.count)")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
-                Spacer(minLength: 8)
+                Spacer(minLength: Ink.space2)
                 if step != .ready {
                     Button("Skip setup") { finishSetup() }
                         .buttonStyle(.plain)
+                        .font(Ink.buttonSmallFont)
                         .foregroundStyle(Ink.secondary)
                         .disabled(practiceRunning || transfer.isWorking)
                 }
@@ -102,10 +126,10 @@ struct OnboardingFlow: View {
                 .disabled(primaryDisabled)
                 .keyboardShortcut(.defaultAction)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
+            .padding(.horizontal, Ink.pageSide)
+            .padding(.vertical, Ink.space4)
         }
-        .background(Ink.card)
+        .background(Ink.window)
     }
 
     private var primaryDisabled: Bool {
@@ -133,15 +157,15 @@ struct OnboardingFlow: View {
     }
 
     private var welcomeBody: some View {
-        VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: Ink.space5) {
             InkCard {
                 InkWavePenMotif(inked: false)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 28)
+                    .padding(.vertical, Ink.space5)
             }
-            HStack(spacing: 12) {
+            HStack(spacing: Ink.space3) {
                 AppLogo(side: 44)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
                     DTWordmark(size: 18, blinks: true)
                     Text(AppVersion.label)
                         .font(Ink.captionFont)
@@ -154,18 +178,17 @@ struct OnboardingFlow: View {
             Text("Talk, and capture the screen when you want the picture with the words. This beta is free and open source.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
-                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: 420)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var readyBody: some View {
-        VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: Ink.space5) {
             InkCard {
                 InkWavePenMotif(inked: true)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 28)
+                    .padding(.vertical, Ink.space5)
             }
             Text(step.title)
                 .font(Ink.onboardingHeroFont)
@@ -173,18 +196,16 @@ struct OnboardingFlow: View {
             Text("The menu bar icon opens da transcribuh again. \(settings.chord.display) starts a session and stops it. While da transcribuh is saving or transcribing, the icon changes so you can see it working.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
-                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: 420)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var permissionsCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Ink.space3) {
             Text(step.title)
                 .font(Ink.stepTitleFont)
                 .foregroundStyle(Ink.label)
-                .frame(maxWidth: .infinity, alignment: .leading)
             InkCard {
                 VStack(alignment: .leading, spacing: 0) {
                     permissionRow(
@@ -195,7 +216,7 @@ struct OnboardingFlow: View {
                             ? "Denied — use Turn On, enable da transcribuh, then Reopen."
                             : nil
                     )
-                    InkDivider(leading: Ink.rowHPad)
+                    InkDivider(leading: 0)
                     permissionRow(
                         title: "Screen Recording",
                         detail: "Captures the tiles you drag while talking.",
@@ -204,7 +225,7 @@ struct OnboardingFlow: View {
                             ? nil
                             : "If the switch is already on, turn it off and on, then Reopen."
                     )
-                    InkDivider(leading: Ink.rowHPad)
+                    InkDivider(leading: 0)
                     permissionRow(
                         title: "Accessibility",
                         detail: "Watches the shortcut and Shift for drawing.",
@@ -219,7 +240,7 @@ struct OnboardingFlow: View {
                 .font(Ink.captionFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 8) {
+            HStack(spacing: Ink.space2) {
                 Button("Turn On") {
                     Task {
                         _ = await Permissions.requestMicrophone()
@@ -234,18 +255,21 @@ struct OnboardingFlow: View {
                 .buttonStyle(InkSecondaryButtonStyle())
             }
             if permissions.status.isReady {
-                Text("All three are on. Continue.")
-                    .font(Ink.buttonSmallFont)
-                    .foregroundStyle(Ink.success)
+                HStack(spacing: Ink.space2) {
+                    InkCheck(done: true)
+                    Text("All three are on. Continue.")
+                        .font(Ink.buttonSmallFont)
+                        .foregroundStyle(Ink.label)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func permissionRow(title: String, detail: String, on: Bool, recovery: String?) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Ink.space3) {
             InkCheck(done: on)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Ink.titleDescGap) {
                 HStack {
                     Text(title)
                         .font(Ink.rowTitleFont)
@@ -268,11 +292,11 @@ struct OnboardingFlow: View {
             }
         }
         .padding(.horizontal, Ink.rowHPad)
-        .padding(.vertical, 12)
+        .padding(.vertical, Ink.rowVPad)
     }
 
     private var shortcutCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Ink.space3) {
             Text(step.title)
                 .font(Ink.stepTitleFont)
                 .foregroundStyle(Ink.label)
@@ -281,9 +305,9 @@ struct OnboardingFlow: View {
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             InkCard {
-                VStack(spacing: 16) {
+                VStack(spacing: Ink.space4) {
                     InkKeycapRow(keys: settings.chord.keycaps)
-                    HStack(spacing: 8) {
+                    HStack(spacing: Ink.space2) {
                         Button(listening ? "Listening" : "Change") {
                             listening = true
                             shortcutNote = nil
@@ -298,9 +322,9 @@ struct OnboardingFlow: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(22)
+                .padding(Ink.cardPad)
             }
-            Text("Hold the chord instead of tapping if you turn on push-to-talk later in Configuration.")
+            Text("Hold the chord instead of tapping if you turn on push-to-talk later in General.")
                 .font(Ink.captionFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -312,7 +336,7 @@ struct OnboardingFlow: View {
     }
 
     private var modelCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Ink.space3) {
             Text(step.title)
                 .font(Ink.stepTitleFont)
                 .foregroundStyle(Ink.label)
@@ -320,18 +344,21 @@ struct OnboardingFlow: View {
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            SpeechModelPicker(settings: settings, transfer: transfer, showsDownloadButton: false)
+            SpeechModelPicker(settings: settings, transfer: transfer, horizontalTiles: false)
             if transfer.isWorking, let fraction = transfer.fraction {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: Ink.space2) {
                     InkProgressBar(fraction: fraction)
                     Text("Downloading \(Int((fraction * 100).rounded()))%. Keep this window open.")
                         .font(Ink.captionFont)
                         .foregroundStyle(Ink.secondary)
                 }
             } else if modelIsReady {
-                Label("Selected model is on this Mac. Continue when you are ready.", systemImage: "checkmark.circle.fill")
-                    .font(Ink.buttonSmallFont)
-                    .foregroundStyle(Ink.success)
+                HStack(spacing: Ink.space2) {
+                    InkCheck(done: true)
+                    Text("Selected model is on this Mac. Continue when you are ready.")
+                        .font(Ink.buttonSmallFont)
+                        .foregroundStyle(Ink.label)
+                }
             } else {
                 Text("Press Download to fetch the selected model, then Continue.")
                     .font(Ink.captionFont)
@@ -342,18 +369,18 @@ struct OnboardingFlow: View {
     }
 
     private var practiceCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Ink.space3) {
             Text(step.title)
                 .font(Ink.stepTitleFont)
                 .foregroundStyle(Ink.label)
             InkCard {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 0) {
                     guideRow("1", "Talk for a few seconds, or stay quiet — both paths are fine.")
+                    InkDivider(leading: 0)
                     guideRow("2", "Drag a rectangle to capture the front window when you want a tile.")
+                    InkDivider(leading: 0)
                     guideRow("3", "Hold Shift to annotate. Release Shift to save that tile.")
                 }
-                .padding(Ink.rowHPad)
-                .padding(.vertical, 14)
             }
             Text("Try a short take now. da transcribuh stops after about five seconds and shows what happened.")
                 .font(Ink.bodyFont)
@@ -368,7 +395,7 @@ struct OnboardingFlow: View {
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Ink.space2) {
                 Button(practiceRunning ? practiceLiveTitle : "Try a 5-second session") {
                     startPractice()
                 }
@@ -435,16 +462,18 @@ struct OnboardingFlow: View {
     }
 
     private func guideRow(_ number: String, _ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: Ink.space3) {
             Text(number)
                 .font(Ink.headingFont)
-                .foregroundStyle(Ink.accent)
+                .foregroundStyle(Ink.label)
                 .frame(width: 16, alignment: .leading)
             Text(text)
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(.horizontal, Ink.rowHPad)
+        .padding(.vertical, Ink.rowVPad)
     }
 
     private func advance() {
@@ -599,6 +628,7 @@ final class OnboardingPresenter {
         window.isReleasedWhenClosed = false
         window.backgroundColor = Ink.windowNSColor
         window.contentView = host
+        window.setContentSize(NSSize(width: OnboardingMetrics.width, height: OnboardingMetrics.height))
         window.center()
         self.window = window
         return window
