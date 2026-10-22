@@ -17,21 +17,31 @@ struct SettingsFolderTabs: View {
     @State private var selectedFrame: CGRect = .null
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: Ink.tabGap) {
-            ForEach(SettingsPage.tabOrder) { page in
-                tab(page)
+        ZStack {
+            // Tabs stay bottom-aligned on the shelf (unchanged positions / sizes).
+            HStack(alignment: .bottom, spacing: Ink.tabGap) {
+                ForEach(SettingsPage.tabOrder) { page in
+                    tab(page)
+                }
+                Spacer(minLength: Ink.space2)
             }
-            Spacer(minLength: Ink.space2)
+            .padding(.horizontal, Ink.pageSide)
+            .padding(.top, Ink.space2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+
+            // ⌘K centered in the strip band (top divider ↔ top of accent shelf).
             if let onSearch {
-                SettingsSearchAffordance(action: onSearch)
-                    .frame(height: tabHeight, alignment: .center)
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    SettingsSearchAffordance(action: onSearch)
+                }
+                .padding(.horizontal, Ink.pageSide)
+                .padding(.bottom, Ink.stroke) // exclude shelf stroke from the centering band
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
             }
         }
-        .padding(.horizontal, Ink.pageSide)
-        .padding(.top, Ink.space2)
-        .frame(maxWidth: .infinity, alignment: .bottomLeading)
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(height: shelfHeight, alignment: .bottom)
+        .frame(maxWidth: .infinity)
+        .frame(height: shelfHeight)
         .coordinateSpace(name: ShelfSpace.name)
         .background {
             ZStack(alignment: .bottom) {

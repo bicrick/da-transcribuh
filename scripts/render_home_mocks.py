@@ -370,11 +370,14 @@ def render(pal: dict) -> Image.Image:
         d, shelf_stroke_y, sx, sy, sw, sh, tab_accent_rgb(saccent, pal)
     )
 
-    # ⌘K chip — square, 2pt outline, no bevel (matches tabs)
+    # ⌘K chip — square, 2pt outline, no bevel; vertically centered in the
+    # tab-strip band (top divider under title ↔ top of 2pt accent shelf).
     cf2 = font_symbol(10 * S)
-    chip_x = W - PAGE_SIDE - 70 * S
-    chip_y = shelf_y + 14 * S
     chip_w, chip_h = 70 * S, 14 * S
+    chip_x = W - PAGE_SIDE - chip_w
+    band_top = shelf_y
+    band_bottom = tab_bottom - STROKE  # top edge of accent shelf stroke
+    chip_y = band_top + (band_bottom - band_top - chip_h) / 2
     d.rectangle(
         [chip_x, chip_y, chip_x + chip_w, chip_y + chip_h],
         fill=c(pal, "fill"),
