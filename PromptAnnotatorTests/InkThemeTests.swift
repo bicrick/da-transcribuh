@@ -52,7 +52,7 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.space7, 48)
         XCTAssertEqual(Ink.statusBarHeight, 32)
         XCTAssertEqual(Ink.titleStripHeight, 40)
-        XCTAssertEqual(Ink.scrollerWidth, 5)
+        XCTAssertEqual(Ink.scrollerWidth, 10)
         XCTAssertEqual(Ink.paintSwatches.count, 16)
         XCTAssertEqual(SettingsPage.tabOrder.count, 7)
         XCTAssertEqual(SettingsPage.tabOrder.first, .home)
