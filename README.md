@@ -27,7 +27,7 @@
 
 ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset shadows, and a toolbox sidebar. departure mono for every “da transcribuh” wordmark and chrome label; sf mono for longer copy. custom thin scrollers. system / light / dark from general (or cycle `theme: …` in the menu bar).
 
-backgrounds stay white or black. color lives in the palette strip, tool chips, progress, meters, traffic lights, the record mark, and paint-green checks. airy margins, fewer boxed cards.
+light backgrounds stay white; dark is charcoal (~#1e1e1e), not pure black — surfaces a step lighter, hairlines soft gray, text off-white. paint accents stay vivid. color lives in the palette strip, tool chips, progress, meters, traffic lights, the record mark, and paint-green checks. airy margins, fewer boxed cards.
 
 the recording island matches home: paint-red record square, cyan waveform comb, hard offset shadow drawn inside the panel, departure mono clock, tiny palette strip. same footprint and hit targets — no new timers.
 

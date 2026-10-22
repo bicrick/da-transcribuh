@@ -2,30 +2,32 @@ import AppKit
 import SwiftUI
 
 /// "da transcribuh" chrome — MS Paint retro: flat color accents, chunky outlines,
-/// hard offset shadows, Departure Mono labels. Backgrounds stay white/black.
+/// hard offset shadows, Departure Mono labels. Light stays white; dark is charcoal
+/// (not pure black) so the Paint accents still pop.
 /// Kept under the `Ink` name so existing call sites stay compile-safe.
 enum Ink {
     // MARK: - Dynamic surfaces (light / dark)
 
-    static let window = color(light: "#FFFFFF", dark: "#000000")
-    static let canvas = color(light: "#FFFFFF", dark: "#000000")
-    static let label = color(light: "#000000", dark: "#FFFFFF")
-    static let onAccent = color(light: "#FFFFFF", dark: "#000000")
+    /// Charcoal dark (~#1E1E1E) — softer than pure black.
+    static let window = color(light: "#FFFFFF", dark: "#1E1E1E")
+    static let canvas = color(light: "#FFFFFF", dark: "#1E1E1E")
+    static let label = color(light: "#000000", dark: "#EDEDED")
+    static let onAccent = color(light: "#FFFFFF", dark: "#1E1E1E")
     /// Primary fill / border rule.
     static let accent = label
     static let accentSoft = fill
     static let sidebarSelection = label
-    static let hairline = color(light: "#C0C0C0", dark: "#333333")
+    static let hairline = color(light: "#C0C0C0", dark: "#3A3A3A")
     static let borderStrong = label
-    static let fill = color(light: "#F0F0F0", dark: "#141414")
+    static let fill = color(light: "#F0F0F0", dark: "#2B2B2B")
     static let track = hairline
     static let meter = label
-    static let secondary = color(light: "#666666", dark: "#A0A0A0")
-    static let tertiary = color(light: "#999999", dark: "#5C5C5C")
+    static let secondary = color(light: "#666666", dark: "#A8A8A8")
+    static let tertiary = color(light: "#999999", dark: "#6E6E6E")
     static let field = window
     static let card = window
     static let keycap = window
-    static let sidebar = color(light: "#F7F7F7", dark: "#0A0A0A")
+    static let sidebar = color(light: "#F7F7F7", dark: "#232323")
 
     // MARK: - Classic MS Paint flat swatches (Win95/98 era)
 
@@ -223,7 +225,7 @@ enum Ink {
     static var windowNSColor: NSColor {
         NSColor(name: nil, dynamicProvider: { appearance in
             let match = appearance.bestMatch(from: [.darkAqua, .aqua])
-            return match == .darkAqua ? nsColor(hex: "#000000") : nsColor(hex: "#FFFFFF")
+            return match == .darkAqua ? nsColor(hex: "#1E1E1E") : nsColor(hex: "#FFFFFF")
         })
     }
 }

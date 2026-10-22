@@ -120,7 +120,7 @@ final class InkThemeTests: XCTestCase {
             darkHex = hexRGB(resolved: Ink.windowNSColor)
         }
         XCTAssertEqual(lightHex.uppercased(), "FFFFFF")
-        XCTAssertEqual(darkHex.uppercased(), "000000")
+        XCTAssertEqual(darkHex.uppercased(), "1E1E1E")
         XCTAssertNotEqual(lightHex, darkHex)
     }
 
