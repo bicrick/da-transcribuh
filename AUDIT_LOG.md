@@ -6,7 +6,13 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–21)
+## Final summary (Runs 1–22)
+
+### Run 22 — GitHub presentation (README / screenshots / social)
+
+- README: new **look** section (Departure Mono / SF Mono, custom scrollers, System/Light/Dark, island+waveform+annotate reskin, sparse Paint accents). Screenshot `<picture>` light/dark under `assets/brand/screenshots/`.
+- Brand: `social-preview.png` (1280×640) regenerated with paint traffic lights in the window mock; `readme-banner.png` same tiny touch. Overwhelmingly B/W. Legacy `social-preview-1280x640.png` / `@2x` kept in sync.
+- Copy: chill lowercase voice kept; dropped the old “overlay unchanged” story from user-facing docs (`AGENTS.md` already documents Run 20 reskin).
 
 ### Run 21 — Models layout polish + classic Paint accents
 
@@ -185,7 +191,7 @@ See summary. Mac checklist:
 
 1. Settings title strip: outlined lights (hover glyphs), centered wordmark + cursor, dither grip; drag window from strip; ⌘W closes, ⌘M minimizes; zoom toggles.
 2. Menu bar: click dt icon → B/W panel with 1px border + hard shadow; hover inverts rows; Start/Stop, paste, Finder, quit all work and dismiss the panel.
-3. Ready-to-paste / busy states still surface in the panel; island unchanged.
+3. Ready-to-paste / busy states still surface in the panel; island / waveform / annotate match B/W chrome (Run 20).
 
 ## Run 17 — Final dt-block brand assets
 
@@ -203,7 +209,7 @@ See summary. Mac checklist:
 2. Status bar at bottom shows idle/model/sessions/shortcut/version in mono.
 3. Wordmark is `da transcribuh` + solid block cursor (h not inverted); onboarding cursor blinks unless Reduce Motion.
 4. Menu bar shows dt template glyph; menu still works.
-5. Light + dark; record a session — island unchanged.
+5. Light + dark; record a session — island / waveform / annotate match B/W chrome (Run 20); Paint accents only on traffic lights / record / success.
 6. Run `InkThemeTests`.
 
 ---
