@@ -105,10 +105,10 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 ### P0 — must pass before recording
 
 - [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`, `SpeechModelTests` holdback, **`FontMetricsTests`**, **`BYOMTests`**, **`InkThemeTests`**, **`FocusPasteDecisionTests`**).
-- [ ] **Ink Settings**: Home / Models / History / Recording / Configuration / Sound / Performance in light + dark — accent tint, card chrome, no island restyle.
+- [ ] **B&W Settings**: Home / Models / History / Recording / Configuration / Sound / Performance in light + dark — 1px B/W chrome, no island restyle.
 - [ ] **Ink padding**: ~20–24pt gap below title-bar to first content on every Settings page (not ~90pt).
-- [ ] **Ink sidebar**: selected row is Ink tint + accent icon/text (not system blue).
-- [ ] **Ink Onboarding**: STEP n OF 6 eyebrow, step dots, Skip / Back / primary order; Welcome+Ready waveform→pen is one continuous line (not a smile); Ready bars inked red.
+- [ ] **Sidebar**: one vertical column of equal square tiles (icon above label, 1px outline; selected inverted); Session / Speech / App labels; scrolls if short; not 2-col, not compact rows.
+- [ ] **Onboarding**: STEP n OF 6 eyebrow, step dots, Skip / Back / primary; wordmark + block cursor (blinks unless Reduce Motion); Welcome+Ready waveform→pen continuous.
 - [ ] Configuration Advanced reads “Speech models are on the Models page.”
 - [ ] **Paste hold**: stop with tiles+words while focus is Desktop/Finder — no stray paste; menu shows Ready to paste; ⌘V or ⌃⌥V into a text field gets image+text.
 - [ ] **Paste auto**: stop with focus in TextEdit/Notes/browser — still auto-pastes as before.
