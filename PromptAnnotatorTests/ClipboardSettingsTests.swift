@@ -81,6 +81,18 @@ final class ClipboardSettingsTests: XCTestCase {
         XCTAssertNotEqual(Ink.rowHover, Ink.window)
     }
 
+    func testModifierGlyphPieces() {
+        let pieces = InkGlyphString.pieces("Reset to ⌘⇧C")
+        XCTAssertEqual(
+            pieces,
+            [.plain("Reset to ⌘"), .glyph(.shift), .plain("C")]
+        )
+        XCTAssertEqual(InkGlyphString.pieces("⌥⌘⌫"), [.plain("⌥⌘"), .glyph(.delete)])
+        XCTAssertEqual(InkGlyphString.pieces("⌃⌥V"), [.glyph(.control), .plain("⌥V")])
+        XCTAssertNil(InkMissingGlyph("⌘"))
+        XCTAssertNil(InkMissingGlyph("⌥"))
+    }
+
     func testSettingsPageIncludesClipboardTab() {
         XCTAssertTrue(SettingsPage.tabOrder.contains(.clipboard))
         XCTAssertEqual(SettingsPage.clipboard.title, "Clipboard")

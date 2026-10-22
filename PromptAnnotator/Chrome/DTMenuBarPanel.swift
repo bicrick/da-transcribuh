@@ -197,9 +197,7 @@ private struct DTMenuRow: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(Ink.menuBarItemFont)
-                .foregroundStyle(rowForeground)
+            InkGlyphString(text: title, size: 13, color: rowForeground)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Ink.space3)
                 .padding(.vertical, Ink.space2)

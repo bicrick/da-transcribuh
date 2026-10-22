@@ -182,11 +182,13 @@ struct ConfigurationPage: View {
                 }
                 HStack {
                     Spacer()
-                    Button("Reset to ⌘⇧C") {
+                    Button {
                         capture = nil
                         message = settings.setClipboardChord(.clipboardDefault)
                             ? nil
                             : "macOS would not register the default shortcut."
+                    } label: {
+                        InkGlyphString(text: "Reset to ⌘⇧C", size: 11)
                     }
                     .buttonStyle(InkSecondaryButtonStyle())
                     Button("Clear history") {

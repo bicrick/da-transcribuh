@@ -211,8 +211,7 @@ struct InkKeycap: View {
     var compact: Bool = false
 
     var body: some View {
-        Text(label)
-            .font(compact ? Ink.keycapCompactFont : Ink.keycapFont)
+        keycapLabel
             .foregroundStyle(Ink.label)
             .padding(.horizontal, compact ? 6 : 7)
             .frame(minWidth: compact ? 22 : 26, minHeight: compact ? 22 : 26)
@@ -226,6 +225,18 @@ struct InkKeycap: View {
                     .fill(Ink.bevel)
                     .offset(y: Ink.bevelOffset)
             )
+    }
+
+    @ViewBuilder
+    private var keycapLabel: some View {
+        let point: CGFloat = compact ? 11 : 13
+        if let glyph = InkMissingGlyph(label) {
+            InkMissingGlyphView(glyph: glyph)
+                .frame(width: point, height: point)
+        } else {
+            Text(label)
+                .font(compact ? Ink.keycapCompactFont : Ink.keycapFont)
+        }
     }
 }
 

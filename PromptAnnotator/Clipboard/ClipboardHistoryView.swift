@@ -223,9 +223,7 @@ struct ClipboardHistoryView: View {
                     .font(Ink.mono(12))
                     .foregroundStyle(Ink.label)
                 Spacer(minLength: 0)
-                Text(shortcut)
-                    .font(Ink.mono(11))
-                    .foregroundStyle(Ink.secondary)
+                InkGlyphString(text: shortcut, size: 11, color: Ink.secondary)
             }
             .padding(.horizontal, Ink.space3)
             .padding(.vertical, 5)
@@ -336,9 +334,7 @@ struct ClipboardPreviewPopover: View {
             Text(item.pinned ? "Press ⌥P to unpin." : "Press ⌥P to pin.")
                 .font(Ink.mono(10))
                 .foregroundStyle(Ink.secondary)
-            Text("Press ⌥⌫ to delete.")
-                .font(Ink.mono(10))
-                .foregroundStyle(Ink.secondary)
+            InkGlyphString(text: "Press ⌥⌫ to delete.", size: 10, color: Ink.secondary)
         }
         .padding(Ink.space3)
         .frame(width: 280, alignment: .leading)

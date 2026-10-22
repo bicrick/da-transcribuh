@@ -424,11 +424,13 @@ struct OnboardingFlow: View {
                             }
                             .buttonStyle(InkSecondaryButtonStyle())
                             .disabled(listening || listeningClipboard)
-                            Button("Use ⌘⇧C") {
+                            Button {
                                 listeningClipboard = false
                                 shortcutNote = settings.setClipboardChord(.clipboardDefault)
                                     ? nil
                                     : "macOS would not register that shortcut."
+                            } label: {
+                                InkGlyphString(text: "Use ⌘⇧C", size: 11)
                             }
                             .buttonStyle(InkSecondaryButtonStyle())
                         }

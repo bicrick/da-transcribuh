@@ -55,11 +55,13 @@ struct ClipboardPage: View {
                 }
                 HStack {
                     Spacer()
-                    Button("Reset to ⌘⇧C") {
+                    Button {
                         captureChord = false
                         message = settings.setClipboardChord(.clipboardDefault)
                             ? nil
                             : "macOS would not register the shortcut."
+                    } label: {
+                        InkGlyphString(text: "Reset to ⌘⇧C", size: 11)
                     }
                     .buttonStyle(InkSecondaryButtonStyle())
                 }
@@ -172,6 +174,7 @@ struct ClipboardPage: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.radioGroup)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(Ink.rowHPad)
                 .padding(.vertical, Ink.rowVPad)
@@ -195,6 +198,7 @@ struct ClipboardPage: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.radioGroup)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(Ink.rowHPad)
                 .padding(.vertical, Ink.rowVPad)
@@ -212,6 +216,7 @@ struct ClipboardPage: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.radioGroup)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(Ink.rowHPad)
                 .padding(.vertical, Ink.rowVPad)

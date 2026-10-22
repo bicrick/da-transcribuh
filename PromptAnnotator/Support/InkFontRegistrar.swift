@@ -45,12 +45,20 @@ enum InkFontRegistrar {
     ]
 
     static func resolveNSFont(size: CGFloat) -> NSFont {
-        for name in candidateNames {
-            if let font = NSFont(name: name, size: size) {
-                return upright(font)
-            }
+        let primary: NSFont
+        if let departure = candidateNames.compactMap({ NSFont(name: $0, size: size) }).first {
+            primary = upright(departure)
+        } else {
+            primary = upright(NSFont.monospacedSystemFont(ofSize: size, weight: .regular))
         }
-        return upright(NSFont.monospacedSystemFont(ofSize: size, weight: .regular))
+        // Departure Mono lacks ⇧ / ⌃ / ⌫. Cascade those to SF Mono so mixed
+        // strings ("⌘⇧C", "⌃⌥V") don't draw .notdef. Keycaps also draw the
+        // missing scalars (InkMissingGlyphView) so a single keycap can't tofu.
+        let fallback = NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+        let descriptor = primary.fontDescriptor.addingAttributes([
+            .cascadeList: [fallback.fontDescriptor],
+        ])
+        return NSFont(descriptor: descriptor, size: size) ?? primary
     }
 
     /// Strip italic/oblique traits — Departure Mono has no italic; never synthesize slant.
