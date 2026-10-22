@@ -40,6 +40,7 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.fieldRadius, 2)
         XCTAssertEqual(Ink.sidebarRowRadius, 2)
         XCTAssertEqual(Ink.folderTabHeight, 30)
+        XCTAssertEqual(Ink.tabGroupGap, 8)
         XCTAssertEqual(Ink.tipIconSize, 48)
         XCTAssertEqual(Ink.tipSymbolPointSize, 22)
         XCTAssertEqual(Ink.pageTop, 28)

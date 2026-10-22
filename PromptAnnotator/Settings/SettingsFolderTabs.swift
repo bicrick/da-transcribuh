@@ -1,22 +1,31 @@
 import SwiftUI
 
 /// Manila-folder divider tabs across the top of Settings — replaces the toolbox sidebar.
+///
+/// Intrinsic height only. Do not put flexible `Color`/`Spacer` children that can grow
+/// vertically inside the shelf HStack — a bare `Color.clear.frame(width:)` greedily
+/// takes the VStack’s leftover height and the shelf fill paints a huge empty band.
 struct SettingsFolderTabs: View {
     @Binding var selection: SettingsPage
     var onSearch: (() -> Void)? = nil
 
     private var tabHeight: CGFloat { Ink.folderTabHeight }
     private let unselectedInset: CGFloat = 3
+    /// Top pad + selected tab face. Keep the shelf from ever stretching.
+    private var shelfHeight: CGFloat { Ink.space2 + tabHeight }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 0) {
             ForEach(Array(SettingsPage.tabGroups.enumerated()), id: \.offset) { groupIndex, group in
                 if groupIndex > 0 {
-                    Color.clear.frame(width: Ink.space3)
+                    // Fixed-size gap — never a flexible Color (expands vertically).
+                    Color.clear
+                        .frame(width: Ink.tabGroupGap, height: 1)
                 }
                 ForEach(Array(group.enumerated()), id: \.element.id) { tabIndex, page in
                     if tabIndex > 0 {
-                        Color.clear.frame(width: 2)
+                        Color.clear
+                            .frame(width: 2, height: 1)
                     }
                     tab(page)
                 }
@@ -29,7 +38,10 @@ struct SettingsFolderTabs: View {
         }
         .padding(.horizontal, Ink.pageSide)
         .padding(.top, Ink.space2)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .bottomLeading)
+        // Ideal height only — refuse the VStack’s leftover flexible height.
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(height: shelfHeight, alignment: .bottom)
         .background(Ink.fill)
         .overlay(alignment: .bottom) {
             // Shelf hairline — selected tab covers it so it reads as the front folder.
