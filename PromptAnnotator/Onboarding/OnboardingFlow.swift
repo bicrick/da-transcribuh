@@ -141,7 +141,7 @@ struct OnboardingFlow: View {
             HStack(spacing: 12) {
                 AppLogo(side: 44)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Mutter")
+                    Text("da transcribuh")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(Ink.label)
                     Text(AppVersion.label)
@@ -171,7 +171,7 @@ struct OnboardingFlow: View {
             Text(step.title)
                 .font(Ink.onboardingHeroFont)
                 .foregroundStyle(Ink.label)
-            Text("The menu bar icon opens Mutter again. \(settings.chord.display) starts a session and stops it. While Mutter is saving or transcribing, the icon changes so you can see it working.")
+            Text("The menu bar icon opens da transcribuh again. \(settings.chord.display) starts a session and stops it. While da transcribuh is saving or transcribing, the icon changes so you can see it working.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .multilineTextAlignment(.center)
@@ -193,7 +193,7 @@ struct OnboardingFlow: View {
                         detail: "Hears your voice for the transcript.",
                         on: permissions.status.microphone,
                         recovery: Permissions.microphoneNeedsSettings()
-                            ? "Denied — use Turn On, enable Mutter, then Reopen."
+                            ? "Denied — use Turn On, enable da transcribuh, then Reopen."
                             : nil
                     )
                     InkDivider(leading: Ink.rowHPad)
@@ -212,11 +212,11 @@ struct OnboardingFlow: View {
                         on: permissions.status.accessibility,
                         recovery: permissions.status.accessibility
                             ? nil
-                            : "Mutter must appear in the list. Turn On prompts for that, then Reopen."
+                            : "da transcribuh must appear in the list. Turn On prompts for that, then Reopen."
                     )
                 }
             }
-            Text("After you change a switch in System Settings, Reopen so Mutter picks it up.")
+            Text("After you change a switch in System Settings, Reopen so da transcribuh picks it up.")
                 .font(Ink.captionFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -356,7 +356,7 @@ struct OnboardingFlow: View {
                 .padding(Ink.rowHPad)
                 .padding(.vertical, 14)
             }
-            Text("Try a short take now. Mutter stops after about five seconds and shows what happened.")
+            Text("Try a short take now. da transcribuh stops after about five seconds and shows what happened.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -424,7 +424,7 @@ struct OnboardingFlow: View {
             }
             return "Download"
         }
-        return step == .ready ? "Open Mutter" : "Continue"
+        return step == .ready ? "open da transcribuh" : "Continue"
     }
 
     private func primaryAction() {
@@ -596,7 +596,7 @@ final class OnboardingPresenter {
             backing: .buffered,
             defer: false
         )
-        window.title = "Welcome to Mutter"
+        window.title = "welcome to da transcribuh"
         window.isReleasedWhenClosed = false
         window.backgroundColor = Ink.windowNSColor
         window.contentView = host

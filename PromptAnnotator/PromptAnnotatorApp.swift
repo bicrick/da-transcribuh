@@ -28,7 +28,7 @@ private struct SessionMenu: View {
     @ObservedObject var settings: AppSettings
 
     var body: some View {
-        Button("Open Mutter") {
+        Button("open da transcribuh") {
             SettingsPresenter.shared.show()
         }
 
@@ -74,7 +74,7 @@ private struct SessionMenu: View {
         Text(AppVersion.label)
             .foregroundStyle(.secondary)
 
-        Button("Quit Mutter") {
+        Button("quit da transcribuh") {
             NSApp.terminate(nil)
         }
     }

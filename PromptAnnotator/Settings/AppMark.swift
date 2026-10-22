@@ -9,6 +9,6 @@ struct AppLogo: View {
             .resizable()
             .interpolation(.high)
             .frame(width: side, height: side)
-            .accessibilityLabel("Mutter")
+            .accessibilityLabel("da transcribuh")
     }
 }

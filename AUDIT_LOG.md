@@ -1,4 +1,4 @@
-# Mutter overnight audit log
+# da transcribuh overnight audit log
 
 Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes kept compile-safe and small.
 
@@ -28,10 +28,18 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 | **Ink polish (Run 13b)** | Fixed stacked top padding (~90pt); custom Ink sidebar selection (no system blue List highlight). |
 | **Paste hold (Run 14)** | Skip synthetic ⌘V when no editable focus; stage multi-rep clipboard; menu “Ready to paste”; ⌃⌥V still sequential. Cancel discards. |
 | **Brand / README (Run 15a)** | da transcribuh README + `assets/brand/` (banner, logo, social previews, bubble16). |
+| **In-app rename (Run 15b)** | User-facing strings → “da transcribuh”; CFBundleDisplayName/Name; release URLs. Bundle ID / PromptAnnotator paths / PRODUCT_NAME=Mutter.app unchanged. |
 
 ### Reverted (Run 9, still gone)
 
 - **Quiet-room calibration** — fixed SpeechGate **0.28** (matches `main`). No dangling Swift/pbxproj refs.
+
+### Run 15b (in-app rename)
+
+- User-visible “Mutter” → “da transcribuh” (menus, onboarding, settings, a11y labels, usage descriptions, session markdown `#` title, island fallback status string).
+- `ReleaseCheck` → `bicrick/da-transcribuh`.
+- **Unchanged on purpose:** `com.bicrick.PromptAnnotator`, Swift target/module `PromptAnnotator`, `PRODUCT_NAME`/`Mutter.app` (TEST_HOST), UserDefaults keys, Keychain service, `~/Documents/PromptAnnotator/`, `MutterBoundary` multipart token, recording island visuals.
+- Patrick by hand: upload social preview; optionally rename `PRODUCT_NAME` / DMG / AppIcon to the bubble brand.
 
 ### Run 15a (README + brand)
 
@@ -118,7 +126,27 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
+## Run 15 — da transcribuh brand (README + in-app)
+
+### 15a commit
+README + `assets/brand/` + docs URL/name. See summary above.
+
+### 15b commit
+In-app user-facing rename. Bundle ID / storage paths / `Mutter.app` product name left alone so permissions and history stay put.
+
+### Mac checklist (rename)
+
+1. Build; confirm Dock/menu bar show “da transcribuh” (display name).
+2. Open settings / onboarding — titles and copy say da transcribuh.
+3. Permission prompts show new usage strings (may need a clean TCC reset only if testing prompts; don’t reset for normal use).
+4. Stop a session; markdown notes header is `# da transcribuh`.
+5. Configuration → View on GitHub opens da-transcribuh releases.
+6. Confirm sessions still load from `~/Documents/PromptAnnotator/Sessions/` and models still on disk.
+
+---
+
 ## Run 14 — Hold paste when no editable focus
+
 
 ### Prior behavior (findings)
 
@@ -820,7 +848,7 @@ Static re-audit of Runs 5–6 (~+2300 lines vs `main`) that have never been Xcod
 **New for Run 3**
 
 - [ ] **Menu bar icon:** idle = pencil tip; while recording = filled record; while Saving / Preparing / Transcribing / Downloading = ellipsis circle (not idle).
-- [ ] VoiceOver on the menu bar item announces “Mutter, recording” / “Mutter, transcribing” (etc.).
+- [ ] VoiceOver on the menu bar item announces “da transcribuh, recording” / “da transcribuh, transcribing” (etc.).
 - [ ] Force a transcription failure (e.g. delete model mid-session or offline download) → menu shows a plain-language error, not `Error Domain=…`.
 - [ ] Quiet stop → menu still shows **No speech detected** (unchanged).
 - [ ] Menu text reads “⌃⌥Space starts and stops” (or Hold… when push-to-talk is on); cancel chord listed when set.

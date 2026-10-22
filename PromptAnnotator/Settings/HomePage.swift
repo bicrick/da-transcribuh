@@ -33,7 +33,7 @@ struct HomePage: View {
                     AppLogo(side: 56)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
-                            Text("Mutter")
+                            Text("da transcribuh")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(Ink.label)
                             InkBadge(text: AppVersion.label)
@@ -292,7 +292,7 @@ struct HomePage: View {
 
     private var startRowDetail: String {
         if session.isBusy {
-            return "Mutter is finishing this take. The menu bar icon shows the same state."
+            return "da transcribuh is finishing this take. the menu bar icon shows the same state."
         }
         if settings.pushToTalk {
             return "Hold \(settings.chord.display) to talk. Release to stop. The Start button stays a tap."

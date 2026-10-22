@@ -51,7 +51,7 @@ struct RecordingIslandView: View {
     }
 
     private var islandAccessibilityLabel: String {
-        let status = session.statusText.isEmpty ? "Mutter" : session.statusText
+        let status = session.statusText.isEmpty ? "da transcribuh" : session.statusText
         if session.phase == .recording {
             let time = TimeFormat.clock(session.elapsed)
             let captures = session.captureCount

@@ -120,20 +120,20 @@ final class SessionController: ObservableObject {
     var menuAccessibilityLabel: String {
         switch phase {
         case .recording:
-            return "Mutter, recording"
+            return "da transcribuh, recording"
         case .finishing:
-            return "Mutter, saving"
+            return "da transcribuh, saving"
         case .downloading:
-            return "Mutter, downloading model"
+            return "da transcribuh, downloading model"
         case .preparingModel:
-            return "Mutter, preparing model"
+            return "da transcribuh, preparing model"
         case .transcribing:
-            return "Mutter, transcribing"
+            return "da transcribuh, transcribing"
         case .idle:
             if let lastError, !lastError.isEmpty {
-                return "Mutter, \(lastError)"
+                return "da transcribuh, \(lastError)"
             }
-            return "Mutter"
+            return "da transcribuh"
         }
     }
 
@@ -737,7 +737,7 @@ final class SessionController: ObservableObject {
                 offerPermissions(Permissions.Status(accessibility: false, microphone: true, screen: true))
             } else {
                 lastError = "Couldn't watch the pointer."
-                presentError("Couldn't watch the pointer", "Accessibility is on, but the event tap did not install. Quit and reopen Mutter.")
+                presentError("Couldn't watch the pointer", "Accessibility is on, but the event tap did not install. Quit and reopen da transcribuh.")
             }
             return
         }

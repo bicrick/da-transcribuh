@@ -227,7 +227,7 @@ struct ModelPage: View {
     private var openAISection: some View {
         SettingsSection(
             title: "Server",
-            footer: "Mutter posts the session audio to {base}/v1/audio/transcriptions when you stop. The API key stays in the Keychain."
+            footer: "da transcribuh posts the session audio to {base}/v1/audio/transcriptions when you stop. The API key stays in the Keychain."
         ) {
             InkCard {
                 VStack(alignment: .leading, spacing: 12) {

@@ -67,7 +67,7 @@ struct SettingsRoot: View {
         HStack(spacing: 8) {
             AppLogo(side: 22)
             VStack(alignment: .leading, spacing: 0) {
-                Text("Mutter")
+                Text("da transcribuh")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Ink.label)
                 Text(AppVersion.label)
@@ -184,7 +184,7 @@ final class SettingsPresenter {
             backing: .buffered,
             defer: false
         )
-        window.title = "Mutter"
+        window.title = "da transcribuh"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none
