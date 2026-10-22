@@ -18,9 +18,9 @@ OUT_ART = Path("/opt/cursor/artifacts")
 
 S = 2.0
 STROKE = int(2 * S)
-# Ink.scrollerWidth 10 + gutterGap 2
+# Ink.scrollerWidth 10 + gutterGap 4
 TRACK_W = int(10 * S)
-GUTTER_GAP = int(2 * S)
+GUTTER_GAP = int(4 * S)
 GUTTER = GUTTER_GAP + TRACK_W
 THUMB_MIN = int(24 * S)
 ROW_H = int(40 * S)

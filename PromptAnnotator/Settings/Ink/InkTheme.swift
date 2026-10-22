@@ -169,7 +169,7 @@ enum Ink {
     static let scrollerThumbMin: CGFloat = 24
     static let scrollerInset: CGFloat = 2
     /// Gap between scroll content and the track.
-    static let scrollerGutterGap: CGFloat = 2
+    static let scrollerGutterGap: CGFloat = 4
     /// Total trailing gutter reserved beside content (`gap + track`).
     /// Kept even when content fits so headers / columns stay aligned.
     static let scrollerGutter: CGFloat = scrollerGutterGap + scrollerWidth
