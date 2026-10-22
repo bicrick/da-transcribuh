@@ -15,13 +15,19 @@ final class ClipboardHistoryPanelController {
     private var resignHideWork: DispatchWorkItem?
     /// Bumped on each `show()` so a stale resign-hide cannot close a fresh panel.
     private var showGeneration: UInt64 = 0
+    /// True while the close fade runs. The window is still on screen but logically gone.
+    private(set) var isClosing = false
+    /// Final frame of the open slide. The preview anchors here, not to the mid-animation frame.
+    private var restingFrame: NSRect = .zero
 
     var isVisible: Bool {
-        panel?.isVisible == true
+        panel?.isVisible == true && !isClosing
     }
 
+    var window: NSWindow? { panel }
+
     var listFrame: NSRect {
-        panel?.frame ?? .zero
+        restingFrame.width > 1 ? restingFrame : (panel?.frame ?? .zero)
     }
 
     func toggle() {
@@ -43,8 +49,9 @@ final class ClipboardHistoryPanelController {
             onPick: { [weak self] item, paste in
                 let wrote = ClipboardHistoryController.shared.pick(item, paste: paste)
                 // Enter / click paste closes; ⌥Enter copy-only keeps the panel open.
+                // Instant: the synthesized ⌘V must land in the target app, not a fading panel.
                 if paste, wrote {
-                    self?.hide()
+                    self?.hide(animated: false)
                 }
             },
             onClose: { [weak self] in self?.hide() },
@@ -73,6 +80,8 @@ final class ClipboardHistoryPanelController {
             host.frame = NSRect(origin: .zero, size: ClipboardHistoryView.preferredSize)
             panel.contentView = host
             panel.acceptsMouseMovedEvents = true
+            // PanelMotion owns open/close; AppKit's utility-window effect would double it.
+            panel.animationBehavior = .none
             self.panel = panel
             self.host = host
         } else {
@@ -81,23 +90,67 @@ final class ClipboardHistoryPanelController {
         guard let panel else { return }
         let size = ClipboardHistoryView.preferredSize
         let chrome = CGSize(width: size.width + Ink.bevelOffset, height: size.height + Ink.bevelOffset)
-        place(panel: panel, size: chrome, visual: size)
-        panel.alphaValue = 0.95
+        let wasOnScreen = panel.isVisible
+        let wasClosing = isClosing
+        isClosing = false
+        panel.ignoresMouseEvents = false
+        if wasClosing {
+            // Re-shown mid-fade: ease back from wherever the fade got to.
+            PanelMotion.present(panel, to: restingFrame, alpha: Self.restingAlpha, from: .zero,
+                                duration: PanelMotion.listOpen, fromCurrent: true)
+        } else {
+            place(panel: panel, size: chrome, visual: size)
+            restingFrame = panel.frame
+        }
         // Nonactivating panel can still be key so arrows/Enter work with search off.
+        // Focus first, motion second: nothing waits on the animation.
         panel.orderFrontRegardless()
         panel.makeKey()
         panel.makeFirstResponder(host)
+        if !wasOnScreen {
+            // Fade in while dropping 6pt into place.
+            PanelMotion.present(panel, to: restingFrame, alpha: Self.restingAlpha,
+                                from: CGVector(dx: 0, dy: PanelMotion.listOpenDrop),
+                                duration: PanelMotion.listOpen)
+        } else if !wasClosing {
+            panel.alphaValue = Self.restingAlpha
+        }
+        AnimSampler.sample("list-open", panel)
         installOutsideClickMonitor()
         installResignObserver()
     }
 
-    func hide() {
+    private static let restingAlpha: CGFloat = 0.95
+    private var hideGeneration: UInt64 = 0
+
+    /// `animated: false` is for picks: the panel must be gone before the paste.
+    func hide(animated: Bool = true) {
         resignHideWork?.cancel()
         resignHideWork = nil
         removeOutsideClickMonitor()
         removeResignObserver()
-        ClipboardPreviewPanelController.shared.hide()
-        panel?.orderOut(nil)
+        ClipboardPreviewPanelController.shared.hide(animated: animated)
+        guard let panel, panel.isVisible else { return }
+        hideGeneration &+= 1
+        let generation = hideGeneration
+        if !animated {
+            isClosing = false
+            panel.orderOut(nil)
+            panel.alphaValue = Self.restingAlpha
+            return
+        }
+        guard !isClosing else { return }
+        isClosing = true
+        panel.ignoresMouseEvents = true
+        // Fade out while lifting 4pt.
+        PanelMotion.dismiss(panel, toward: CGVector(dx: 0, dy: PanelMotion.listCloseLift),
+                            duration: PanelMotion.listClose) { [weak self] in
+            guard let self, self.hideGeneration == generation, self.isClosing else { return }
+            self.isClosing = false
+            panel.orderOut(nil)
+            panel.ignoresMouseEvents = false
+        }
+        AnimSampler.sample("list-close", panel)
     }
 
     private func installOutsideClickMonitor() {

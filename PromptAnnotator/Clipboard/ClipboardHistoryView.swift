@@ -17,6 +17,10 @@ struct ClipboardHistoryView: View {
     @State private var selection: UUID?
     @State private var hovered: UUID?
     @State private var previewTask: Task<Void, Never>?
+    /// Bumped on each keyboard move so only that move scrolls the selection into view
+    /// (hover selection must never scroll the list under the pointer).
+    @State private var revealToken = 0
+    @State private var revealOnSelect = false
     @FocusState private var searchFocused: Bool
 
     /// Maccy Popup-ish width; Paint chrome around it.
@@ -29,8 +33,6 @@ struct ClipboardHistoryView: View {
         store.orderedForDisplay(filter: filter)
     }
 
-    private var pinnedRows: [ClipboardItem] { rows.filter(\.pinned) }
-    private var unpinnedRows: [ClipboardItem] { rows.filter { !$0.pinned } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -120,6 +122,10 @@ struct ClipboardHistoryView: View {
                 .foregroundStyle(Ink.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
+            // Order once per body (was three sorts per selection change).
+            let all = rows
+            let pinnedRows = all.filter(\.pinned)
+            let unpinnedRows = all.filter { !$0.pinned }
             DTScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(pinnedRows.enumerated()), id: \.element.id) { index, item in
@@ -156,7 +162,14 @@ struct ClipboardHistoryView: View {
         }
         .padding(.horizontal, hPad + 4)
         .frame(height: item.kind == .image ? max(rowHeight, imageMaxHeight + 4) : rowHeight)
-        .background(bg)
+        // Short color ease so hover / arrow highlight glides instead of snapping.
+        // A color fade is not motion, so it stays on with Reduce Motion.
+        .background {
+            Rectangle()
+                .fill(bg)
+                .animation(.easeOut(duration: 0.09), value: bg)
+        }
+        .background(SelectionRevealAnchor(token: selected && revealOnSelect ? revealToken : nil))
         .contentShape(Rectangle())
         .onTapGesture {
             selection = item.id
@@ -165,6 +178,7 @@ struct ClipboardHistoryView: View {
         .onHover { isHovering in
             if isHovering {
                 hovered = item.id
+                revealOnSelect = false
                 selection = item.id
             } else if hovered == item.id {
                 hovered = nil
@@ -176,7 +190,7 @@ struct ClipboardHistoryView: View {
     private func rowBody(_ item: ClipboardItem, foreground: Color) -> some View {
         switch item.kind {
         case .image:
-            if let image = store.image(for: item) {
+            if let image = store.thumbnail(for: item, maxHeight: imageMaxHeight) {
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
@@ -236,8 +250,16 @@ struct ClipboardHistoryView: View {
 
     private func schedulePreview(for id: UUID?) {
         previewTask?.cancel()
-        onPreview(nil)
-        guard let id, let item = rows.first(where: { $0.id == id }) else { return }
+        guard let id, let item = rows.first(where: { $0.id == id }) else {
+            onPreview(nil)
+            return
+        }
+        // Preview already up: swap its content in place. Hiding first made it
+        // re-slide on every arrow press.
+        if ClipboardPreviewPanelController.shared.isShowing {
+            onPreview(item)
+            return
+        }
         let delay = UInt64(max(0, settings.clipboardPreviewDelayMs)) * 1_000_000
         previewTask = Task { @MainActor in
             if delay > 0 {
@@ -262,6 +284,8 @@ struct ClipboardHistoryView: View {
         let ids = rows.map(\.id)
         let idx = selection.flatMap { ids.firstIndex(of: $0) } ?? 0
         let next = min(max(idx + delta, 0), ids.count - 1)
+        revealOnSelect = true
+        revealToken &+= 1
         selection = ids[next]
     }
 
@@ -303,6 +327,57 @@ struct ClipboardHistoryView: View {
             filter = ""
         } else {
             onClose()
+        }
+    }
+}
+
+// MARK: - Keyboard reveal
+
+/// Scrolls its row into view when `token` changes to a new non-nil value.
+/// Keyboard moves only. Eased 0.1s, instant with Reduce Motion.
+private struct SelectionRevealAnchor: NSViewRepresentable {
+    var token: Int?
+
+    func makeNSView(context: Context) -> AnchorView { AnchorView() }
+
+    func updateNSView(_ view: AnchorView, context: Context) {
+        guard let token, token != view.lastToken else { return }
+        view.lastToken = token
+        DispatchQueue.main.async { view.reveal() }
+    }
+
+    final class AnchorView: NSView {
+        var lastToken: Int?
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        func reveal() {
+            guard let scroll = enclosingScrollView, let doc = scroll.documentView else { return }
+            let clip = scroll.contentView
+            let row = convert(bounds, to: doc)
+            let visible = clip.bounds
+            let pad: CGFloat = 4
+            var y = visible.origin.y
+            if row.minY < visible.minY {
+                y = row.minY - pad
+            } else if row.maxY > visible.maxY {
+                y = row.maxY - visible.height + pad
+            } else {
+                return
+            }
+            let maxY = max(doc.frame.height - visible.height, 0)
+            let target = NSPoint(x: visible.origin.x, y: min(max(y, 0), maxY))
+            if PanelMotion.reduceMotion {
+                clip.setBoundsOrigin(target)
+                scroll.reflectScrolledClipView(clip)
+                return
+            }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.1
+                context.timingFunction = PanelMotion.easeOut
+                clip.animator().setBoundsOrigin(target)
+            }
+            scroll.reflectScrolledClipView(clip)
         }
     }
 }
@@ -431,7 +506,16 @@ private struct KeyboardMonitor: NSViewRepresentable {
         }
 
         private func handle(_ event: NSEvent) -> Bool {
-            guard let handlers else { return false }
+            guard let handlers, let window else { return false }
+            // The local monitor is app-wide and outlives orderOut, so only act on
+            // keys aimed at the list or its preview. Otherwise Return in Settings
+            // could paste the hidden selection.
+            let target = event.window
+            let ours = target === window
+                || (target != nil && target === ClipboardPreviewPanelController.shared.window)
+            guard ours, window.isVisible else { return false }
+            // Swallow keys during the close fade so they cannot act on a closing list.
+            if ClipboardHistoryPanelController.shared.isClosing { return true }
             let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             // ⌃N / ⌃P
             if mods.contains(.control), !mods.contains(.command), !mods.contains(.option),
@@ -475,8 +559,12 @@ private struct KeyboardMonitor: NSViewRepresentable {
                 return true
             }
             switch event.keyCode {
-            case 125: handlers.onMove(1); return true
-            case 126: handlers.onMove(-1); return true
+            case 125, 126:
+                // Arrow -> selection -> committed frame, logged as `dtperf move`.
+                PerfProbe.begin("move", event.keyCode == 125 ? "down" : "up")
+                handlers.onMove(event.keyCode == 125 ? 1 : -1)
+                PerfProbe.endAfterDisplay("move")
+                return true
             case 36, 76:
                 handlers.onReturn(mods.contains(.option))
                 return true

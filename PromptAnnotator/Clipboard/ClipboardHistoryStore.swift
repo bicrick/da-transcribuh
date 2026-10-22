@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ImageIO
 
 /// Disk-backed clipboard history: JSON index + image files under Application Support.
 @MainActor
@@ -19,6 +20,16 @@ final class ClipboardHistoryStore: ObservableObject {
     var historyLimitOverride: Int?
 
     private let fileManager = FileManager.default
+    private let imageCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 6
+        return cache
+    }()
+    private let thumbnailCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 200
+        return cache
+    }()
     private var folderURL: URL
     private var indexURL: URL
     private var imagesURL: URL
@@ -186,9 +197,41 @@ final class ClipboardHistoryStore: ObservableObject {
         }
     }
 
+    /// Full-size image for the preview. Cached: the panel body asks again on every
+    /// selection change, and re-reading PNGs from disk per arrow press cost ~58ms.
     func image(for item: ClipboardItem) -> NSImage? {
         guard let name = item.imageFileName else { return nil }
-        return NSImage(contentsOf: imagesURL.appendingPathComponent(name))
+        let key = name as NSString
+        if let hit = imageCache.object(forKey: key) { return hit }
+        guard let image = NSImage(contentsOf: imagesURL.appendingPathComponent(name)) else { return nil }
+        imageCache.setObject(image, forKey: key)
+        return image
+    }
+
+    /// Row thumbnail downsampled once with ImageIO to `maxHeight` points at 2x,
+    /// so list rows never decode or rescale a full screenshot while scrolling.
+    func thumbnail(for item: ClipboardItem, maxHeight: CGFloat) -> NSImage? {
+        guard let name = item.imageFileName else { return nil }
+        let key = "\(name)@\(Int(maxHeight))" as NSString
+        if let hit = thumbnailCache.object(forKey: key) { return hit }
+        let url = imagesURL.appendingPathComponent(name)
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let pixelW = (props?[kCGImagePropertyPixelWidth] as? CGFloat) ?? 0
+        let pixelH = (props?[kCGImagePropertyPixelHeight] as? CGFloat) ?? 0
+        let scale = pixelH > 0 ? min(1, (maxHeight * 2) / pixelH) : 1
+        let maxPixel = max(1, max(pixelW, pixelH) * scale)
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return nil
+        }
+        let image = NSImage(cgImage: cg, size: NSSize(width: CGFloat(cg.width) / 2, height: CGFloat(cg.height) / 2))
+        thumbnailCache.setObject(image, forKey: key)
+        return image
     }
 
     /// History folder (index + images). Read-only for off-main measurement.

@@ -117,10 +117,34 @@ extension PerfHarness {
             return
         }
         ClipboardHistoryPanelController.shared.show()
-        after(ms: 700) {
-            ClipboardHistoryPanelController.shared.hide()
-            after(ms: 300) { panelStep(remaining: remaining - 1) }
+        let moves = UserDefaults.standard.integer(forKey: "DTPerfPanelMoves")
+        // Wait out the preview delay so the moves run with the preview up.
+        let previewWait = moves > 0 ? max(0, AppSettings.shared.clipboardPreviewDelayMs) + 300 : 0
+        after(ms: 300 + previewWait) {
+            postArrows(moves) {
+                after(ms: 400) {
+                    ClipboardHistoryPanelController.shared.hide()
+                    after(ms: 300) { panelStep(remaining: remaining - 1) }
+                }
+            }
         }
+    }
+
+    /// `-DTPerfPanelMoves <n>` posts n real down-arrow key events, 60ms apart,
+    /// into the open panel (logs `dtperf move down <ms>` per press).
+    private static func postArrows(_ count: Int, then done: @escaping @MainActor () -> Void) {
+        guard count > 0 else { done(); return }
+        let window = ClipboardHistoryPanelController.shared.window
+        if let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window?.windowNumber ?? 0, context: nil,
+            characters: "\u{F701}", charactersIgnoringModifiers: "\u{F701}",
+            isARepeat: false, keyCode: 125
+        ) {
+            NSApp.postEvent(event, atStart: false)
+        }
+        after(ms: 60) { postArrows(count - 1, then: done) }
     }
 
     private static func after(ms: Int, _ work: @escaping @MainActor () -> Void) {
