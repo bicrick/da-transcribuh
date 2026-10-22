@@ -20,7 +20,7 @@
 
 <p align="center">if u like that, u'd probably like grabbing screens while u talk. drop a few tiles so u can point at multiple nits in one go.</p>
 
-<p align="center">clipboard history is coming soon (⌘⇧C).</p>
+<p align="center">and ur clipboard history is right there too (⌘⇧C).</p>
 
 ## install
 
