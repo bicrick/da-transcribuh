@@ -10,16 +10,21 @@ final class ModelTransfer: ObservableObject {
 
     var isWorking: Bool { workingVariant != nil }
 
-    func download(_ variant: String) {
+    func download(_ variant: String, repo: String = WhisperKitTranscriber.modelRepo) {
+        let trimmedVariant = variant.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedVariant.isEmpty else {
+            message = "Enter a model variant to download."
+            return
+        }
         generation += 1
         let generation = generation
         task?.cancel()
         message = nil
         fraction = 0
-        workingVariant = variant
+        workingVariant = trimmedVariant
         task = Task { [weak self] in
             do {
-                _ = try await WhisperKitTranscriber.fetch(variant: variant) { value in
+                _ = try await WhisperKitTranscriber.fetch(variant: trimmedVariant, repo: repo) { value in
                     Task { @MainActor in
                         guard self?.generation == generation else { return }
                         self?.fraction = value
@@ -35,7 +40,7 @@ final class ModelTransfer: ObservableObject {
                 self?.workingVariant = nil
             } catch {
                 guard self?.generation == generation else { return }
-                self?.message = error.localizedDescription
+                self?.message = UserFacingError.modelDownload(error)
                 self?.fraction = nil
                 self?.workingVariant = nil
             }
@@ -46,36 +51,30 @@ final class ModelTransfer: ObservableObject {
 struct SpeechModelPicker: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var transfer: ModelTransfer
-    var showsDownloadButton = true
+    var horizontalTiles = true
     @State private var installed: Set<String> = []
 
+    /// Shared card height so Fast / Balanced / Highest tops and footers line up.
+    private let tileMinHeight: CGFloat = 248
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(SpeechModelChoice.all) { choice in
-                modelCard(choice)
-            }
-            Text("Weights from argmaxinc/whisperkit-coreml. Size is the download. Speed and quality compare these three.")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let message = transfer.message {
-                Text(message)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if showsDownloadButton {
-                HStack {
-                    Button(downloadTitle) {
-                        transfer.download(settings.speechModel)
-                    }
-                    .disabled(selectedIsInstalled || transfer.isWorking)
-                    if selectedIsInstalled {
-                        Text("On this Mac")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: Ink.space3) {
+            if horizontalTiles {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: Ink.gridGap), count: 3),
+                    spacing: Ink.gridGap
+                ) {
+                    ForEach(SpeechModelChoice.all) { choice in
+                        modelTile(choice)
                     }
                 }
+            } else {
+                ForEach(SpeechModelChoice.all) { choice in
+                    modelTile(choice)
+                }
+            }
+            if let message = transfer.message {
+                InkErrorBanner(message: message)
             }
         }
         .onAppear(perform: refresh)
@@ -84,69 +83,109 @@ struct SpeechModelPicker: View {
         }
     }
 
-    private var selectedIsInstalled: Bool {
-        installed.contains(settings.speechModel)
-    }
-
-    private var downloadTitle: String {
-        guard transfer.workingVariant == settings.speechModel, let fraction = transfer.fraction else {
-            return selectedIsInstalled ? "Downloaded" : "Download"
-        }
-        return "Downloading \(Int((fraction * 100).rounded()))%"
-    }
-
-    private func modelCard(_ choice: SpeechModelChoice) -> some View {
-        let selected = settings.speechModel == choice.variant
+    private func modelTile(_ choice: SpeechModelChoice) -> some View {
+        let selected = settings.customModelID == nil && settings.speechModel == choice.variant
+        let onDisk = installed.contains(choice.variant)
+        let downloading = transfer.workingVariant == choice.variant
         return Button {
             settings.setSpeechModel(choice.variant)
             transfer.message = nil
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(choice.title)
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(choice.variant)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    if choice.isDefault {
-                        Text("Default")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
+            InkTile(selected: selected) {
+                VStack(alignment: .leading, spacing: Ink.space3) {
+                    HStack(alignment: .top, spacing: Ink.space2) {
+                        InkRadio(selected: selected)
+                        Image(systemName: iconName(for: choice))
+                            .font(Ink.labelFont)
+                            .foregroundStyle(Ink.label)
+                            .frame(width: 16, alignment: .center)
+                        Spacer(minLength: 0)
                     }
-                    Text("\(choice.megabytes) MB")
-                        .font(.system(size: 12, weight: .medium).monospacedDigit())
+
+                    VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                        HStack(spacing: Ink.space2) {
+                            Text(choice.title)
+                                .font(Ink.tileTitleFont)
+                                .foregroundStyle(Ink.label)
+                                .lineLimit(1)
+                            if choice.isDefault {
+                                InkBadge(text: "Default")
+                            }
+                        }
+                        Text(choice.variant)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        Text(choice.detail)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading)
+                    }
+
+                    VStack(alignment: .leading, spacing: Ink.space2) {
+                        InkSegmentMeter(label: "Speed", fraction: choice.speed)
+                        InkSegmentMeter(label: "Quality", fraction: choice.quality)
+                        InkSegmentMeter(label: "Size", fraction: choice.size)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    footer(for: choice, onDisk: onDisk, downloading: downloading)
                 }
-                Text(choice.detail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .multilineTextAlignment(.leading)
-                MeterBar(label: "Size", fraction: choice.size)
-                MeterBar(label: "Speed", fraction: choice.speed)
-                MeterBar(label: "Quality", fraction: choice.quality)
-                if transfer.workingVariant == choice.variant, let fraction = transfer.fraction {
-                    ProgressView(value: min(1, max(0, fraction)))
-                        .progressViewStyle(.linear)
-                } else if installed.contains(choice.variant) {
-                    Text("On disk")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
+                .frame(maxWidth: .infinity, minHeight: tileMinHeight - 40, alignment: .topLeading)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                Color(nsColor: .controlBackgroundColor),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(selected ? Color.primary : Color(nsColor: .separatorColor).opacity(0.7), lineWidth: selected ? 2 : 1)
-            )
         }
         .buttonStyle(.plain)
-        .disabled(transfer.isWorking)
+        .disabled(transfer.isWorking && !downloading)
+    }
+
+    @ViewBuilder
+    private func footer(for choice: SpeechModelChoice, onDisk: Bool, downloading: Bool) -> some View {
+        if downloading, let fraction = transfer.fraction {
+            VStack(alignment: .leading, spacing: Ink.space1) {
+                InkProgressBar(fraction: fraction)
+                Text("Downloading \(Int((fraction * 100).rounded()))%")
+                    .font(Ink.buttonSmallFont)
+                    .foregroundStyle(Ink.secondary)
+            }
+        } else if onDisk {
+            HStack(spacing: Ink.space2) {
+                Image(systemName: "checkmark")
+                    .font(Ink.microFont)
+                    .foregroundStyle(Ink.success)
+                Text("On disk")
+                    .font(Ink.buttonSmallFont)
+                    .foregroundStyle(Ink.label)
+                Spacer(minLength: 0)
+            }
+        } else {
+            // Footer action (not a nested Button — those fight the card Button on macOS).
+            Text("Download \(choice.megabytes) MB")
+                .font(Ink.buttonSmallFont)
+                .foregroundStyle(Ink.label)
+                .padding(.horizontal, Ink.space2)
+                .padding(.vertical, Ink.space1)
+                .overlay(
+                    Rectangle()
+                        .strokeBorder(Ink.label, lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard !transfer.isWorking else { return }
+                    settings.setSpeechModel(choice.variant)
+                    transfer.download(choice.variant)
+                }
+        }
+    }
+
+    private func iconName(for choice: SpeechModelChoice) -> String {
+        switch choice.variant {
+        case "tiny.en": return "bolt.fill"
+        case "small.en_217MB": return "scalemass.fill"
+        default: return "diamond.fill"
+        }
     }
 
     private func refresh() {
@@ -154,29 +193,5 @@ struct SpeechModelPicker: View {
         installed = Set(SpeechModelChoice.all.compactMap { choice in
             WhisperModelLocator.locate(in: root, variant: choice.variant) == nil ? nil : choice.variant
         })
-    }
-}
-
-private struct MeterBar: View {
-    var label: String
-    var fraction: Double
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .leading)
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.primary.opacity(0.08))
-                    Capsule()
-                        .fill(Color.primary.opacity(0.82))
-                        .frame(width: max(3, geo.size.width * min(1, max(0, fraction))))
-                }
-            }
-            .frame(height: 6)
-        }
     }
 }

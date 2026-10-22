@@ -102,7 +102,6 @@ final class HotkeyCenter {
                     return noErr
                 }
                 return OSStatus(eventNotHandledErr)
-                return noErr
             },
             1,
             &eventType,

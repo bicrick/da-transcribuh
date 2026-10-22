@@ -16,13 +16,22 @@ struct MachineSnapshot: Equatable {
 
 enum MachineLoad {
     static func capture(modelReady: Bool, modelFolder: URL) -> MachineSnapshot {
+        capture(modelReady: modelReady, modelBytes: folderBytes(modelFolder))
+    }
+
+    /// Lightweight snapshot that reuses a cached on-disk model size (avoids walking the folder).
+    static func capture(modelReady: Bool, modelBytes: UInt64) -> MachineSnapshot {
         MachineSnapshot(
             appBytes: physicalFootprint(),
-            modelBytes: folderBytes(modelFolder),
+            modelBytes: modelBytes,
             modelReady: modelReady,
             physicalBytes: ProcessInfo.processInfo.physicalMemory,
             processorCount: ProcessInfo.processInfo.processorCount
         )
+    }
+
+    static func modelFolderBytes(_ folder: URL) -> UInt64 {
+        folderBytes(folder)
     }
 
     static func megabytes(_ bytes: UInt64) -> String {

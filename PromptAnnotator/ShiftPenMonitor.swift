@@ -37,6 +37,8 @@ final class ShiftPenMonitor {
     }
 
     private var shiftDown = false
+    /// Coalesces Shift edge delivery so AppKit/SwiftUI work runs after the CGEvent tap returns.
+    private var shiftDeliveryScheduled = false
     private var hold: PointerHold = .idle
     private var chromePress: PressedClick?
     private var discardUntilLeftUp = false
@@ -92,6 +94,7 @@ final class ShiftPenMonitor {
     func stop() {
         active = false
         shiftDown = false
+        shiftDeliveryScheduled = false
         hold = .idle
         chromePress = nil
         discardUntilLeftUp = false
@@ -136,9 +139,13 @@ final class ShiftPenMonitor {
         case .flagsChanged:
             let down = event.flags.contains(.maskShift)
             if down != shiftDown {
+                // Keep the monitor's Shift bit current for the next mouse event in this
+                // tap, but do not run session UI here. `penShift` orders windows, updates
+                // @Published SwiftUI state, and may commit the canvas — all of which can
+                // raise AppKit exceptions when re-entered from a CGEvent tap (HIToolbox
+                // then reports SOME_OTHER_THREAD_SWALLOWED_AT_LEAST_ONE_EXCEPTION).
                 shiftDown = down
-                session.penShift(down: down)
-                updateCursor(session: session)
+                scheduleShiftDelivery()
             }
             return Unmanaged.passUnretained(event)
 
@@ -406,6 +413,21 @@ final class ShiftPenMonitor {
                 }
             }
             return nil
+        }
+    }
+
+    /// Delivers the latest Shift edge on the next main-queue turn, coalescing bursts.
+    private func scheduleShiftDelivery() {
+        guard !shiftDeliveryScheduled else { return }
+        shiftDeliveryScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.shiftDeliveryScheduled = false
+                guard let session = self.session else { return }
+                session.penShift(down: self.shiftDown)
+                self.updateCursor(session: session)
+            }
         }
     }
 

@@ -33,23 +33,26 @@ struct MarkupToolbarView: View {
         .padding(.horizontal, 8)
         .frame(height: 44)
         .fixedSize(horizontal: true, vertical: false)
-        .background(.regularMaterial, in: Capsule(style: .continuous))
-        .overlay(
-            Capsule(style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
-        )
+        .background {
+            RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
+                .fill(Ink.window)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
+                        .strokeBorder(Ink.label, lineWidth: 1)
+                )
+        }
     }
 
     private var captureButton: some View {
         let selected = session.markupMode == .capture
         return PressSurface(action: { session.selectCapture() }) {
             Image(systemName: "viewfinder")
-                .font(.system(size: 15, weight: .medium))
+                .font(Ink.labelFont)
                 .frame(width: 32, height: 28)
-                .foregroundStyle(selected ? Color.accentColor : Color.primary)
+                .foregroundStyle(selected ? Ink.onAccent : Ink.label)
                 .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(selected ? Color.accentColor.opacity(0.16) : Color.clear)
+                    RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
+                        .fill(selected ? Ink.label : Color.clear)
                 )
         }
         .help("Capture a snippet")
@@ -60,12 +63,12 @@ struct MarkupToolbarView: View {
         let selected = session.markupMode == .annotate && session.tool == tool
         return PressSurface(action: { session.select(tool: tool) }) {
             Image(systemName: tool.symbolName)
-                .font(.system(size: 15, weight: .medium))
+                .font(Ink.labelFont)
                 .frame(width: 32, height: 28)
-                .foregroundStyle(selected ? Color.accentColor : Color.primary)
+                .foregroundStyle(selected ? Ink.onAccent : Ink.label)
                 .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(selected ? Color.accentColor.opacity(0.16) : Color.clear)
+                    RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
+                        .fill(selected ? Ink.label : Color.clear)
                 )
         }
         .help(tool.title)
@@ -75,9 +78,9 @@ struct MarkupToolbarView: View {
     private func iconButton(symbol: String, help: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 14, weight: .medium))
+                .font(Ink.buttonSmallFont)
                 .frame(width: 32, height: 28)
-                .foregroundStyle(Color.primary.opacity(enabled ? 1 : 0.35))
+                .foregroundStyle(Ink.label.opacity(enabled ? 1 : 0.35))
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
@@ -95,11 +98,11 @@ struct MarkupToolbarView: View {
                 .frame(width: 14, height: 14)
                 .overlay(
                     Circle()
-                        .strokeBorder(Color.primary.opacity(color.isNearWhite ? 0.45 : 0.25), lineWidth: 1)
+                        .strokeBorder(Ink.label.opacity(color.isNearWhite ? 0.55 : 0.35), lineWidth: 1)
                 )
                 .overlay(
                     Circle()
-                        .strokeBorder(Color.primary, lineWidth: selected ? 2 : 0)
+                        .strokeBorder(Ink.label, lineWidth: selected ? 2 : 0)
                         .padding(-3)
                 )
                 .frame(width: 24, height: 28)
@@ -134,7 +137,7 @@ struct MarkupToolbarView: View {
 
     private var hairline: some View {
         Rectangle()
-            .fill(Color(nsColor: .separatorColor))
+            .fill(Ink.label)
             .frame(width: 1, height: 20)
             .padding(.horizontal, 4)
     }

@@ -178,10 +178,7 @@ enum IslandMetrics {
     }
 
     private static func textWidth(_ text: String, size: CGFloat, weight: NSFont.Weight, mono: Bool) -> CGFloat {
-        let font = mono
-            ? NSFont.monospacedSystemFont(ofSize: size, weight: weight)
-            : NSFont.systemFont(ofSize: size, weight: weight)
-        return (text as NSString).size(withAttributes: [.font: font]).width
+        FontMetrics.width(of: text, size: size, weight: weight, mono: mono)
     }
 }
 

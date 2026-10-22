@@ -16,10 +16,20 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         case .home: return "Home"
         case .history: return "History"
         case .recording: return "Recording"
-        case .configuration: return "Configuration"
+        // Shorter tile label so Departure Mono breathes inside the square.
+        case .configuration: return "General"
         case .sound: return "Sound"
-        case .model: return "Model"
+        case .model: return "Models"
+        case .performance: return "Perf"
+        }
+    }
+
+    /// Full page heading (may differ from the compact sidebar tile).
+    var pageTitle: String {
+        switch self {
+        case .configuration: return "General"
         case .performance: return "Performance"
+        default: return title
         }
     }
 
@@ -34,24 +44,89 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         case .performance: return "memorychip"
         }
     }
+
+    static var sidebarSections: [(title: String, pages: [SettingsPage])] {
+        [
+            ("Session", [.home, .history, .recording]),
+            ("Speech", [.model]),
+            ("App", [.configuration, .sound, .performance]),
+        ]
+    }
+}
+
+/// Layout metrics — Ink tokens, kept under the SettingsMetrics name for call sites.
+enum SettingsMetrics {
+    static let pagePadding: CGFloat = Ink.pageSide
+    static let pageTop: CGFloat = Ink.pageTop
+    static let pageSpacing: CGFloat = Ink.sectionGap
+    static let sectionSpacing: CGFloat = Ink.sectionInnerGap
+    static let rowPadding: CGFloat = Ink.rowHPad
+    static let maxContentWidth: CGFloat = Ink.maxContentWidth
+    static let cardCorner: CGFloat = Ink.cardRadius
+    static let sidebarFooterPadding: CGFloat = Ink.space4
+    static let sidebarWidth: CGFloat = Ink.sidebarWidth
 }
 
 struct SettingsPageStack<Content: View>: View {
     var title: String
+    var subtitle: String? = nil
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text(title)
-                    .font(.system(size: 22, weight: .semibold))
+        DTScrollView {
+            VStack(alignment: .leading, spacing: Ink.sectionGap) {
+                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                    Text(title)
+                        .font(Ink.pageTitleFont)
+                        .foregroundStyle(Ink.label)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(Ink.bodyFont)
+                            .foregroundStyle(Ink.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
                 content()
             }
-            .padding(28)
-            .frame(maxWidth: 680, alignment: .leading)
+            .padding(.top, Ink.pageTop)
+            .padding(.horizontal, Ink.pageSide)
+            .padding(.bottom, Ink.pageBottom)
+            .frame(maxWidth: Ink.maxContentWidth, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .inkPageChrome()
+    }
+}
+
+struct SettingsSection<Content: View>: View {
+    var title: String? = nil
+    var footer: String? = nil
+    @ViewBuilder var content: () -> Content
+
+    init(
+        title: String? = nil,
+        footer: String? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.title = title
+        self.footer = footer
+        self.content = content
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Ink.sectionInnerGap) {
+            if let title {
+                InkSectionHeader(title: title)
+            }
+            content()
+            if let footer {
+                Text(footer)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 }
 
@@ -59,27 +134,13 @@ struct SettingsCard<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color(nsColor: .controlBackgroundColor),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.7), lineWidth: 1)
-        )
+        InkCard { content() }
     }
 }
 
 struct SettingsDivider: View {
     var body: some View {
-        Rectangle()
-            .fill(Color(nsColor: .separatorColor).opacity(0.7))
-            .frame(height: 1)
-            .padding(.leading, 46)
+        InkDivider(leading: 46)
     }
 }
 
@@ -88,12 +149,50 @@ struct ShortcutBadge: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12, weight: .medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                Color(nsColor: .quaternaryLabelColor).opacity(0.18),
-                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .font(Ink.badgeFont)
+            .foregroundStyle(Ink.label)
+            .padding(.horizontal, Ink.space2)
+            .padding(.vertical, Ink.space1)
+            .overlay(
+                RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
+                    .strokeBorder(Ink.label, lineWidth: 1)
             )
+    }
+}
+
+/// B/W segmented control for System / Light / Dark.
+struct InkAppearanceSegment: View {
+    @Binding var selection: AppAppearance
+    var onChange: (AppAppearance) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(AppAppearance.allCases) { mode in
+                let selected = selection == mode
+                Button {
+                    selection = mode
+                    onChange(mode)
+                } label: {
+                    Text(mode.title.uppercased())
+                        .font(Ink.buttonSmallFont)
+                        .foregroundStyle(selected ? Ink.onAccent : Ink.label)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Ink.space2)
+                        .background(selected ? Ink.label : Color.clear)
+                }
+                .buttonStyle(.plain)
+                if mode != AppAppearance.allCases.last {
+                    Rectangle()
+                        .fill(Ink.label)
+                        .frame(width: 1)
+                }
+            }
+        }
+        .overlay(
+            Rectangle()
+                .strokeBorder(Ink.label, lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Appearance")
     }
 }

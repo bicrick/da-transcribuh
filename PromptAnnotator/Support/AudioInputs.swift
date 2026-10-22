@@ -9,6 +9,13 @@ struct AudioInputDevice: Identifiable, Equatable {
 /// Lists input devices and, for one session, can switch the system input and raise its level.
 enum AudioInputs {
     private static var previousDefault: AudioDeviceID?
+    private static var previousVolume: RestoredVolume?
+
+    private struct RestoredVolume {
+        var device: AudioDeviceID
+        var address: AudioObjectPropertyAddress
+        var volume: Float32
+    }
 
     static func devices() -> [AudioInputDevice] {
         deviceIDs().compactMap { id in
@@ -28,11 +35,18 @@ enum AudioInputs {
             }
         }
         if raiseVolume, let active = defaultInputID() {
-            raiseInputVolume(active, target: 0.85)
+            // Only store when we actually raised — a nil result must not clear a prior restore.
+            if let raised = raiseInputVolume(active, target: 0.85) {
+                previousVolume = raised
+            }
         }
     }
 
     static func endSession() {
+        if let previousVolume {
+            setVolume(previousVolume.device, address: previousVolume.address, volume: previousVolume.volume)
+            self.previousVolume = nil
+        }
         if let previousDefault {
             setDefaultInput(previousDefault)
             self.previousDefault = nil
@@ -97,7 +111,9 @@ enum AudioInputs {
         AudioObjectSetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, size, &value)
     }
 
-    private static func raiseInputVolume(_ device: AudioDeviceID, target: Float32) {
+    /// Raises the input level when it is below `target`. Returns the prior value so the session can restore it.
+    @discardableResult
+    private static func raiseInputVolume(_ device: AudioDeviceID, target: Float32) -> RestoredVolume? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyVolumeScalar,
             mScope: kAudioDevicePropertyScopeInput,
@@ -105,14 +121,22 @@ enum AudioInputs {
         )
         if !AudioObjectHasProperty(device, &address) {
             address.mElement = 1
-            guard AudioObjectHasProperty(device, &address) else { return }
+            guard AudioObjectHasProperty(device, &address) else { return nil }
         }
         var current: Float32 = 0
         var size = UInt32(MemoryLayout<Float32>.size)
-        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &current) == noErr else { return }
-        guard current < target else { return }
-        var volume = target
-        AudioObjectSetPropertyData(device, &address, 0, nil, size, &volume)
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &current) == noErr else { return nil }
+        guard current < target else { return nil }
+        let prior = RestoredVolume(device: device, address: address, volume: current)
+        setVolume(device, address: address, volume: target)
+        return prior
+    }
+
+    private static func setVolume(_ device: AudioDeviceID, address: AudioObjectPropertyAddress, volume: Float32) {
+        var address = address
+        var value = volume
+        let size = UInt32(MemoryLayout<Float32>.size)
+        AudioObjectSetPropertyData(device, &address, 0, nil, size, &value)
     }
 
     private static func stringProperty(_ selector: AudioObjectPropertySelector, device: AudioDeviceID) -> String? {

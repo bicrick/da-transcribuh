@@ -54,9 +54,10 @@ enum Aligner {
     }
 
     static func spokenText(_ words: [TimedWord]) -> String {
-        words
+        let joined = NonSpeechFilter.filterWords(words)
             .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
+        return NonSpeechFilter.scrub(joined)
     }
 }

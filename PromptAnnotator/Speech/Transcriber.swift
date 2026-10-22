@@ -17,7 +17,9 @@ struct Transcript: Sendable, Equatable {
 protocol Transcribing: Sendable {
     func resetLive()
     func prepare() async
-    func consume(samples: [Float]) async
+    /// Live decode of PCM whose index 0 is `bufferStart` seconds into the session.
+    /// `absoluteEndCount` is the session-absolute sample index after `samples` (avoids float drift).
+    func consume(samples: [Float], bufferStart: TimeInterval, absoluteEndCount: Int) async
     func transcribe(
         audioURL: URL,
         samples: [Float],
@@ -43,6 +45,8 @@ actor WhisperKitTranscriber: Transcribing {
     private var loading: Task<WhisperKit, Error>?
     private var decodeInFlight = false
     private var didLogConsumeError = false
+    /// Security-scoped folder access kept alive while the custom model is loaded.
+    private var scopedFolderURL: URL?
 
     nonisolated static var isModelReady: Bool { readyFlag.isReady }
 
@@ -50,40 +54,84 @@ actor WhisperKitTranscriber: Transcribing {
         live.reset()
     }
 
+    /// Drops the resident pipe so the next prepare/transcribe picks up a new selection.
+    func unload() {
+        pipe = nil
+        loadedFolder = nil
+        loading = nil
+        stopScopedAccess()
+        Self.readyFlag.set(false)
+    }
+
     func prepare() async {
-        guard let installed = Self.installedModel() else { return }
-        if pipe != nil, loadedFolder == installed.url.path {
-            Self.readyFlag.set(true)
-            return
-        }
+        let source = WhisperSourceResolver.resolve()
         do {
             let directory = try Self.modelsDirectory()
-            _ = try await load(folder: installed.url, directory: directory, variant: installed.variant)
+            if case .folder(let url, let label, _) = source {
+                beginScopedAccess(url)
+                guard WhisperModelLocator.isComplete(url) else { return }
+                if pipe != nil, loadedFolder == url.path {
+                    Self.readyFlag.set(true)
+                    return
+                }
+                _ = try await load(folder: url, directory: directory, variant: label, repo: source.modelRepo)
+                return
+            }
+            guard let installed = Self.installedModel(for: source) else { return }
+            if pipe != nil, loadedFolder == installed.url.path {
+                Self.readyFlag.set(true)
+                return
+            }
+            _ = try await load(
+                folder: installed.url,
+                directory: directory,
+                variant: installed.variant,
+                repo: source.modelRepo
+            )
         } catch {
             log.error("Model prepare failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    func consume(samples: [Float]) async {
+    func consume(samples: [Float], bufferStart: TimeInterval, absoluteEndCount: Int) async {
         let shot = live.snapshot()
-        guard samples.count >= WhisperKit.sampleRate, samples.count - shot.lastCount >= WhisperKit.sampleRate else { return }
+        let absoluteCount = max(absoluteEndCount, samples.count)
+        guard samples.count >= WhisperKit.sampleRate, absoluteCount - shot.lastCount >= WhisperKit.sampleRate else { return }
         guard !decodeInFlight, let pipe else { return }
         decodeInFlight = true
         defer { decodeInFlight = false }
 
         do {
-            let words = try await decode(samples: samples, pipe: pipe, clipStart: shot.confirmedEnd)
-            let duration = Double(samples.count) / Double(WhisperKit.sampleRate)
-            let stable = words.filter { $0.end <= duration - LiveWordBuffer.holdback }
+            let decoded = try await decode(
+                samples: samples,
+                bufferStart: bufferStart,
+                pipe: pipe,
+                clipStart: shot.confirmedEnd,
+                workers: 2,
+                capWindow: true
+            )
+            // Holdback is relative to the decode window end — not the full buffer tail.
+            // After the live ~45 s head-cap, using buffer duration would mark the whole
+            // window stable (including the trailing second meant for revision).
+            let stable = decoded.words.filter {
+                $0.end <= decoded.windowEnd - LiveWordBuffer.holdback
+            }
             let merged = LiveWordBuffer.appending(shot.confirmed, stable, confirmedEnd: shot.confirmedEnd)
             _ = live.save(
                 generation: shot.generation,
                 confirmed: merged.words,
                 confirmedEnd: merged.end,
-                lastCount: samples.count
+                lastCount: absoluteCount
             )
             didLogConsumeError = false
         } catch {
+            // Advance lastCount so a stuck decode doesn't retry the same window every second.
+            _ = live.save(
+                generation: shot.generation,
+                confirmed: shot.confirmed,
+                confirmedEnd: shot.confirmedEnd,
+                lastCount: absoluteCount
+            )
             if !didLogConsumeError {
                 didLogConsumeError = true
                 log.error("Live transcription failed: \(error.localizedDescription, privacy: .public)")
@@ -97,6 +145,7 @@ actor WhisperKitTranscriber: Transcribing {
         onProgress: @escaping @Sendable (SpeechProgress) -> Void
     ) async throws -> Transcript {
         while decodeInFlight {
+            try Task.checkCancellation()
             try await Task.sleep(nanoseconds: 20_000_000)
         }
 
@@ -114,42 +163,76 @@ actor WhisperKitTranscriber: Transcribing {
         defer { decodeInFlight = false }
         let resolved = try await resolveModel(onProgress: onProgress)
         onProgress(.transcribing)
-        let active = try await load(folder: resolved.url, directory: resolved.directory, variant: resolved.variant)
+        let active = try await load(
+            folder: resolved.url,
+            directory: resolved.directory,
+            variant: resolved.variant,
+            repo: WhisperSourceResolver.resolve().modelRepo
+        )
 
         if useSamples {
             let shot = live.snapshot()
             let tail: [TimedWord]
             do {
-                tail = try await decode(samples: samples, pipe: active, clipStart: shot.confirmedEnd)
+                // Final path must not apply the live ~45 s cap — only clip from confirmedEnd.
+                tail = try await decode(
+                    samples: samples,
+                    bufferStart: 0,
+                    pipe: active,
+                    clipStart: shot.confirmedEnd,
+                    workers: 4,
+                    capWindow: false
+                ).words
             } catch {
-                live.reset()
-                if shot.confirmed.isEmpty { throw error }
                 log.error("Tail transcription failed: \(error.localizedDescription, privacy: .public)")
-                return Transcript(words: shot.confirmed, model: resolved.variant)
+                // Fall back to full-file decode so the live holdback second isn't dropped.
+                do {
+                    return try await decodeFileMergingLive(
+                        audioURL: audioURL,
+                        pipe: active,
+                        variant: resolved.variant
+                    )
+                } catch {
+                    live.reset()
+                    if shot.confirmed.isEmpty { throw error }
+                    return Transcript(words: shot.confirmed, model: resolved.variant)
+                }
             }
             let merged = LiveWordBuffer.appending(shot.confirmed, tail, confirmedEnd: shot.confirmedEnd)
             live.reset()
             return Transcript(words: merged.words, model: resolved.variant)
         }
 
-        let options = DecodingOptions(
-            language: "en",
-            temperatureFallbackCount: 1,
-            usePrefillPrompt: true,
-            detectLanguage: false,
-            skipSpecialTokens: true,
-            wordTimestamps: true,
-            windowClipTime: 0,
-            concurrentWorkerCount: 4,
-            chunkingStrategy: .vad
+        // Empty / capped PCM: decode the AAC file and merge any live-confirmed words.
+        return try await decodeFileMergingLive(
+            audioURL: audioURL,
+            pipe: active,
+            variant: resolved.variant
         )
-        let results = try await active.transcribe(audioPath: audioURL.path, decodeOptions: options)
+    }
+
+    private func decodeFileMergingLive(
+        audioURL: URL,
+        pipe: WhisperKit,
+        variant: String
+    ) async throws -> Transcript {
+        let shot = live.snapshot()
+        var options = Self.decodingOptions(chunking: .vad, windowClipTime: 1.0, workers: 4)
+        if shot.confirmedEnd > 0.05 {
+            options.clipTimestamps = [Float(shot.confirmedEnd)]
+        }
+        let results = try await pipe.transcribe(
+            audioPath: audioURL.path,
+            decodeOptions: options
+        )
+        let tail = Self.words(from: results)
+        let merged = LiveWordBuffer.appending(shot.confirmed, tail, confirmedEnd: shot.confirmedEnd)
         live.reset()
-        return Transcript(words: Self.words(from: results), model: resolved.variant)
+        return Transcript(words: merged.words, model: variant)
     }
 
     nonisolated static func selectedVariant() -> String {
-        SpeechModelChoice.stored(UserDefaults.standard.string(forKey: SpeechModelChoice.defaultsKey)).variant
+        WhisperSourceResolver.resolve().variantLabel
     }
 
     nonisolated static func modelsFolder() -> URL {
@@ -158,11 +241,30 @@ actor WhisperKitTranscriber: Transcribing {
     }
 
     nonisolated static func modelIsInstalled() -> Bool {
-        installedModel() != nil
+        let source = WhisperSourceResolver.resolve()
+        switch source {
+        case .folder(let url, _, _):
+            return WhisperModelLocator.isComplete(url)
+        case .builtIn, .huggingFace:
+            return installedModel(for: source) != nil
+        }
     }
 
-    nonisolated private static func installedModel() -> WhisperModelFolder? {
-        WhisperModelLocator.locate(in: modelsFolder(), variant: selectedVariant())
+    nonisolated static func liveCaptionsEnabled() -> Bool {
+        SpeechEngineKind.stored(UserDefaults.standard.string(forKey: SpeechEngineKind.defaultsKey))
+            == .whisperKit
+    }
+
+    nonisolated private static func installedModel(for source: WhisperSource) -> WhisperModelFolder? {
+        switch source {
+        case .folder(let url, let label, _):
+            guard WhisperModelLocator.isComplete(url) else { return nil }
+            return WhisperModelFolder(url: url, variant: label)
+        case .builtIn(let variant, _):
+            return WhisperModelLocator.locate(in: modelsFolder(), variant: variant)
+        case .huggingFace(_, let variant):
+            return WhisperModelLocator.locate(in: modelsFolder(), variant: variant)
+        }
     }
 
     private static func modelsDirectory() throws -> URL {
@@ -181,25 +283,56 @@ actor WhisperKitTranscriber: Transcribing {
         onProgress: @escaping @Sendable (SpeechProgress) -> Void
     ) async throws -> ResolvedModel {
         let directory = try Self.modelsDirectory()
-        let variant = Self.selectedVariant()
+        let source = WhisperSourceResolver.resolve()
+
+        if case .folder(let url, let label, _) = source {
+            beginScopedAccess(url)
+            guard WhisperModelLocator.isComplete(url) else {
+                throw ExportError("The custom Core ML folder is incomplete. Pick another model in Settings.")
+            }
+            if pipe == nil || loadedFolder != url.path {
+                onProgress(.preparing)
+                _ = try await load(folder: url, directory: directory, variant: label, repo: source.modelRepo)
+            }
+            return ResolvedModel(url: url, variant: label, directory: directory)
+        }
+
+        let variant = source.variantLabel
+        let repo = source.modelRepo
         if let installed = WhisperModelLocator.locate(in: directory, variant: variant) {
             if pipe == nil || loadedFolder != installed.url.path {
                 onProgress(.preparing)
-                _ = try await load(folder: installed.url, directory: directory, variant: installed.variant)
+                _ = try await load(
+                    folder: installed.url,
+                    directory: directory,
+                    variant: installed.variant,
+                    repo: repo
+                )
             }
             return ResolvedModel(url: installed.url, variant: installed.variant, directory: directory)
         }
 
         onProgress(.downloading(0))
-        let downloaded = try await Self.fetchResult(variant: variant, into: directory, onProgress: onProgress)
+        let downloaded = try await Self.fetchResult(
+            variant: variant,
+            repo: repo,
+            into: directory,
+            onProgress: onProgress
+        )
         onProgress(.preparing)
-        _ = try await load(folder: downloaded.url, directory: directory, variant: downloaded.variant)
+        _ = try await load(
+            folder: downloaded.url,
+            directory: directory,
+            variant: downloaded.variant,
+            repo: repo
+        )
         return ResolvedModel(url: downloaded.url, variant: downloaded.variant, directory: directory)
     }
 
     /// Downloads the chosen model when it is not already complete. Tests do not call this.
     static func fetch(
         variant: String,
+        repo: String = modelRepo,
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         let directory = try modelsDirectory()
@@ -211,39 +344,51 @@ actor WhisperKitTranscriber: Transcribing {
                 onProgress(fraction)
             }
         }
-        return try await fetchResult(variant: variant, into: directory, onProgress: report).url
+        return try await fetchResult(variant: variant, repo: repo, into: directory, onProgress: report).url
     }
 
     private static func fetchResult(
         variant: String,
+        repo: String,
         into directory: URL,
         onProgress: @escaping @Sendable (SpeechProgress) -> Void
     ) async throws -> (url: URL, variant: String) {
-        if variant == preferredVariant {
-            return try await download(into: directory, onProgress: onProgress)
+        if variant == preferredVariant, repo == modelRepo {
+            return try await downloadPreferred(into: directory, onProgress: onProgress)
         }
-        let url = try await download(variant: variant, into: directory, onProgress: onProgress)
+        let url = try await download(variant: variant, repo: repo, into: directory, onProgress: onProgress)
         return (url, variant)
     }
 
-    private static func download(
+    private static func downloadPreferred(
         into directory: URL,
         onProgress: @escaping @Sendable (SpeechProgress) -> Void
     ) async throws -> (url: URL, variant: String) {
         do {
-            let url = try await download(variant: preferredVariant, into: directory, onProgress: onProgress)
+            let url = try await download(
+                variant: preferredVariant,
+                repo: modelRepo,
+                into: directory,
+                onProgress: onProgress
+            )
             return (url, preferredVariant)
         } catch {
             let description = String(describing: error)
             let unresolved = description.contains("No models found") || description.contains("Multiple models found")
             guard unresolved else { throw error }
-            let url = try await download(variant: fallbackVariant, into: directory, onProgress: onProgress)
+            let url = try await download(
+                variant: fallbackVariant,
+                repo: modelRepo,
+                into: directory,
+                onProgress: onProgress
+            )
             return (url, fallbackVariant)
         }
     }
 
     private static func download(
         variant: String,
+        repo: String,
         into directory: URL,
         onProgress: @escaping @Sendable (SpeechProgress) -> Void
     ) async throws -> URL {
@@ -251,14 +396,19 @@ actor WhisperKitTranscriber: Transcribing {
             variant: variant,
             downloadBase: directory,
             useBackgroundSession: false,
-            from: modelRepo,
+            from: repo,
             progressCallback: { progress in
                 onProgress(.downloading(progress.fractionCompleted))
             }
         )
     }
 
-    private func load(folder: URL, directory: URL, variant: String) async throws -> WhisperKit {
+    private func load(
+        folder: URL,
+        directory: URL,
+        variant: String,
+        repo: String
+    ) async throws -> WhisperKit {
         if let pipe, loadedFolder == folder.path {
             Self.readyFlag.set(true)
             return pipe
@@ -271,7 +421,12 @@ actor WhisperKitTranscriber: Transcribing {
         }
         let task = Task { () throws -> WhisperKit in
             do {
-                let pipe = try await self.makePipe(folder: folder, directory: directory, variant: variant)
+                let pipe = try await self.makePipe(
+                    folder: folder,
+                    directory: directory,
+                    variant: variant,
+                    repo: repo
+                )
                 await self.store(pipe, folder: folder)
                 return pipe
             } catch {
@@ -291,11 +446,31 @@ actor WhisperKitTranscriber: Transcribing {
         log.notice("Whisper model is resident")
     }
 
-    private func makePipe(folder: URL, directory: URL, variant: String) async throws -> WhisperKit {
+    private func beginScopedAccess(_ url: URL) {
+        if scopedFolderURL?.path == url.path { return }
+        stopScopedAccess()
+        if url.startAccessingSecurityScopedResource() {
+            scopedFolderURL = url
+        }
+    }
+
+    private func stopScopedAccess() {
+        if let scopedFolderURL {
+            scopedFolderURL.stopAccessingSecurityScopedResource()
+        }
+        scopedFolderURL = nil
+    }
+
+    private func makePipe(
+        folder: URL,
+        directory: URL,
+        variant: String,
+        repo: String
+    ) async throws -> WhisperKit {
         let config = WhisperKitConfig(
             model: variant,
             downloadBase: directory,
-            modelRepo: Self.modelRepo,
+            modelRepo: repo,
             modelFolder: folder.path,
             tokenizerFolder: directory,
             computeOptions: ModelComputeOptions(
@@ -305,41 +480,85 @@ actor WhisperKitTranscriber: Transcribing {
             ),
             verbose: false,
             logLevel: .error,
-            prewarm: false,
+            // Prefill Core ML special tokens so the first real decode is not cold.
+            prewarm: true,
             load: true,
             download: false
         )
         return try await WhisperKit(config)
     }
 
-    private func decode(samples: [Float], pipe: WhisperKit, clipStart: TimeInterval) async throws -> [TimedWord] {
-        var options = DecodingOptions(
+    private func decode(
+        samples: [Float],
+        bufferStart: TimeInterval,
+        pipe: WhisperKit,
+        clipStart: TimeInterval,
+        workers: Int,
+        capWindow: Bool
+    ) async throws -> (words: [TimedWord], windowEnd: TimeInterval) {
+        let window = LiveSampleWindow.slice(
+            samples: samples,
+            bufferStart: bufferStart,
+            clipStart: clipStart,
+            sampleRate: WhisperKit.sampleRate,
+            maxSeconds: capWindow ? LiveSampleWindow.maxSeconds : nil
+        )
+        let windowEnd = window.timeOffset
+            + Double(window.samples.count) / Double(WhisperKit.sampleRate)
+        guard !window.samples.isEmpty else { return ([], windowEnd) }
+
+        // Live tails stay unclipped (`windowClipTime: 0`) so a sub-second remainder still decodes.
+        var options = Self.decodingOptions(chunking: nil, windowClipTime: 0, workers: workers)
+        let relativeClip = clipStart - window.timeOffset
+        if relativeClip > 0.05 {
+            options.clipTimestamps = [Float(relativeClip)]
+        } else if window.samples.count > WhisperKit.sampleRate * 30 {
+            options.chunkingStrategy = .vad
+        }
+        let results = try await pipe.transcribe(audioArray: window.samples, decodeOptions: options)
+        let words = Self.words(from: results)
+        guard window.timeOffset > 0.000_5 else { return (words, windowEnd) }
+        let shifted = words.map {
+            TimedWord(text: $0.text, start: $0.start + window.timeOffset, end: $0.end + window.timeOffset)
+        }
+        return (shifted, windowEnd)
+    }
+
+    /// Shared decode settings. `suppressBlank` cuts silent-window hallucinations;
+    /// `NonSpeechFilter` still scrubs any that slip through. Final/VAD uses WhisperKit's
+    /// default `windowClipTime` (1.0); live decode passes 0 so short tails aren't padded away.
+    /// Live paths use fewer workers to keep recording responsive on battery.
+    private static func decodingOptions(
+        chunking: ChunkingStrategy?,
+        windowClipTime: Float,
+        workers: Int
+    ) -> DecodingOptions {
+        DecodingOptions(
             language: "en",
             temperatureFallbackCount: 1,
             usePrefillPrompt: true,
             detectLanguage: false,
             skipSpecialTokens: true,
             wordTimestamps: true,
-            windowClipTime: 0,
-            concurrentWorkerCount: 4
+            windowClipTime: windowClipTime,
+            suppressBlank: true,
+            compressionRatioThreshold: 2.4,
+            logProbThreshold: -1.0,
+            noSpeechThreshold: 0.6,
+            concurrentWorkerCount: max(1, workers),
+            chunkingStrategy: chunking
         )
-        if clipStart > 0.05 {
-            options.clipTimestamps = [Float(clipStart)]
-        } else if samples.count > WhisperKit.sampleRate * 30 {
-            options.chunkingStrategy = .vad
-        }
-        let results = try await pipe.transcribe(audioArray: samples, decodeOptions: options)
-        return Self.words(from: results)
     }
 
     private static func words(from results: [TranscriptionResult]) -> [TimedWord] {
-        results
+        let timed = results
             .flatMap(\.allWords)
             .map { TimedWord(text: $0.word, start: TimeInterval($0.start), end: TimeInterval($0.end)) }
             .sorted { lhs, rhs in
                 if lhs.start == rhs.start { return lhs.end < rhs.end }
                 return lhs.start < rhs.start
             }
+        return NonSpeechFilter.filterWords(timed)
     }
 }
 

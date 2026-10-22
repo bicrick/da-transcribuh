@@ -39,15 +39,17 @@ final class AnnotationCanvasView: NSView {
         shade.addRect(bounds)
         shade.addRect(box)
         context.addPath(shade)
-        context.setFillColor(NSColor.black.withAlphaComponent(0.28).cgColor)
+        // Light dim so the 1px marching border stays the focus (B&W chrome).
+        context.setFillColor(NSColor.black.withAlphaComponent(0.22).cgColor)
         context.fillPath(using: .evenOdd)
     }
 
     private func drawSelectionBorder(_ rect: CGRect, in context: CGContext) {
         let box = rect.standardized
         guard box.width >= 1, box.height >= 1 else { return }
+        // Crisp dual stroke: black outer, white inner — readable on any desktop.
         context.setLineWidth(1)
-        context.setStrokeColor(NSColor.black.withAlphaComponent(0.85).cgColor)
+        context.setStrokeColor(NSColor.black.cgColor)
         context.stroke(box)
         context.setStrokeColor(NSColor.white.cgColor)
         context.stroke(box.insetBy(dx: 1, dy: 1))
@@ -86,8 +88,14 @@ final class OverlayPanel: NSPanel {
 final class OverlayController {
     private var panels: [CGDirectDisplayID: OverlayPanel] = [:]
     private var canvases: [CGDirectDisplayID: AnnotationCanvasView] = [:]
+    private var screenObserver: NSObjectProtocol?
+    private var isShowing = false
+    /// Called after panels are rebuilt for a display change so the session can re-push marks.
+    var onScreensChanged: (() -> Void)?
 
     func show() {
+        isShowing = true
+        watchScreens()
         rebuild(keepingContent: true)
         for panel in panels.values {
             panel.orderFrontRegardless()
@@ -95,8 +103,27 @@ final class OverlayController {
     }
 
     func hide() {
+        isShowing = false
         for panel in panels.values {
             panel.orderOut(nil)
+        }
+    }
+
+    private func watchScreens() {
+        guard screenObserver == nil else { return }
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isShowing else { return }
+                self.rebuild(keepingContent: true)
+                for panel in self.panels.values {
+                    panel.orderFrontRegardless()
+                }
+                self.onScreensChanged?()
+            }
         }
     }
 

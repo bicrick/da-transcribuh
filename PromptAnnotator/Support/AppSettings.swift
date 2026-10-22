@@ -88,6 +88,7 @@ final class AppSettings: ObservableObject {
     @Published var keepWindowOnTop: Bool
     @Published var errorLogging: Bool
     @Published var showInDock: Bool
+    @Published var appearance: AppAppearance
     @Published var silenceStopSeconds: Double
     @Published var maxSessionMinutes: Double
     @Published var normalizeSpeech: Bool
@@ -95,10 +96,17 @@ final class AppSettings: ObservableObject {
     @Published var returnOnShift: Bool
     @Published var capitalizeTranscript: Bool
     @Published var speechModel: String
+    @Published var speechEngine: SpeechEngineKind
+    @Published var customModelID: String?
+    @Published var customModels: [CustomWhisperModel]
+    @Published var openAIBaseURL: String
+    @Published var openAIModel: String
     @Published var loginItemNote: String?
 
     var onChromeChange: (() -> Void)?
     var onAppChange: (() -> Void)?
+    /// Fired after the speech engine or model selection changes so the session can reload.
+    var onSpeechSelectionChange: (() -> Void)?
 
     private let defaults: UserDefaults
     private var isLoading = false
@@ -132,6 +140,7 @@ final class AppSettings: ObservableObject {
         keepWindowOnTop = defaults.bool(forKey: Keys.onTop)
         errorLogging = defaults.bool(forKey: Keys.errorLog)
         showInDock = defaults.object(forKey: Keys.dock) as? Bool ?? true
+        appearance = AppAppearance.stored(defaults.string(forKey: Keys.appearance))
         silenceStopSeconds = defaults.object(forKey: Keys.silence) as? Double ?? 0
         maxSessionMinutes = defaults.object(forKey: Keys.maxMinutes) as? Double ?? 0
         normalizeSpeech = defaults.bool(forKey: Keys.normalize)
@@ -139,8 +148,32 @@ final class AppSettings: ObservableObject {
         returnOnShift = defaults.bool(forKey: Keys.returnOnShift)
         capitalizeTranscript = defaults.bool(forKey: Keys.capitalize)
         speechModel = SpeechModelChoice.stored(defaults.string(forKey: Keys.speechModel)).variant
+        speechEngine = SpeechEngineKind.stored(defaults.string(forKey: Keys.speechEngine))
+        customModels = CustomWhisperCatalog.load(defaults: defaults)
+        let customID = CustomWhisperCatalog.selectedCustomID(defaults: defaults)
+        customModelID = customID.flatMap { id in
+            customModels.contains(where: { $0.id == id }) ? id : nil
+        }
+        openAIBaseURL = OpenAICompatibleTranscriber.storedBaseURL(defaults: defaults)
+        openAIModel = OpenAICompatibleTranscriber.storedModel(defaults: defaults)
         loginItemNote = nil
         isLoading = false
+        appearance.applyToApp()
+    }
+
+    func setAppearance(_ mode: AppAppearance) {
+        guard appearance != mode else {
+            mode.applyToApp()
+            return
+        }
+        appearance = mode
+        persist(Keys.appearance, mode.rawValue)
+        mode.applyToApp()
+        onAppChange?()
+    }
+
+    func cycleAppearance() {
+        setAppearance(appearance.next)
     }
 
     private static func chord(key: String, mods: String, defaults: UserDefaults) -> HotkeyChord? {
@@ -256,7 +289,81 @@ final class AppSettings: ObservableObject {
 
     func setSpeechModel(_ variant: String) {
         speechModel = SpeechModelChoice.stored(variant).variant
+        customModelID = nil
+        CustomWhisperCatalog.setSelectedCustomID(nil, defaults: defaults)
         persist(Keys.speechModel, speechModel)
+        notifySpeechSelectionChange()
+    }
+
+    func setSpeechEngine(_ engine: SpeechEngineKind) {
+        guard speechEngine != engine else { return }
+        speechEngine = engine
+        persist(Keys.speechEngine, engine.rawValue)
+        notifySpeechSelectionChange()
+    }
+
+    func selectCustomModel(_ id: String) {
+        guard customModels.contains(where: { $0.id == id }) else { return }
+        customModelID = id
+        CustomWhisperCatalog.setSelectedCustomID(id, defaults: defaults)
+        notifySpeechSelectionChange()
+    }
+
+    func addCustomModel(_ model: CustomWhisperModel) {
+        CustomWhisperCatalog.upsert(model, defaults: defaults)
+        customModels = CustomWhisperCatalog.load(defaults: defaults)
+    }
+
+    func removeCustomModel(id: String) {
+        CustomWhisperCatalog.remove(id: id, defaults: defaults)
+        customModels = CustomWhisperCatalog.load(defaults: defaults)
+        if customModelID == id {
+            customModelID = nil
+            notifySpeechSelectionChange()
+        }
+    }
+
+    func setOpenAIBaseURL(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        openAIBaseURL = trimmed.isEmpty ? "https://api.openai.com" : trimmed
+        persist(Keys.openAIBaseURL, openAIBaseURL)
+    }
+
+    func setOpenAIModel(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        openAIModel = trimmed.isEmpty ? "whisper-1" : trimmed
+        persist(Keys.openAIModel, openAIModel)
+    }
+
+    func setOpenAIAPIKey(_ value: String) {
+        KeychainStore.set(value, account: KeychainStore.openAIAPIKeyAccount)
+        notifySpeechSelectionChange()
+    }
+
+    func openAIAPIKey() -> String {
+        KeychainStore.get(account: KeychainStore.openAIAPIKeyAccount) ?? ""
+    }
+
+    var usesCustomWhisperModel: Bool {
+        customModelID != nil
+    }
+
+    var liveCaptionsEnabled: Bool {
+        speechEngine == .whisperKit
+    }
+
+    /// Clears a broken custom selection and restores the built-in balanced model (no reload notify).
+    func fallBackToDefaultWhisperModel() {
+        customModelID = nil
+        CustomWhisperCatalog.setSelectedCustomID(nil, defaults: defaults)
+        speechModel = SpeechModelChoice.recommended.variant
+        persist(Keys.speechModel, speechModel)
+        customModels = CustomWhisperCatalog.load(defaults: defaults)
+    }
+
+    private func notifySpeechSelectionChange() {
+        guard !isLoading else { return }
+        onSpeechSelectionChange?()
     }
 
     func setIslandStyle(_ style: IslandStyle) {
@@ -320,6 +427,7 @@ final class AppSettings: ObservableObject {
         static let onTop = "app.windowOnTop"
         static let errorLog = "app.errorLog"
         static let dock = "app.showInDock"
+        static let appearance = "app.appearance"
         static let silence = "session.silenceStop"
         static let maxMinutes = "session.maxMinutes"
         static let normalize = "session.normalize"
@@ -327,5 +435,8 @@ final class AppSettings: ObservableObject {
         static let returnOnShift = "session.returnOnShift"
         static let capitalize = "session.capitalize"
         static let speechModel = SpeechModelChoice.defaultsKey
+        static let speechEngine = SpeechEngineKind.defaultsKey
+        static let openAIBaseURL = OpenAICompatibleTranscriber.baseURLKey
+        static let openAIModel = OpenAICompatibleTranscriber.modelKey
     }
 }

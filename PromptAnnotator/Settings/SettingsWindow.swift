@@ -10,69 +10,190 @@ struct SettingsRoot: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var session: SessionController
     @StateObject private var permissions = PermissionModel()
-    @State private var page: SettingsPage? = .home
+    @State private var page: SettingsPage = .home
     @State private var sessions: [SessionSummary] = []
 
     var body: some View {
-        NavigationSplitView {
-            VStack(spacing: 0) {
-                List(selection: $page) {
-                    ForEach(SettingsPage.allCases) { item in
-                        Label(item.title, systemImage: item.symbol)
-                            .tag(item)
-                    }
+        VStack(spacing: 0) {
+            DTTitleStrip()
+
+            NavigationSplitView {
+                VStack(spacing: 0) {
+                    SettingsSidebar(selection: $page)
+                    sidebarFooter
                 }
-                .listStyle(.sidebar)
-                footer
+                .background(Ink.sidebar)
+                .navigationSplitViewColumnWidth(
+                    min: Ink.sidebarWidth - 8,
+                    ideal: Ink.sidebarWidth,
+                    max: Ink.sidebarWidth + 16
+                )
+            } detail: {
+                VStack(spacing: 0) {
+                    detail
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .toolbar(.hidden, for: .automatic)
+                    DTStatusBar(
+                        cells: statusCells,
+                        trailing: AppVersion.label,
+                        recording: session.phase == .recording
+                    )
+                }
+                .background(Ink.window)
             }
-            .navigationSplitViewColumnWidth(min: 188, ideal: 200, max: 220)
-        } detail: {
-            switch page ?? .home {
-            case .home:
-                HomePage(session: session, settings: settings, permissions: permissions, sessions: sessions)
-            case .history:
-                HistoryPage(sessions: sessions, reload: reload)
-            case .recording:
-                RecordingPage(settings: settings, session: session)
-            case .configuration:
-                ConfigurationPage(settings: settings)
-            case .sound:
-                SoundPage(settings: settings)
-            case .model:
-                ModelPage()
-            case .performance:
-                PerformancePage()
-            }
+            .navigationSplitViewStyle(.balanced)
         }
-        .navigationSplitViewStyle(.balanced)
-        .onAppear(perform: reload)
+        .tint(Ink.label)
+        .background(Ink.window)
+        .preferredColorScheme(settings.appearance.preferredColorScheme)
+        // Draw under the (hidden) system titlebar so our strip owns the top edge.
+        .ignoresSafeArea(.container, edges: .top)
+        .onAppear {
+            settings.appearance.applyToApp()
+            SettingsPresenter.shared.applyChrome()
+            reload()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSettingsShown)) { _ in
             reload()
             permissions.refresh()
+            SettingsPresenter.shared.applyChrome()
         }
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSessionsChanged)) { _ in
             reload()
         }
     }
 
-    private var footer: some View {
-        HStack(spacing: 8) {
-            AppLogo(side: 22)
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Mutter")
-                    .font(.system(size: 11, weight: .semibold))
-                Text(AppVersion.label)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
+    @ViewBuilder
+    private var detail: some View {
+        switch page {
+        case .home:
+            HomePage(session: session, settings: settings, permissions: permissions, sessions: sessions)
+        case .history:
+            HistoryPage(sessions: sessions, reload: reload)
+        case .recording:
+            RecordingPage(settings: settings, session: session)
+        case .configuration:
+            ConfigurationPage(settings: settings)
+        case .sound:
+            SoundPage(settings: settings)
+        case .model:
+            ModelPage()
+        case .performance:
+            PerformancePage()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+    }
+
+    private var statusCells: [String] {
+        var cells: [String] = []
+        let state: String = {
+            if !session.statusText.isEmpty { return session.statusText.lowercased() }
+            if let hint = session.pasteReadyHint, !hint.isEmpty { return "ready to paste" }
+            return "idle"
+        }()
+        cells.append(state)
+        cells.append(settings.speechModel)
+        let n = sessions.count
+        cells.append("\(n) session\(n == 1 ? "" : "s")")
+        cells.append(settings.chord.display)
+        return cells
+    }
+
+    private var sidebarFooter: some View {
+        VStack(spacing: Ink.space1) {
+            Image("AppMark")
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 28, height: 28)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .strokeBorder(Ink.label, lineWidth: 1)
+                )
+            Text(AppVersion.label)
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: Ink.sidebarFooterHeight)
+        .padding(.horizontal, Ink.space2)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Ink.label).frame(height: 1)
+        }
     }
 
     private func reload() {
         sessions = SessionLibrary.load()
+    }
+}
+
+/// Single-column tool-palette sidebar: square tiles (icon above label), selected = inverted.
+struct SettingsSidebar: View {
+    @Binding var selection: SettingsPage
+
+    var body: some View {
+        DTScrollView(bottomInset: Ink.space2) {
+            VStack(alignment: .center, spacing: Ink.sidebarSectionGap) {
+                ForEach(SettingsPage.sidebarSections, id: \.title) { section in
+                    VStack(alignment: .center, spacing: Ink.space2) {
+                        Text(section.title.uppercased())
+                            .font(Ink.sidebarSectionFont)
+                            .foregroundStyle(Ink.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, Ink.space2)
+
+                        VStack(spacing: Ink.sidebarTileGap) {
+                            ForEach(section.pages) { item in
+                                toolTile(item)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+            .padding(.horizontal, Ink.space3)
+            .padding(.top, Ink.space2)
+            .padding(.bottom, Ink.space2)
+            .frame(maxWidth: .infinity, alignment: .top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Settings")
+    }
+
+    private func toolTile(_ item: SettingsPage) -> some View {
+        let selected = selection == item
+        return Button {
+            selection = item
+        } label: {
+            VStack(spacing: Ink.sidebarIconLabelGap) {
+                Image(systemName: item.symbol)
+                    .font(Ink.labelFont)
+                    .foregroundStyle(selected ? Ink.onAccent : Ink.label)
+                Text(item.title)
+                    .font(Ink.sidebarTileLabelFont)
+                    .foregroundStyle(selected ? Ink.onAccent : Ink.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.horizontal, Ink.sidebarTilePad)
+                    .frame(maxWidth: .infinity)
+            }
+            .frame(width: Ink.sidebarTileSize, height: Ink.sidebarTileSize)
+            .background(
+                (selected ? Ink.label : Ink.window),
+                in: RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
+                    .strokeBorder(Ink.label, lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .accessibilityLabel(item.title)
+        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
     }
 }
 
@@ -82,6 +203,9 @@ final class SettingsPresenter {
 
     private var window: NSWindow?
     private let shownKey = "home.shown"
+
+    /// Exposed for custom traffic lights (performClose / miniaturize / zoom).
+    var attachedWindow: NSWindow? { window }
 
     func showOnFirstLaunch() {
         guard !UserDefaults.standard.bool(forKey: shownKey) else { return }
@@ -93,6 +217,7 @@ final class SettingsPresenter {
         let window = ensure()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        applyChrome()
         NotificationCenter.default.post(name: .promptAnnotatorSettingsShown, object: nil)
     }
 
@@ -109,15 +234,15 @@ final class SettingsPresenter {
             backing: .buffered,
             defer: false
         )
-        window.title = "Mutter"
+        window.title = "da transcribuh"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none
         window.isReleasedWhenClosed = false
-        window.backgroundColor = .windowBackgroundColor
+        window.backgroundColor = Ink.windowNSColor
         window.contentView = host
-        window.setContentSize(NSSize(width: 880, height: 600))
-        window.minSize = NSSize(width: 760, height: 520)
+        window.setContentSize(NSSize(width: 960, height: 660))
+        window.minSize = NSSize(width: 820, height: 560)
         window.center()
         self.window = window
         applyChrome()
@@ -129,7 +254,12 @@ final class SettingsPresenter {
     }
 
     func applyChrome() {
-        window?.level = AppSettings.shared.keepWindowOnTop ? .floating : .normal
+        guard let window else { return }
+        window.level = AppSettings.shared.keepWindowOnTop ? .floating : .normal
+        window.backgroundColor = Ink.windowNSColor
+        // Keep closable / miniaturizable in the style mask so ⌘W / ⌘M still work
+        // even though the stock buttons are hidden behind our custom lights.
+        DTSystemTrafficLights.hide(on: window)
     }
 }
 

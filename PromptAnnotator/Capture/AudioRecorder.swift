@@ -1,8 +1,20 @@
 import AVFoundation
+import Darwin
 import Foundation
 import os
 
-final class AudioRecorder {
+struct SpeechBufferSnapshot: Sendable {
+    /// PCM whose index 0 is `timeOffset` seconds into the session.
+    var samples: [Float]
+    var timeOffset: TimeInterval
+    /// Session-absolute sample count through the end of `samples` (integer; no float round-trip).
+    var absoluteCount: Int
+    /// `true` when the in-memory buffer still covers the whole take (no trim).
+    var isComplete: Bool
+}
+
+/// Mic capture + PCM ring. Mutable state is guarded by `sampleLock` / the capture queue.
+final class AudioRecorder: @unchecked Sendable {
     private let log = Logger(subsystem: "com.bicrick.PromptAnnotator", category: "audio")
     private let engine = AVAudioEngine()
     private let captureQueue = DispatchQueue(label: "com.bicrick.PromptAnnotator.audio")
@@ -11,6 +23,8 @@ final class AudioRecorder {
     private var speechConverter: AVAudioConverter?
     private var speechFormat: AVAudioFormat?
     private var speechSamples: [Float] = []
+    /// Samples dropped from the front of `speechSamples` (session-absolute index of retained [0]).
+    private var droppedSpeechSamples = 0
     private var bandWindow: [Float] = []
     private var target: [CGFloat] = FrequencyBands.resting(WaveformSamples.count)
     private var bands: [CGFloat] = FrequencyBands.resting(WaveformSamples.count)
@@ -22,9 +36,15 @@ final class AudioRecorder {
     private var tapInstalled = false
     private var usingEngine = false
 
+    /// Soft cap on retained PCM (~10 min @ 16 kHz mono ≈ 38 MB). Longer takes keep the AAC file.
+    private static let maxRetainedSamples = 16_000 * 60 * 10
+    /// Only compact when this far over the cap so `removeFirst` is rare on the audio queue.
+    private static let retainSlack = 16_000 * 5
+
     func start(url: URL) throws {
         sampleLock.lock()
         speechSamples = []
+        droppedSpeechSamples = 0
         bandWindow = []
         currentLevel = 0.12
         voicedBuffers = 0
@@ -56,13 +76,27 @@ final class AudioRecorder {
     func sampleCount() -> Int {
         sampleLock.lock()
         defer { sampleLock.unlock() }
-        return speechSamples.count
+        return droppedSpeechSamples + speechSamples.count
     }
 
     func copySamples() -> [Float] {
         sampleLock.lock()
         defer { sampleLock.unlock() }
         return speechSamples
+    }
+
+    /// Thread-safe snapshot for live / final speech paths.
+    func copySpeechBuffer() -> SpeechBufferSnapshot {
+        sampleLock.lock()
+        defer { sampleLock.unlock() }
+        let absolute = droppedSpeechSamples + speechSamples.count
+        let offset = Double(droppedSpeechSamples) / 16_000.0
+        return SpeechBufferSnapshot(
+            samples: speechSamples,
+            timeOffset: offset,
+            absoluteCount: absolute,
+            isComplete: droppedSpeechSamples == 0
+        )
     }
 
     func heardSpeech() -> Bool {
@@ -85,9 +119,9 @@ final class AudioRecorder {
             let decibels = recorder.averagePower(forChannel: 0)
             let clamped = min(0, max(-50, decibels))
             let level = CGFloat((clamped + 50) / 50)
-            currentLevel = level
             meterTarget = FrequencyBands.shaped(level: level, count: WaveformSamples.count)
             sampleLock.lock()
+            currentLevel = level
             SpeechGate.note(level: level, voicedBuffers: &voicedBuffers, heard: &speechHeard)
             sampleLock.unlock()
         }
@@ -137,8 +171,10 @@ final class AudioRecorder {
         self.speechFormat = speechFormat
         input.installTap(onBus: 0, bufferSize: 1024, format: tapFormat) { [weak self] buffer, _ in
             guard let self, buffer.frameLength > 0 else { return }
+            // Tap buffers are only valid inside this callback — copy before leaving.
+            guard let owned = Self.copyPCMBuffer(buffer) else { return }
             self.captureQueue.async {
-                self.capture(buffer)
+                self.capture(owned)
             }
         }
         tapInstalled = true
@@ -173,6 +209,12 @@ final class AudioRecorder {
         let level = Self.unitLevel(floats)
         sampleLock.lock()
         speechSamples.append(contentsOf: floats)
+        Self.trimSpeechSamplesIfNeeded(
+            samples: &speechSamples,
+            dropped: &droppedSpeechSamples,
+            maxCount: Self.maxRetainedSamples,
+            slack: Self.retainSlack
+        )
         bandWindow.append(contentsOf: floats)
         if bandWindow.count > FrequencyBands.window + 2_048 {
             bandWindow.removeFirst(bandWindow.count - FrequencyBands.window)
@@ -217,6 +259,36 @@ final class AudioRecorder {
         }
         guard error == nil, status != .error, output.frameLength > 0 else { return nil }
         return output
+    }
+
+    /// Owns a PCM copy so async capture never reads the engine's recycled tap buffer.
+    private static func copyPCMBuffer(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        guard let copy = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: buffer.frameLength) else {
+            return nil
+        }
+        copy.frameLength = buffer.frameLength
+        let source = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
+        let destination = UnsafeMutableAudioBufferListPointer(copy.mutableAudioBufferList)
+        for (src, dst) in zip(source, destination) {
+            guard let srcData = src.mData, let dstData = dst.mData else { continue }
+            memcpy(dstData, srcData, Int(src.mDataByteSize))
+            dst.mDataByteSize = src.mDataByteSize
+        }
+        return copy
+    }
+
+    /// Drops the oldest PCM once the buffer is `slack` past `maxCount`.
+    static func trimSpeechSamplesIfNeeded(
+        samples: inout [Float],
+        dropped: inout Int,
+        maxCount: Int,
+        slack: Int
+    ) {
+        let limit = maxCount + max(0, slack)
+        guard samples.count > limit else { return }
+        let overflow = samples.count - maxCount
+        samples.removeFirst(overflow)
+        dropped += overflow
     }
 
     private static func floats(from buffer: AVAudioPCMBuffer) -> [Float] {

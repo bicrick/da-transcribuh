@@ -18,7 +18,7 @@ final class ProductSurfaceTests: XCTestCase {
         XCTAssertTrue(OnboardingStore.isFinished(defaults))
         XCTAssertEqual(
             OnboardingStep.allCases.map(\.title),
-            ["Welcome", "Permissions", "Shortcut", "A session", "Model", "Ready"]
+            ["Welcome", "Permissions", "Shortcut", "Model", "Try a session", "Ready"]
         )
     }
 

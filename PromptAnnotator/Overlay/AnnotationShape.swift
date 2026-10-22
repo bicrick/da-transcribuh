@@ -99,7 +99,7 @@ struct AnnotationShape: Identifiable, Equatable {
 
     var bounds: CGRect {
         if tool == .text, let text, let origin = points.first {
-            let font = NSFont.systemFont(ofSize: InkStyle.fontSize, weight: .semibold)
+            let font = FontMetrics.font(size: InkStyle.fontSize, weight: .semibold)
             let size = (text as NSString).size(withAttributes: [.font: font])
             return CGRect(origin: origin, size: size)
         }

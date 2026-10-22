@@ -14,65 +14,26 @@ struct PromptAnnotatorApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            SessionMenu(session: session, settings: AppSettings.shared)
+            DTMenuBarPanel(session: session, settings: AppSettings.shared)
         } label: {
-            // A system image. A custom drawing in this label does not show up in the menu bar.
-            Image(systemName: session.phase == .recording ? "record.circle.fill" : "pencil.tip.crop.circle")
-                .accessibilityLabel(session.phase == .recording ? "Mutter, recording" : "Mutter")
-        }
-    }
-}
-
-private struct SessionMenu: View {
-    @ObservedObject var session: SessionController
-    @ObservedObject var settings: AppSettings
-
-    var body: some View {
-        Button("Open Mutter") {
-            SettingsPresenter.shared.show()
-        }
-
-        Divider()
-
-        Button(session.toggleTitle) {
-            session.toggle()
-        }
-        .disabled(session.isBusy)
-
-        Text("Shortcut: \(settings.chord.display)")
-        if let cancel = settings.cancelChord {
-            Text("Cancel: \(cancel.display)")
-        }
-        Text(AppVersion.label)
-
-        if session.isBusy {
-            Text(session.statusText)
-        }
-
-        if let lastError = session.lastError, session.phase != .recording {
-            Text(lastError)
-        }
-
-        Divider()
-
-        if session.lastSessionURL != nil {
-            Button("Paste Image and Text (\(PasteFollowUp.shortcut))") {
-                PasteFollowUp.shared.pasteBoth()
+            // Template dt glyph (assets).
+            Label {
+                Text(session.menuAccessibilityLabel)
+            } icon: {
+                Image("MenuBarIcon")
+                    .renderingMode(.template)
             }
-            Button("Show Last Session in Finder") {
-                session.revealSession()
-            }
+            .labelStyle(.iconOnly)
+            .accessibilityLabel(session.menuAccessibilityLabel)
         }
-
-        Button("Quit Mutter") {
-            NSApp.terminate(nil)
-        }
+        .menuBarExtraStyle(.window)
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Runtime.isUnitTest else { return }
+        AppSettings.shared.appearance.applyToApp()
         HotkeyCenter.shared.handler = {
             SessionController.shared.handleHotkey()
         }
@@ -95,7 +56,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             OnboardingPresenter.shared.show()
         }
+        // Let the menu bar / welcome window paint before Core ML prewarm competes for CPU.
         Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 450_000_000)
             SessionController.shared.prepareModel()
         }
     }

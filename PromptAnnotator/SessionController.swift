@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import os
 
 enum SessionPhase: Equatable {
@@ -41,6 +42,8 @@ final class SessionController: ObservableObject {
     @Published private(set) var transcriptionError: String?
     @Published private(set) var lastError: String?
     @Published private(set) var lastSessionURL: URL?
+    /// Shown in the menu when session output is staged but auto-paste was held.
+    @Published private(set) var pasteReadyHint: String?
 
     private let log = Logger(subsystem: "com.bicrick.PromptAnnotator", category: "session")
     private let chrome = ChromeHost()
@@ -75,13 +78,19 @@ final class SessionController: ObservableObject {
     private var isStarting = false
     private var chromeScreenID: CGDirectDisplayID?
     private var lastToggle = Date.distantPast
-    private var didOfferPermissions = false
+    private var lastOfferedPermissions: String?
     private var keepTranscribing = false
     private var speechTask: Task<Void, Never>?
     private var lastSpeechCount = 0
     private var silenceWatch = SilenceWatch()
     private var stopQueued = false
     private var clockSpan: CGFloat = 0
+    /// Push-to-talk key-up arrived while `begin()` was still awaiting permissions / setup.
+    private var pushToTalkReleasedWhileStarting = false
+    /// Onboarding practice skips paste-on-stop so the welcome window is not disrupted.
+    private var skipNextPaste = false
+    /// Injectable for tests; production uses the live Accessibility probe.
+    var focusProbe: any FocusedEditableProbing = SystemFocusedEditableProbe()
 
     var isBusy: Bool {
         switch phase {
@@ -96,8 +105,36 @@ final class SessionController: ObservableObject {
         phase == .recording ? "Stop Session" : "Start Session"
     }
 
+    /// Menu bar glyph. Busy phases must not look idle — launch demos stop on the icon.
     var menuIcon: String {
-        phase == .recording ? "record.circle.fill" : "pencil.tip.crop.circle"
+        switch phase {
+        case .recording:
+            return "record.circle.fill"
+        case .finishing, .downloading, .preparingModel, .transcribing:
+            return "ellipsis.circle"
+        case .idle:
+            return "pencil.tip.crop.circle"
+        }
+    }
+
+    var menuAccessibilityLabel: String {
+        switch phase {
+        case .recording:
+            return "da transcribuh, recording"
+        case .finishing:
+            return "da transcribuh, saving"
+        case .downloading:
+            return "da transcribuh, downloading model"
+        case .preparingModel:
+            return "da transcribuh, preparing model"
+        case .transcribing:
+            return "da transcribuh, transcribing"
+        case .idle:
+            if let lastError, !lastError.isEmpty {
+                return "da transcribuh, \(lastError)"
+            }
+            return "da transcribuh"
+        }
     }
 
     var statusText: String {
@@ -118,12 +155,24 @@ final class SessionController: ObservableObject {
         }
     }
 
-    init(transcriber: any Transcribing = WhisperKitTranscriber()) {
+    /// Menu / home status line: live phase, else paste-ready hint, else last calm cue or error.
+    var menuStatusLine: String? {
+        let live = statusText
+        if !live.isEmpty { return live }
+        if let pasteReadyHint, !pasteReadyHint.isEmpty { return pasteReadyHint }
+        if let lastError, !lastError.isEmpty { return lastError }
+        return nil
+    }
+
+    init(transcriber: any Transcribing = RoutingTranscriber()) {
         self.transcriber = transcriber
         monitor.session = self
         chrome.attach(self)
         islandChrome.onFrame = { [weak self] in
             self?.placeIsland(animated: false)
+        }
+        overlay.onScreensChanged = { [weak self] in
+            self?.syncOverlay()
         }
         let settings = AppSettings.shared
         tool = settings.defaultTool
@@ -131,6 +180,27 @@ final class SessionController: ObservableObject {
         settings.onChromeChange = { [weak self] in
             DispatchQueue.main.async {
                 self?.refreshChrome()
+            }
+        }
+        settings.onSpeechSelectionChange = { [weak self] in
+            DispatchQueue.main.async {
+                self?.reloadSpeechEngine()
+            }
+        }
+        PasteFollowUp.shared.onAwaitingPasteChange = { [weak self] awaiting in
+            if !awaiting {
+                self?.pasteReadyHint = nil
+            }
+        }
+    }
+
+    /// Unloads and re-prepares after the user switches engine or model in Settings.
+    private func reloadSpeechEngine() {
+        Task {
+            if let router = transcriber as? RoutingTranscriber {
+                await router.reloadSelection()
+            } else {
+                await transcriber.prepare()
             }
         }
     }
@@ -147,6 +217,7 @@ final class SessionController: ObservableObject {
                 PushToTalk.shared.disarm()
                 Task { await finish() }
             } else if !isBusy {
+                pushToTalkReleasedWhileStarting = false
                 PushToTalk.shared.arm(keyCode: UInt16(AppSettings.shared.chord.keyCode))
                 Task { await begin() }
             }
@@ -156,16 +227,40 @@ final class SessionController: ObservableObject {
     }
 
     func releasePushToTalk() {
-        guard AppSettings.shared.pushToTalk, phase == .recording else { return }
-        Task { await finish() }
+        guard AppSettings.shared.pushToTalk else { return }
+        if phase == .recording {
+            Task { await finish() }
+        } else {
+            // Key-up before or during begin (including the gap after arm before isStarting).
+            // Only reached when PushToTalk was armed — menu/Home Start never arms.
+            pushToTalkReleasedWhileStarting = true
+        }
+    }
+
+    /// Starts a short first-run take from onboarding without pasting into the welcome window.
+    /// Returns `true` when recording actually began.
+    @discardableResult
+    func startOnboardingPractice() async -> Bool {
+        guard !isBusy, phase != .recording, !isStarting else { return false }
+        skipNextPaste = true
+        // Practice does not arm PTT — clear any stale release latch so begin is not auto-stopped.
+        pushToTalkReleasedWhileStarting = false
+        await begin()
+        if phase == .recording { return true }
+        skipNextPaste = false
+        return false
     }
 
     func cancel() {
         guard phase == .recording else { return }
         PushToTalk.shared.disarm()
+        pushToTalkReleasedWhileStarting = false
+        skipNextPaste = false
         keepTranscribing = false
         speechTask?.cancel()
         speechTask = nil
+        captureTail.cancel()
+        captureTail = Task {}
         monitor.stop()
         audio.stop()
         AudioInputs.endSession()
@@ -183,6 +278,9 @@ final class SessionController: ObservableObject {
         draft = nil
         textEdit = nil
         stopQueued = false
+        // Cancel discards the take — no clipboard staging and no paste-ready hint.
+        pasteReadyHint = nil
+        PasteFollowUp.shared.clearAwaitingPaste()
         setPhase(.idle)
     }
 
@@ -302,44 +400,98 @@ final class SessionController: ObservableObject {
         SessionClipboard.copy(image: image, transcript: text)
     }
 
+    /// Puts the last session back on the clipboard after something else overwrote it.
+    func copyLastAgain() {
+        guard !isBusy, phase != .recording else { return }
+        if PasteFollowUp.shared.restoreClipboard() { return }
+        guard lastSessionURL != nil else { return }
+        copyToClipboard()
+    }
+
+    var canCopyLastAgain: Bool {
+        PasteFollowUp.shared.canReplay
+            || (lastSessionURL != nil && (!pasteText.isEmpty || sheetURL != nil))
+    }
+
     private func deliverIfRequested() {
+        let skipping = skipNextPaste
+        if skipNextPaste {
+            skipNextPaste = false
+        }
         let settings = AppSettings.shared
-        guard settings.pasteOnStop else { return }
-        guard !SettingsPresenter.shared.isKey else { return }
-        let sendReturn = settings.returnOnShift && NSEvent.modifierFlags.contains(.shift)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            PasteFollowUp.shared.pasteBoth()
-            guard sendReturn else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
-                ReturnKey.post()
+        let hasOutput = PasteFollowUp.shared.canReplay
+            || !pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || sheetURL != nil
+        let target = focusProbe.classifyFocusedElement()
+        let action = FocusPasteDecision.action(
+            target: target,
+            pasteOnStop: settings.pasteOnStop,
+            settingsFocused: SettingsPresenter.shared.isKey,
+            skipPaste: skipping,
+            hasOutput: hasOutput
+        )
+        switch action {
+        case .skip:
+            pasteReadyHint = nil
+            return
+        case .autoPaste:
+            pasteReadyHint = nil
+            let sendReturn = settings.returnOnShift && NSEvent.modifierFlags.contains(.shift)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                PasteFollowUp.shared.pasteBoth()
+                guard sendReturn else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+                    ReturnKey.post()
+                }
             }
+        case .holdPending:
+            // Restage as multi-rep so ⌘V keeps images + text where the target allows it.
+            let image = sheetURL.flatMap { NSImage(contentsOf: $0) }
+            _ = SessionClipboard.stageCombined(image: image, transcript: pasteText)
+            pasteReadyHint = PasteFollowUp.readyHint
         }
     }
 
     private func startSpeechFollow() {
+        speechTask?.cancel()
         keepTranscribing = true
+        // Stays on the main actor (SessionController is @MainActor). Cancel + throwing sleep
+        // so a new follow cannot resurrect after cancel/finish.
         speechTask = Task { @MainActor in
-            while self.keepTranscribing {
-                try? await Task.sleep(nanoseconds: 250_000_000)
-                guard self.keepTranscribing else { return }
-                let count = self.audio.sampleCount()
-                guard count >= self.lastSpeechCount + 16_000 else { continue }
-                let samples = self.audio.copySamples()
-                self.lastSpeechCount = samples.count
-                await self.transcriber.consume(samples: samples)
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: 250_000_000)
+                } catch {
+                    return
+                }
+                guard keepTranscribing, !Task.isCancelled else { return }
+                let count = audio.sampleCount()
+                guard count >= lastSpeechCount + 16_000 else { continue }
+                let buffer = audio.copySpeechBuffer()
+                lastSpeechCount = buffer.absoluteCount
+                await transcriber.consume(
+                    samples: buffer.samples,
+                    bufferStart: buffer.timeOffset,
+                    absoluteEndCount: buffer.absoluteCount
+                )
             }
         }
     }
 
     func abandonIfRecording() {
         guard phase == .recording || phase == .finishing else { return }
+        PushToTalk.shared.disarm()
+        pushToTalkReleasedWhileStarting = false
+        skipNextPaste = false
         keepTranscribing = false
         speechTask?.cancel()
+        speechTask = nil
+        captureTail.cancel()
+        captureTail = Task {}
         monitor.stop()
         audio.stop()
         AudioInputs.endSession()
-        timer?.invalidate()
-        timer = nil
+        stopTimer()
         stopProcessingMotion()
     }
 
@@ -555,6 +707,8 @@ final class SessionController: ObservableObject {
         if phase == .recording {
             await finish()
         } else {
+            // Menu/Home Start never arms PTT — drop any stale release latch from an earlier chord.
+            pushToTalkReleasedWhileStarting = false
             await begin()
         }
     }
@@ -569,15 +723,21 @@ final class SessionController: ObservableObject {
             access.microphone = await Permissions.requestMicrophone()
         }
         guard access.isReady else {
+            PushToTalk.shared.disarm()
+            pushToTalkReleasedWhileStarting = false
+            skipNextPaste = false
             offerPermissions(access)
             return
         }
         guard monitor.install() else {
+            PushToTalk.shared.disarm()
+            pushToTalkReleasedWhileStarting = false
+            skipNextPaste = false
             if !AXIsProcessTrusted() {
                 offerPermissions(Permissions.Status(accessibility: false, microphone: true, screen: true))
             } else {
                 lastError = "Couldn't watch the pointer."
-                presentError("Couldn't watch the pointer", "Accessibility is on, but the event tap did not install. Quit and reopen Mutter.")
+                presentError("Couldn't watch the pointer", "Accessibility is on, but the event tap did not install. Quit and reopen da transcribuh.")
             }
             return
         }
@@ -599,6 +759,8 @@ final class SessionController: ObservableObject {
             sheetURL = nil
             transcriptionError = nil
             lastError = nil
+            pasteReadyHint = nil
+            PasteFollowUp.shared.clearAwaitingPaste()
             lastSpeechCount = 0
             silenceWatch = SilenceWatch()
             stopQueued = false
@@ -610,6 +772,7 @@ final class SessionController: ObservableObject {
             selectionRect = nil
             tool = AppSettings.shared.defaultTool
             color = AppSettings.shared.defaultColor
+            lastOfferedPermissions = nil
             setPhase(.recording)
             startTimer()
             transcriber.resetLive()
@@ -617,7 +780,19 @@ final class SessionController: ObservableObject {
             prepareModel()
             AppSounds.sessionStarted()
             log.info("Session started at \(folder.path, privacy: .public)")
+
+            // Push-to-talk release during permission wait would otherwise leave the session running.
+            // Only the latch — never `!isArmed`, which would auto-stop menu/Home Start (they never arm).
+            let stopForPushToTalk = preferences.pushToTalk && pushToTalkReleasedWhileStarting
+            pushToTalkReleasedWhileStarting = false
+            if stopForPushToTalk {
+                PushToTalk.shared.disarm()
+                Task { await self.finish() }
+            }
         } catch {
+            PushToTalk.shared.disarm()
+            pushToTalkReleasedWhileStarting = false
+            skipNextPaste = false
             monitor.stop()
             audio.stop()
             AudioInputs.endSession()
@@ -625,14 +800,17 @@ final class SessionController: ObservableObject {
                 try? FileManager.default.removeItem(at: directory)
             }
             directory = nil
-            lastError = error.localizedDescription
-            presentError("Couldn't start the session", error.localizedDescription)
+            let message = UserFacingError.sessionStart(error)
+            lastError = message
+            presentError("Couldn't start the session", message)
             setPhase(.idle)
         }
     }
 
     private func finish() async {
         guard phase == .recording else { return }
+        PushToTalk.shared.disarm()
+        pushToTalkReleasedWhileStarting = false
         let heardSpeech = audio.heardSpeech()
         AppSounds.sessionStopped(heardSpeech: heardSpeech)
         setPhase(.finishing)
@@ -688,13 +866,21 @@ final class SessionController: ObservableObject {
         speechTask = nil
         audio.stop()
         AudioInputs.endSession()
-        let spokenSamples = SampleNormalize.apply(
-            audio.copySamples(),
-            enabled: AppSettings.shared.normalizeSpeech
-        )
+        // When the live PCM buffer was trimmed, prefer the AAC file so the dropped prefix is not lost.
+        let speechBuffer = audio.copySpeechBuffer()
+        let spokenSamples: [Float]
+        if speechBuffer.isComplete {
+            spokenSamples = SampleNormalize.apply(
+                speechBuffer.samples,
+                enabled: AppSettings.shared.normalizeSpeech
+            )
+        } else {
+            spokenSamples = []
+        }
         overlay.hide()
         let ended = Date()
         guard let directory else {
+            skipNextPaste = false
             lastError = "The session folder is missing."
             setPhase(.idle)
             return
@@ -703,7 +889,9 @@ final class SessionController: ObservableObject {
         var spoken: [TimedWord] = []
         var model: String?
         if heardSpeech, let audioURL {
-            if WhisperKitTranscriber.isModelReady {
+            if AppSettings.shared.speechEngine == .openAICompatible {
+                setPhase(.transcribing)
+            } else if WhisperKitTranscriber.isModelReady {
                 setPhase(.transcribing)
             } else if WhisperKitTranscriber.modelIsInstalled() {
                 setPhase(.preparingModel)
@@ -729,7 +917,9 @@ final class SessionController: ObservableObject {
                 spoken = transcript.words
                 model = transcript.model
             } catch {
-                transcriptionError = error.localizedDescription
+                let message = UserFacingError.transcription(error)
+                transcriptionError = message
+                lastError = message
                 ErrorLog.record("Transcription failed: \(error.localizedDescription)")
                 log.error("Transcription failed: \(error.localizedDescription, privacy: .public)")
             }
@@ -756,14 +946,22 @@ final class SessionController: ObservableObject {
             pasteText = saved.pasteText
             sheetURL = saved.sheetURL
             lastSessionURL = directory
+            // Empty clipboard text after silence looks like a broken stop — surface a calm cue.
+            // Prefer an existing transcription failure message when both apply.
+            if saved.pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               transcriptionError == nil {
+                lastError = "No speech detected"
+            }
             copyToClipboard()
             deliverIfRequested()
             NotificationCenter.default.post(name: .promptAnnotatorSessionsChanged, object: nil)
             setPhase(.idle)
         } catch {
-            lastError = error.localizedDescription
+            skipNextPaste = false
+            let message = UserFacingError.sessionWrite(error)
+            lastError = message
             ErrorLog.record("Couldn't write the session: \(error.localizedDescription)")
-            presentError("Couldn't write the session", error.localizedDescription)
+            presentError("Couldn't write the session", message)
             lastSessionURL = directory
             setPhase(.idle)
         }
@@ -844,6 +1042,7 @@ final class SessionController: ObservableObject {
         let significant = shapes.filter { $0.isSignificant() }
         if significant.isEmpty, !allowEmpty { return }
         guard let directory else { return }
+        guard !Task.isCancelled else { return }
 
         let screen: NSScreen?
         if let displayID {
@@ -857,6 +1056,9 @@ final class SessionController: ObservableObject {
             return
         }
 
+        // Hold the session folder across the await. Cancel clears `directory`; a new
+        // session replaces it. Either way, discard this shot instead of writing again.
+        let sessionDirectory = directory
         do {
             let captured = try await DisplayCapture.capture(
                 displayID: resolvedID,
@@ -864,6 +1066,7 @@ final class SessionController: ObservableObject {
                 shapes: significant,
                 excludedWindowIDs: overlay.windowIDs() + chrome.windowIDs()
             )
+            guard !Task.isCancelled, self.directory == sessionDirectory else { return }
             let image: CGImage
             if let crop {
                 guard let cropped = RegionCrop.crop(captured, selection: crop, pointSize: screen.frame.size) else {
@@ -875,7 +1078,7 @@ final class SessionController: ObservableObject {
                 image = captured
             }
             let index = groups.count + 1
-            let url = directory.appendingPathComponent(String(format: "frames/%02d.png", index))
+            let url = sessionDirectory.appendingPathComponent(String(format: "frames/%02d.png", index))
             try PNG.write(image, to: url)
             groups.append(
                 StoredGroup(
@@ -897,8 +1100,9 @@ final class SessionController: ObservableObject {
             redoGroups.removeAll()
             refreshControls()
         } catch {
+            guard self.directory == sessionDirectory else { return }
             log.error("Capture failed: \(error.localizedDescription, privacy: .public)")
-            lastError = error.localizedDescription
+            lastError = UserFacingError.capture(error)
             restore(significant, allowEmpty: allowEmpty)
         }
     }
@@ -1149,8 +1353,10 @@ final class SessionController: ObservableObject {
 
     private func offerPermissions(_ status: Permissions.Status) {
         lastError = status.summary.map { "Turn on \($0), then reopen the app." }
-        guard !didOfferPermissions else { return }
-        didOfferPermissions = true
+        // Re-open Settings when the missing set changes (e.g. mic granted, screen still off).
+        let missing = status.summary ?? ""
+        guard missing != lastOfferedPermissions else { return }
+        lastOfferedPermissions = missing
         Permissions.revealSettings(for: status)
     }
 
