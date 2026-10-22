@@ -2,10 +2,10 @@ import SwiftUI
 
 /// Chrome-style folder tabs across the top of Settings.
 ///
-/// Selected tab: convex top corners (~6pt) + **outward** concave feet that flare
-/// into the shelf line (Chrome bell-bottom). Unselected: rounded tops, straight
-/// sides to the baseline (no feet). The shelf rule and selected outline are one
-/// continuous 1pt stroke in the selected accent, edge to edge.
+/// Selected tab: convex top corners (~6pt) + concave cove feet (fillet into the
+/// shelf — not a bullnose ledge). Unselected: rounded tops, straight sides to
+/// the baseline (no feet). The shelf rule and selected outline are one continuous
+/// 1pt stroke in the selected accent, edge to edge.
 struct SettingsFolderTabs: View {
     @Binding var selection: SettingsPage
     var onSearch: (() -> Void)? = nil
@@ -166,12 +166,12 @@ private struct SelectedTabShelfStroke: Shape {
 // MARK: - Chrome-style tab silhouette
 
 /// Chrome tab geometry.
-/// - `flared`: selected — outward concave feet + rounded top (bell-bottom into shelf).
+/// - `flared`: selected — concave cove feet (fillet into shelf) + rounded top.
 /// - not flared: unselected — rounded top, straight sides to the baseline (no feet).
 struct FolderTabShape: Shape {
     static let corner: CGFloat = 6
     static let foot: CGFloat = 6
-    /// Cubic kappa for a quarter-circle Bézier.
+    /// Cubic kappa for a quarter-circle Bézier (top corners only).
     private static let k: CGFloat = 0.5522847498
 
     var flared: Bool
@@ -180,8 +180,6 @@ struct FolderTabShape: Shape {
         var path = Path()
         if flared {
             Self.appendFlaredOutline(to: &path, in: rect, shelfY: rect.maxY, moveToStart: true)
-            // Leave bottom open for selected fill (merges with page); close for hit testing
-            // is unnecessary — fill still works with an open path in SwiftUI.
         } else {
             Self.appendPlainOutline(to: &path, in: rect, closeBottom: true)
         }
@@ -194,14 +192,12 @@ struct FolderTabShape: Shape {
         let kappa = k * r
         path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
         path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
-        // Top-left convex corner (outward).
         path.addCurve(
             to: CGPoint(x: rect.minX + r, y: rect.minY),
             control1: CGPoint(x: rect.minX, y: rect.minY + r - kappa),
             control2: CGPoint(x: rect.minX + r - kappa, y: rect.minY)
         )
         path.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
-        // Top-right.
         path.addCurve(
             to: CGPoint(x: rect.maxX, y: rect.minY + r),
             control1: CGPoint(x: rect.maxX - r + kappa, y: rect.minY),
@@ -214,10 +210,12 @@ struct FolderTabShape: Shape {
         }
     }
 
-    /// Selected open outline: left foot tip → outward left foot → top → outward right foot tip.
+    /// Selected open outline with Chrome **concave** feet (cove / fillet, not bullnose).
     ///
-    /// Feet use quarter-circle Béziers centered on the body corners at the shelf so the
-    /// silhouette flares **out** into the baseline (Chrome), not an inward notch.
+    /// Left foot: baseline tip `(sideX - r, shelfY)` → vertical `(sideX, shelfY - r)`.
+    /// Arc center is **outside** the tab and **above** the baseline at
+    /// `(sideX - r, shelfY - r)`; quad control `(sideX, shelfY)` gives the cove.
+    /// The side then rises straight from the fillet end — no ledge or extra step.
     static func appendFlaredOutline(
         to path: inout Path,
         in rect: CGRect,
@@ -226,50 +224,44 @@ struct FolderTabShape: Shape {
     ) {
         let f = foot
         let r = min(corner, max(0, (rect.width - 2 * f) / 2), max(0, (shelfY - rect.minY) / 2))
-        let bodyLeft = rect.minX + f
-        let bodyRight = rect.maxX - f
+        let sideLeft = rect.minX + f
+        let sideRight = rect.maxX - f
         let top = rect.minY
-        let kappaF = k * f
         let kappaR = k * r
 
         if moveToStart {
             path.move(to: CGPoint(x: rect.minX, y: shelfY))
         }
 
-        // Left foot: tip (minX, shelf) → wall (bodyLeft, shelf - f).
-        // Quarter circle in the NW quadrant relative to center (bodyLeft, shelf) —
-        // curves through (bodyLeft - f, shelf - f), which is OUTSIDE the body (flare).
-        path.addCurve(
-            to: CGPoint(x: bodyLeft, y: shelfY - f),
-            control1: CGPoint(x: rect.minX, y: shelfY - kappaF),
-            control2: CGPoint(x: bodyLeft - kappaF, y: shelfY - f)
+        // Left concave fillet: tangent to baseline at tip, tangent to side at (sideLeft, shelfY - f).
+        path.addQuadCurve(
+            to: CGPoint(x: sideLeft, y: shelfY - f),
+            control: CGPoint(x: sideLeft, y: shelfY)
         )
 
-        path.addLine(to: CGPoint(x: bodyLeft, y: top + r))
+        // Straight side — fillet already ends on the wall.
+        path.addLine(to: CGPoint(x: sideLeft, y: top + r))
 
-        // Top-left convex corner.
         path.addCurve(
-            to: CGPoint(x: bodyLeft + r, y: top),
-            control1: CGPoint(x: bodyLeft, y: top + r - kappaR),
-            control2: CGPoint(x: bodyLeft + r - kappaR, y: top)
+            to: CGPoint(x: sideLeft + r, y: top),
+            control1: CGPoint(x: sideLeft, y: top + r - kappaR),
+            control2: CGPoint(x: sideLeft + r - kappaR, y: top)
         )
 
-        path.addLine(to: CGPoint(x: bodyRight - r, y: top))
+        path.addLine(to: CGPoint(x: sideRight - r, y: top))
 
-        // Top-right convex corner.
         path.addCurve(
-            to: CGPoint(x: bodyRight, y: top + r),
-            control1: CGPoint(x: bodyRight - r + kappaR, y: top),
-            control2: CGPoint(x: bodyRight, y: top + r - kappaR)
+            to: CGPoint(x: sideRight, y: top + r),
+            control1: CGPoint(x: sideRight - r + kappaR, y: top),
+            control2: CGPoint(x: sideRight, y: top + r - kappaR)
         )
 
-        path.addLine(to: CGPoint(x: bodyRight, y: shelfY - f))
+        path.addLine(to: CGPoint(x: sideRight, y: shelfY - f))
 
-        // Right foot: wall → tip (maxX, shelf). NE→E quarter outside the body.
-        path.addCurve(
+        // Right concave fillet (mirrored).
+        path.addQuadCurve(
             to: CGPoint(x: rect.maxX, y: shelfY),
-            control1: CGPoint(x: bodyRight + kappaF, y: shelfY - f),
-            control2: CGPoint(x: rect.maxX, y: shelfY - kappaF)
+            control: CGPoint(x: sideRight, y: shelfY)
         )
     }
 }

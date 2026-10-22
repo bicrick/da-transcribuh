@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Regenerate Settings Home README screenshots / paint mocks (light + graphite dark).
 
-Matches the real app: Chrome FolderTabShape — selected has outward flared feet +
-continuous accent shelf stroke; unselected have plain rounded tops, muted accent
-outlines, no inner stripes. Departure Mono chrome; DejaVu for ⌃⌥⌘ glyphs.
+Matches the real app: Chrome FolderTabShape — selected has concave cove feet
+(fillet into shelf) + continuous accent shelf stroke; unselected have plain
+rounded tops, muted accent outlines, no inner stripes. Departure Mono chrome;
+DejaVu for ⌃⌥⌘ glyphs.
 """
 
 from __future__ import annotations
@@ -157,25 +158,55 @@ def _bezier(
     return pts
 
 
+def _quad(
+    p0: tuple[float, float],
+    control: tuple[float, float],
+    p1: tuple[float, float],
+    n: int = 16,
+) -> list[tuple[float, float]]:
+    """Quadratic Bézier — matches Swift Path.addQuadCurve (concave cove feet)."""
+    pts = []
+    for i in range(n + 1):
+        t = i / n
+        u = 1 - t
+        x = u**2 * p0[0] + 2 * u * t * control[0] + t**2 * p1[0]
+        y = u**2 * p0[1] + 2 * u * t * control[1] + t**2 * p1[1]
+        pts.append((x, y))
+    return pts
+
+
 def flared_tab_outline(x: float, y: float, w: float, h: float) -> list[tuple[float, float]]:
-    """Selected open outline — outward feet (matches Swift FolderTabShape.appendFlaredOutline)."""
+    """Selected open outline — concave cove feet (matches Swift appendFlaredOutline).
+
+    Left foot: tip (sideX - r, shelfY) → wall (sideX, shelfY - r) with quad control
+    (sideX, shelfY). Arc center sits outside the tab above the baseline; curve bows
+    into the tab-bottom corner (shaded fill is convex at the base). No ledge.
+    """
     f, r = FOOT, CORNER_R
-    body_l, body_r = x + f, x + w - f
+    side_l, side_r = x + f, x + w - f
     top, shelf = y, y + h
-    safe_r = min(r, max(0.0, (body_r - body_l) / 2), max(0.0, h / 2))
-    kf, kr = KAPPA * f, KAPPA * safe_r
+    safe_r = min(r, max(0.0, (side_r - side_l) / 2), max(0.0, h / 2))
+    kr = KAPPA * safe_r
     pts: list[tuple[float, float]] = [(x, shelf)]
-    pts += _bezier((x, shelf), (x, shelf - kf), (body_l - kf, shelf - f), (body_l, shelf - f))[1:]
-    pts.append((body_l, top + safe_r))
+    # Left concave fillet (cove): control at (side_l, shelf)
+    pts += _quad((x, shelf), (side_l, shelf), (side_l, shelf - f))[1:]
+    pts.append((side_l, top + safe_r))
     pts += _bezier(
-        (body_l, top + safe_r), (body_l, top + safe_r - kr), (body_l + safe_r - kr, top), (body_l + safe_r, top)
+        (side_l, top + safe_r),
+        (side_l, top + safe_r - kr),
+        (side_l + safe_r - kr, top),
+        (side_l + safe_r, top),
     )[1:]
-    pts.append((body_r - safe_r, top))
+    pts.append((side_r - safe_r, top))
     pts += _bezier(
-        (body_r - safe_r, top), (body_r - safe_r + kr, top), (body_r, top + safe_r - kr), (body_r, top + safe_r)
+        (side_r - safe_r, top),
+        (side_r - safe_r + kr, top),
+        (side_r, top + safe_r - kr),
+        (side_r, top + safe_r),
     )[1:]
-    pts.append((body_r, shelf - f))
-    pts += _bezier((body_r, shelf - f), (body_r + kf, shelf - f), (x + w, shelf - kf), (x + w, shelf))[1:]
+    pts.append((side_r, shelf - f))
+    # Right concave fillet (mirrored)
+    pts += _quad((side_r, shelf - f), (side_r, shelf), (x + w, shelf))[1:]
     return pts
 
 
