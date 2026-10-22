@@ -260,13 +260,35 @@ Contact sheets: `clipboard-a-states-{light,dark}-2x.png`, `clipboard-a-preview-{
 
 ## Implementation notes (after sign-off)
 
-- `PromptAnnotator/Clipboard/` — store, watcher, panel, keyboard monitor, controller.
-- Reuse `PasteFollowUp.simulateCommandV`, nonactivating panel patterns, `Ink*`.
-- `HotkeyChord.canRegister(allowingShift:)` for clipboard only.
-- Tests: dedupe, pin order, concealed skip, limit trim, search filter, Esc clear-then-close.
-- Land only after #19 is on `main` and this design PR is approved.
+**Do not start until this design PR is approved and #19 is on `main`.** New module: `PromptAnnotator/Clipboard/` (store, watcher, list panel, preview popover, keyboard monitor, controller). Prefer reusing the existing stack below rather than inventing parallel paths.
+
+### Reuse map (codebase exploration)
+
+| Concern | Reuse |
+| --- | --- |
+| Paste into frontmost app | `PasteFollowUp` / `postCommandV()` (`CGEvent` ⌘V); stage via `SessionClipboard.writeTranscript` / `writeImage` |
+| Auto-paste gating | `FocusPasteDecision` + `FocusedEditableProbe` / `AXIsProcessTrusted()` when relevant |
+| Global hotkey | Carbon under signature `'PAnn'` — next free id (record=`1`, paste-follow-up=`2`, cancel=`3` → clipboard=`4`); mirror `PasteFollowUp.installHotKey` or extend `HotkeyCenter` |
+| Bindable chord | `HotkeyChord` + `ShortcutCapture` + `AppSettings` setter; `canRegister(allowingShift: true)` for ⌘⇧C |
+| Floating chrome | `ChromePanel` (`.nonactivatingPanel`); position with `NSEvent.mouseLocation` + clamp to `ScreenGeometry` / `visibleFrame` (today’s island uses screen-under-mouse top-center — history should be cursor-local) |
+| Preview popover | Second nonactivating panel sibling; same Ink double-pane bevel as list |
+| Persistence | **No SwiftData.** JSON index + image files under Application Support (same family as Whisper models / error log). Small prefs in `AppSettings` / UserDefaults (pattern: `CustomWhisperCatalog`) |
+| Settings | First ship as `SettingsSection` on `ConfigurationPage` (General). Full `SettingsPage` tab only if needed (then update `tabOrder`, search catalog, `InkThemeTests`) |
+| Session ingest | Hook after `SessionController.copyToClipboard()` / inside `SessionClipboard.copy` & `stageCombined` so every staged paste is recorded once; tag transcript vs screenshot |
+| Own-write suppress | Wrap `SessionClipboard` general-board mutations so the watcher does not echo our writes |
+| Ink | `Ink.stroke` 2, `Ink.bevelOffset` 3, `Ink.bevel`, `Ink.mono` / Departure Mono, `.inkDoublePane` |
+| Tests | Named `NSPasteboard` (never `.general`); isolated `UserDefaults(suiteName:)`; `Runtime.isUnitTest` skips live Carbon/panels; cover dedupe, pin order, concealed skip, limit trim, search, Esc clear-then-close |
+
+### Suggested land order
+
+1. Store + watcher + AppSettings keys (no UI)
+2. Panel A list + keyboard model + ⌘⇧C hotkey
+3. Preview popover (~400ms)
+4. Session ingest + menu bar row
+5. General Clipboard card + onboarding Keybinds / Clipboard steps + Home checklist
 
 ## Related
 
 - PR #19 — wordmark cursor removal + ⌥Space default (land first)
 - Closed PR #20 — premature implementation; superseded by this design pass
+- Design PR — this document + `assets/brand/mocks/clipboard-a-*`
