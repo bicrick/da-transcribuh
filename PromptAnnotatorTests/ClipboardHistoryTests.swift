@@ -155,10 +155,10 @@ final class ClipboardHistoryTests: XCTestCase {
     }
 
     func testCarbonHotKeyIdsDoNotCollide() {
-        // record=1, paste-follow-up=2, cancel=3, clipboard=4 — same 'PAnn' signature.
-        XCTAssertEqual(UInt32(1), 1)
-        XCTAssertEqual(UInt32(2), 2)
-        XCTAssertEqual(UInt32(3), 3)
-        XCTAssertEqual(ClipboardHistoryController.sharedHotKeyIDForTests, 4)
+        // record=1 (HotkeyCenter), paste=2 (PasteFollowUp), cancel=3, clipboard=4.
+        XCTAssertEqual(ClipboardHistoryController.carbonHotKeyID, 4)
+        XCTAssertNotEqual(ClipboardHistoryController.carbonHotKeyID, 1)
+        XCTAssertNotEqual(ClipboardHistoryController.carbonHotKeyID, 2)
+        XCTAssertNotEqual(ClipboardHistoryController.carbonHotKeyID, 3)
     }
 }
