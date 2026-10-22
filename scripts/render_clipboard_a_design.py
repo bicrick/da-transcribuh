@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Direction A clipboard design mocks — panel states, settings, onboarding (light+dark @2×)."""
+"""Direction A clipboard mocks — refined Maccy-like compact list (light+dark @2×).
+
+Header: app label + focused search (caret, “type to search…”, magnifier).
+Rows: no type boxes; mid-truncated text; ~48pt image thumbs; ⌘N right, muted;
+      pin mark; selected = solid invert. Footer: short muted hints (DejaVu glyphs).
+Chrome: Departure Mono UI, 2pt stroke, 3pt hard offset bevel.
+"""
 
 from __future__ import annotations
 
@@ -9,12 +15,18 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 DEPARTURE = ROOT / "PromptAnnotator" / "Fonts" / "DepartureMono-Regular.otf"
+SYMBOL = Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf")
+SYMBOL_SANS = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 OUT = Path("/opt/cursor/artifacts")
 OUT_MOCKS = ROOT / "assets" / "brand" / "mocks"
 
 S = 2.0
 STROKE = int(2 * S)
 BEVEL = int(3 * S)
+ROW_H_TEXT = int(36 * S)
+ROW_H_IMG = int(56 * S)
+THUMB_H = int(48 * S)
+PAD = int(12 * S)
 
 LIGHT = {
     "window": "#FFFFFF",
@@ -28,10 +40,9 @@ LIGHT = {
     "bevel": "#000000",
     "desk": "#5A5A5A",
     "highlight": "#FFF200",
-    "pin": "#ED1C24",
-    "thumb_a": "#3F48CC",
-    "thumb_b": "#22B14C",
-    "thumb_c": "#FF7F27",
+    "sel_bg": "#000000",
+    "sel_fg": "#FFFFFF",
+    "sel_muted": "#AAAAAA",
 }
 DARK = {
     "window": "#2C2C2E",
@@ -45,52 +56,58 @@ DARK = {
     "bevel": "#F2F2F2",
     "desk": "#1A1A1C",
     "highlight": "#5A5200",
-    "pin": "#FF5A5F",
-    "thumb_a": "#6B73E0",
-    "thumb_b": "#3FD06A",
-    "thumb_c": "#FF9A4D",
+    "sel_bg": "#F2F2F2",
+    "sel_fg": "#2C2C2E",
+    "sel_muted": "#666666",
 }
 
-FOOTER = "↑↓ ⌃N⌃P · ↩ paste · ⌥↩ copy · ⌘1–9 · ⌥P pin · ⌥⌫ · Esc · ⌘,"
+FOOTER = "↑↓  ↩ paste  ⌥↩ copy  ⌘1–9  ⌥P pin  Esc"
 
-# kind: text | code | url | transcript | shot
 DEFAULT_ROWS = [
-    {"digit": "⌘1", "kind": "text", "preview": "API_BASE=https://api.local/v1", "tag": "", "pinned": True},
-    {"digit": "⌘2", "kind": "code", "preview": "func paste() { simulateCommandV() }", "tag": "", "pinned": False},
-    {"digit": "⌘3", "kind": "url", "preview": "https://github.com/bicrick/da-transcribuh", "tag": "", "pinned": False},
-    {"digit": "⌘4", "kind": "transcript", "preview": "okay so the island bevel should invert…", "tag": "words", "pinned": False},
-    {"digit": "⌘5", "kind": "shot", "preview": "Screenshot · Home bento", "tag": "tile", "pinned": False},
-    {"digit": "⌘6", "kind": "text", "preview": "meeting notes — q3 roadmap draft", "tag": "", "pinned": False},
-    {"digit": "⌘7", "kind": "transcript", "preview": "ship the compact clipboard panel first", "tag": "words", "pinned": False},
+    {"kind": "text", "preview": "API_BASE=https://api.local/v1", "tag": "", "pinned": True},
+    {"kind": "code", "preview": "func paste() { simulateCommandV() }", "tag": "", "pinned": False},
+    {"kind": "url", "preview": "https://github.com/bicrick/da-transcribuh", "tag": "", "pinned": False},
+    {"kind": "transcript", "preview": "okay so the island bevel should invert in dark mode", "tag": "words", "pinned": False},
+    {"kind": "shot", "preview": "Home bento", "tag": "tile", "pinned": False, "thumb": 0},
+    {"kind": "text", "preview": "meeting notes — q3 roadmap draft", "tag": "", "pinned": False},
+    {"kind": "transcript", "preview": "ship the compact clipboard panel first", "tag": "words", "pinned": False},
 ]
 
 LONG_ROWS = [
-    {"digit": f"⌘{i}" if i <= 9 else "", "kind": k, "preview": p, "tag": t, "pinned": pin}
+    {"kind": k, "preview": p, "tag": t, "pinned": pin, **({"thumb": i % 3} if k == "shot" else {})}
     for i, (k, p, t, pin) in enumerate(
         [
             ("text", "API_BASE=https://api.local/v1", "", True),
             ("code", "guard chord.canRegister(allowingShift: true)", "", False),
             ("url", "https://docs.example.com/clipboard", "", False),
             ("transcript", "type straight into search, no click needed", "words", False),
-            ("shot", "Screenshot · Appearance graphite", "tile", False),
+            ("shot", "Appearance graphite", "tile", False),
             ("text", "patrick@da-transcribuh design review", "", False),
             ("code", "RegisterEventHotKey(/* id 4 */)", "", False),
             ("transcript", "Esc clears search then closes the panel", "words", False),
-            ("shot", "Screenshot · recording island", "tile", False),
+            ("shot", "recording island", "tile", False),
             ("text", "Maccy-like: ⌃N ⌃P move selection", "", False),
             ("url", "https://github.com/p0deje/Maccy", "", False),
             ("text", "pinned items stay above recents", "", False),
             ("transcript", "paste back uses Accessibility we already have", "words", False),
-            ("shot", "Screenshot · Models picker", "tile", False),
+            ("shot", "Models picker", "tile", False),
             ("code", "NSPasteboard.general.changeCount", "", False),
-        ],
-        start=1,
+        ]
     )
 ]
 
 
 def font(size: float) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(str(DEPARTURE), size=size)
+
+
+def font_symbol(size: float) -> ImageFont.FreeTypeFont:
+    path = SYMBOL if SYMBOL.exists() else SYMBOL_SANS
+    return ImageFont.truetype(str(path), size=size) if path.exists() else font(size)
+
+
+def needs_symbol(ch: str) -> bool:
+    return ord(ch) > 127
 
 
 def hex_rgb(h: str) -> tuple[int, int, int]:
@@ -107,150 +124,287 @@ def text_size(draw: ImageDraw.ImageDraw, text: str, f: ImageFont.ImageFont) -> t
     return bb[2] - bb[0], bb[3] - bb[1]
 
 
-def draw_bevel_panel(
-    canvas: Image.Image,
-    ox: int,
-    oy: int,
-    pw: int,
-    ph: int,
-    pal: dict,
-) -> ImageDraw.ImageDraw:
+def mixed_width(draw: ImageDraw.ImageDraw, text: str, size: float) -> float:
+    fd, fs = font(size), font_symbol(size)
+    return sum(text_size(draw, ch, fs if needs_symbol(ch) else fd)[0] for ch in text)
+
+
+def draw_mixed(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[float, float],
+    text: str,
+    size: float,
+    fill: tuple[int, int, int],
+) -> float:
+    x, y = xy
+    fd, fs = font(size), font_symbol(size)
+    _, body_h = text_size(draw, "Hg", fd)
+    for ch in text:
+        f = fs if needs_symbol(ch) else fd
+        cw, ch_h = text_size(draw, ch, f)
+        draw.text((x, y + (body_h - ch_h) / 2), ch, font=f, fill=fill)
+        x += cw
+    return x - xy[0]
+
+
+def mid_truncate(draw: ImageDraw.ImageDraw, text: str, f: ImageFont.ImageFont, max_w: float) -> str:
+    if text_size(draw, text, f)[0] <= max_w:
+        return text
+    ell = "…"
+    if text_size(draw, ell, f)[0] >= max_w:
+        return ell
+    left, right = 1, 1
+    best = ell
+    while left + right < len(text):
+        trial = text[:left] + ell + text[-right:]
+        if text_size(draw, trial, f)[0] <= max_w:
+            best = trial
+            if left <= right:
+                left += 1
+            else:
+                right += 1
+        else:
+            break
+    return best
+
+
+def keycap_font(label: str, h: float) -> ImageFont.FreeTypeFont:
+    if any(needs_symbol(ch) for ch in label):
+        return font_symbol(h * 0.42)
+    return font(h * 0.38 if len(label) > 1 else h * 0.42)
+
+
+def keycap_width(draw: ImageDraw.ImageDraw, label: str, h: float = 26 * S) -> float:
+    tw, _ = text_size(draw, label, keycap_font(label, h))
+    pad = 12 * S if len(label) > 2 else (10 * S if len(label) > 1 else 8 * S)
+    return max(h, tw + pad * 2)
+
+
+def draw_keycap(draw: ImageDraw.ImageDraw, x: float, y: float, label: str, pal: dict, h: float = 26 * S) -> float:
+    f = keycap_font(label, h)
+    tw, th = text_size(draw, label, f)
+    w = keycap_width(draw, label, h)
+    draw.rectangle([x + BEVEL, y + BEVEL, x + w + BEVEL, y + h + BEVEL], fill=c(pal, "bevel"))
+    draw.rectangle([x, y, x + w, y + h], fill=c(pal, "front"), outline=c(pal, "label"), width=STROKE)
+    draw.text((x + (w - tw) / 2, y + (h - th) / 2), label, font=f, fill=c(pal, "label"))
+    return w
+
+
+def draw_bevel_panel(canvas: Image.Image, ox: int, oy: int, pw: int, ph: int, pal: dict) -> ImageDraw.ImageDraw:
     d = ImageDraw.Draw(canvas)
     d.rectangle([ox + BEVEL, oy + BEVEL, ox + pw + BEVEL, oy + ph + BEVEL], fill=c(pal, "bevel"))
     d.rectangle([ox, oy, ox + pw, oy + ph], fill=c(pal, "front"), outline=c(pal, "label"), width=STROKE)
     return d
 
 
-def kind_glyph(kind: str) -> str:
-    return {"text": "T", "code": "{", "url": "U", "transcript": "W", "shot": ""}.get(kind, "T")
+def make_thumb(pal: dict, variant: int, h: int = THUMB_H) -> Image.Image:
+    """Synthetic but real-looking UI screenshot thumbnail."""
+    aspect = 1.55
+    w = int(h * aspect)
+    img = Image.new("RGB", (w, h), c(pal, "fill"))
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, w - 1, h - 1], outline=c(pal, "hairline"))
+    # title strip
+    d.rectangle([0, 0, w, int(h * 0.18)], fill=c(pal, "window"))
+    d.rectangle([0, int(h * 0.18), w, int(h * 0.18) + 1], fill=c(pal, "label"))
+    accents = ["#ED1C24", "#FF7F27", "#22B14C", "#3F48CC"]
+    for i, col in enumerate(accents[:3]):
+        d.rectangle([4 + i * 8, 4, 10 + i * 8, 10], fill=hex_rgb(col))
+    # content blocks
+    palette = [
+        hex_rgb("#3F48CC" if variant % 3 == 0 else "#22B14C"),
+        hex_rgb("#FF7F27"),
+        hex_rgb("#00A2E8"),
+    ]
+    y0 = int(h * 0.28)
+    gap = 4
+    cell_w = (w - 16 - gap * 2) // 3
+    for i in range(3):
+        x = 8 + i * (cell_w + gap)
+        d.rectangle([x, y0, x + cell_w, y0 + int(h * 0.32)], fill=palette[(i + variant) % 3])
+        d.rectangle([x, y0, x + cell_w, y0 + int(h * 0.32)], outline=c(pal, "label"))
+    d.rectangle([8, y0 + int(h * 0.4), w - 8, h - 6], fill=c(pal, "front"), outline=c(pal, "hairline"))
+    d.text((12, y0 + int(h * 0.48)), ["Home", "Island", "Models"][variant % 3], font=font(7 * S), fill=c(pal, "label"))
+    return img
 
 
-def draw_thumb(d: ImageDraw.ImageDraw, x: int, y: int, size: int, pal: dict, variant: int) -> None:
-    keys = ["thumb_a", "thumb_b", "thumb_c"]
-    fill = c(pal, keys[variant % 3])
-    d.rectangle([x, y, x + size, y + size], fill=fill, outline=c(pal, "label"), width=max(1, STROKE // 2))
-    # faux window chrome
-    d.rectangle([x + 2, y + 2, x + size - 2, y + size // 3], fill=c(pal, "fill"))
+def draw_pin(d: ImageDraw.ImageDraw, x: float, y: float, pal: dict, fg: tuple[int, int, int]) -> None:
+    """Small pin glyph (not a red dot) — simple filled chevron/pin shape."""
+    # stem + head as simple geometry
+    d.polygon(
+        [
+            (x + 3 * S, y),
+            (x + 7 * S, y),
+            (x + 7 * S, y + 6 * S),
+            (x + 5 * S, y + 9 * S),
+            (x + 3 * S, y + 6 * S),
+        ],
+        fill=fg,
+    )
+    d.ellipse([x + 2 * S, y - 1 * S, x + 8 * S, y + 5 * S], outline=fg)
 
 
-def draw_match_text(
-    d: ImageDraw.ImageDraw,
-    x: float,
-    y: float,
-    text: str,
-    query: str,
-    f: ImageFont.ImageFont,
-    pal: dict,
-    max_w: float,
-) -> None:
-    """Draw truncated preview with yellow highlight behind case-insensitive match span."""
-    shown = text
-    while text_size(d, shown + "…", f)[0] > max_w and len(shown) > 4:
-        shown = shown[:-1]
-    if shown != text:
-        shown = shown.rstrip() + "…"
+def draw_header(d: ImageDraw.ImageDraw, ox: int, oy: int, pw: int, pal: dict, query: str, focused: bool = True) -> int:
+    """App label + search field (focused caret). Returns header height."""
+    hh = int(40 * S)
+    d.rectangle([ox, oy, ox + pw, oy + hh], fill=c(pal, "front"))
+    d.rectangle([ox, oy + hh - STROKE, ox + pw, oy + hh], fill=c(pal, "label"))
 
-    q = query.lower()
-    lower = shown.lower()
-    idx = lower.find(q) if q else -1
-    if idx < 0 or not q:
-        d.text((x, y), shown, font=f, fill=c(pal, "label"))
-        return
+    label = "clipboard"
+    lf = font(10 * S)
+    lw, lh = text_size(d, label, lf)
+    d.text((ox + PAD, oy + (hh - lh) / 2 - 1), label, font=lf, fill=c(pal, "tertiary"))
 
-    before = shown[:idx]
-    match = shown[idx : idx + len(q)]
-    after = shown[idx + len(q) :]
-    bx = x
-    if before:
-        d.text((bx, y), before, font=f, fill=c(pal, "label"))
-        bx += text_size(d, before, f)[0]
-    mw, mh = text_size(d, match, f)
-    d.rectangle([bx - 1, y - 1, bx + mw + 1, y + mh + 2], fill=c(pal, "highlight"))
-    d.text((bx, y), match, font=f, fill=c(pal, "label"))
-    bx += mw
-    if after:
-        d.text((bx, y), after, font=f, fill=c(pal, "label"))
+    # Search field to the right of label
+    field_x = ox + PAD + lw + int(10 * S)
+    field_y = oy + int(8 * S)
+    field_h = hh - int(16 * S)
+    field_w = ox + pw - PAD - field_x
+    d.rectangle(
+        [field_x, field_y, field_x + field_w, field_y + field_h],
+        fill=c(pal, "fill"),
+        outline=c(pal, "label"),
+        width=STROKE,
+    )
+    # Magnifier (simple circle + handle via DejaVu ⌕ or geometry)
+    mag = "⌕"
+    draw_mixed(d, (field_x + 8 * S, field_y + 5 * S), mag, 11 * S, c(pal, "secondary"))
+    text_x = field_x + 24 * S
+    if query:
+        draw_mixed(d, (text_x, field_y + 5 * S), query, 11 * S, c(pal, "label"))
+        caret_x = text_x + mixed_width(d, query, 11 * S) + 2
+    else:
+        draw_mixed(d, (text_x, field_y + 5 * S), "type to search…", 11 * S, c(pal, "tertiary"))
+        caret_x = text_x
+    if focused:
+        _, ch = text_size(d, "Hg", font(11 * S))
+        d.rectangle([caret_x, field_y + 5 * S, caret_x + 2 * S, field_y + 5 * S + ch], fill=c(pal, "label"))
+    return hh
+
+
+def draw_footer(d: ImageDraw.ImageDraw, ox: int, oy: int, pw: int, ph: int, pal: dict) -> None:
+    fh = int(24 * S)
+    fy = oy + ph - fh
+    d.rectangle([ox, fy, ox + pw, oy + ph], fill=c(pal, "fill"))
+    d.rectangle([ox, fy, ox + pw, fy + 1], fill=c(pal, "hairline"))
+    draw_mixed(d, (ox + PAD, fy + 6 * S), FOOTER, 9 * S, c(pal, "tertiary"))
+
+
+def row_height(row: dict) -> int:
+    return ROW_H_IMG if row.get("kind") == "shot" else ROW_H_TEXT
 
 
 def draw_rows(
     d: ImageDraw.ImageDraw,
+    canvas: Image.Image,
     ox: int,
     list_top: int,
     pw: int,
-    row_h: float,
     rows: list[dict],
     pal: dict,
     selected: int,
     query: str = "",
-    max_rows: int | None = None,
+    max_count: int | None = None,
     fade_bottom: bool = False,
 ) -> float:
-    visible = rows if max_rows is None else rows[:max_rows]
+    visible = rows if max_count is None else rows[:max_count]
     y = float(list_top)
-    f_digit = font(10 * S)
     f_body = font(12 * S)
     f_tag = font(9 * S)
+
     for i, row in enumerate(visible):
-        bg = c(pal, "fill") if i == selected else c(pal, "front")
-        d.rectangle([ox + STROKE, y, ox + pw - STROKE, y + row_h], fill=bg)
-        if i == selected:
-            d.rectangle(
-                [ox + STROKE + 1, y + 1, ox + pw - STROKE - 1, y + row_h - 1],
-                outline=c(pal, "label"),
-                width=STROKE,
-            )
+        rh = row_height(row)
+        selected_row = i == selected
+        bg = c(pal, "sel_bg") if selected_row else c(pal, "front")
+        fg = c(pal, "sel_fg") if selected_row else c(pal, "label")
+        muted = c(pal, "sel_muted") if selected_row else c(pal, "tertiary")
+        d.rectangle([ox + STROKE, y, ox + pw - STROKE, y + rh], fill=bg)
 
-        # digit
-        digit = row.get("digit") or ""
-        if digit:
-            d.text((ox + 10 * S, y + 13 * S), digit, font=f_digit, fill=c(pal, "secondary"))
-
-        # kind / thumb
-        gx = ox + 48 * S
-        gy = y + 6 * S
-        gsize = int(28 * S)
-        if row["kind"] == "shot":
-            draw_thumb(d, int(gx), int(gy), gsize, pal, i)
-        else:
-            d.rectangle([gx, gy, gx + gsize, gy + gsize], outline=c(pal, "label"), width=max(1, STROKE // 2))
-            glyph = kind_glyph(row["kind"])
-            gw, gh = text_size(d, glyph, font(12 * S))
-            d.text((gx + (gsize - gw) / 2, gy + (gsize - gh) / 2 - 1), glyph, font=font(12 * S), fill=c(pal, "label"))
-
-        # pin
-        text_x = ox + 84 * S
+        left = ox + PAD
+        # Pin mark
         if row.get("pinned"):
-            d.ellipse([text_x, y + 14 * S, text_x + 8 * S, y + 22 * S], fill=c(pal, "pin"))
-            text_x += 12 * S
+            draw_pin(d, left, y + rh / 2 - 4 * S, pal, fg)
+            left += 14 * S
 
-        # preview
+        # Image thumbnail or text
+        content_right = ox + pw - PAD
+        digit = f"⌘{i + 1}" if i < 9 else ""
+        digit_w = mixed_width(d, digit, 10 * S) if digit else 0
+        if digit:
+            content_right -= digit_w + 8 * S
+
         tag = row.get("tag") or ""
-        right_pad = 12 * S
-        if tag:
-            tw, _ = text_size(d, tag, f_tag)
-            right_pad += tw + 8 * S
-            d.text((ox + pw - 12 * S - tw, y + 14 * S), tag, font=f_tag, fill=c(pal, "secondary"))
-        max_w = ox + pw - right_pad - text_x
-        draw_match_text(d, text_x, y + 12 * S, row["preview"], query, f_body, pal, max_w)
+        # Only transcripts get a tiny muted source tag
+        show_tag = row.get("kind") == "transcript" and tag
+        tag_w = text_size(d, tag, f_tag)[0] + 8 * S if show_tag else 0
+        if show_tag:
+            content_right -= tag_w
 
-        y += row_h
-        d.rectangle([ox + STROKE, y, ox + pw - STROKE, y + 1], fill=c(pal, "hairline"))
+        if row.get("kind") == "shot":
+            thumb = make_thumb(pal, int(row.get("thumb", 0)))
+            ty = int(y + (rh - thumb.height) / 2)
+            canvas.paste(thumb, (int(left), ty))
+            # outline thumb
+            ImageDraw.Draw(canvas).rectangle(
+                [left, ty, left + thumb.width, ty + thumb.height],
+                outline=fg if selected_row else c(pal, "hairline"),
+            )
+            tx = left + thumb.width + 10 * S
+            preview = mid_truncate(d, row["preview"], f_body, content_right - tx)
+            tw, th = text_size(d, preview, f_body)
+            d.text((tx, y + (rh - th) / 2), preview, font=f_body, fill=fg)
+        else:
+            preview = mid_truncate(d, row["preview"], f_body, content_right - left)
+            if query and query.lower() in preview.lower():
+                # highlight match span on non-selected rows
+                q = query.lower()
+                lower = preview.lower()
+                idx = lower.find(q)
+                if idx >= 0 and not selected_row:
+                    before, match, after = preview[:idx], preview[idx : idx + len(q)], preview[idx + len(q) :]
+                    bx = left
+                    if before:
+                        d.text((bx, y + (rh - text_size(d, before, f_body)[1]) / 2), before, font=f_body, fill=fg)
+                        bx += text_size(d, before, f_body)[0]
+                    mw, mh = text_size(d, match, f_body)
+                    by = y + (rh - mh) / 2
+                    d.rectangle([bx - 1, by - 1, bx + mw + 1, by + mh + 1], fill=c(pal, "highlight"))
+                    d.text((bx, by), match, font=f_body, fill=c(pal, "label"))
+                    bx += mw
+                    if after:
+                        d.text((bx, by), after, font=f_body, fill=fg)
+                else:
+                    tw, th = text_size(d, preview, f_body)
+                    d.text((left, y + (rh - th) / 2), preview, font=f_body, fill=fg)
+            else:
+                tw, th = text_size(d, preview, f_body)
+                d.text((left, y + (rh - th) / 2), preview, font=f_body, fill=fg)
+
+        if show_tag:
+            tw, th = text_size(d, tag, f_tag)
+            d.text((ox + pw - PAD - digit_w - (8 * S if digit else 0) - tw, y + (rh - th) / 2), tag, font=f_tag, fill=muted)
+
+        if digit:
+            draw_mixed(d, (ox + pw - PAD - digit_w, y + (rh - text_size(d, "Hg", font(10 * S))[1]) / 2), digit, 10 * S, muted)
+
+        y += rh
+        if not selected_row:
+            d.rectangle([ox + PAD, y - 1, ox + pw - PAD, y], fill=c(pal, "hairline"))
 
     if fade_bottom:
-        # scroll cue: partial next row + scroller thumb
-        tip = list_top + (max_rows or 0) * row_h
-        d.rectangle([ox + STROKE, tip, ox + pw - STROKE, tip + row_h * 0.45], fill=c(pal, "front"))
-        d.text((ox + 84 * S, tip + 4 * S), "…", font=f_body, fill=c(pal, "tertiary"))
-        track_x = ox + pw - 10 * S
-        d.rectangle([track_x, list_top + 4, track_x + 6 * S, tip - 4], fill=c(pal, "fill"), outline=c(pal, "hairline"))
-        d.rectangle([track_x, list_top + 4, track_x + 6 * S, list_top + 70 * S], fill=c(pal, "label"))
-
+        # scroll cue
+        tip = y
+        d.rectangle([ox + STROKE, tip, ox + pw - STROKE, tip + 18 * S], fill=c(pal, "front"))
+        d.text((ox + PAD, tip + 2 * S), "…", font=font(12 * S), fill=c(pal, "tertiary"))
+        track_x = ox + pw - 8 * S
+        d.rectangle([track_x, list_top + 4, track_x + 4 * S, tip - 4], fill=c(pal, "fill"))
+        d.rectangle([track_x, list_top + 4, track_x + 4 * S, list_top + 60 * S], fill=c(pal, "label"))
     return y
 
 
-def panel_canvas(pal: dict, ph: float | None = None) -> tuple[Image.Image, ImageDraw.ImageDraw, int, int, int, int]:
-    pw = int(360 * S)
-    height = int((ph or 420) * S)
+def panel_canvas(pal: dict, ph: float = 440) -> tuple[Image.Image, ImageDraw.ImageDraw, int, int, int, int]:
+    pw = int(380 * S)
+    height = int(ph * S)
     margin = 28
     canvas = Image.new("RGB", (pw + BEVEL + margin * 2, height + BEVEL + margin * 2 + 36), c(pal, "desk"))
     ox, oy = margin, margin
@@ -258,33 +412,7 @@ def panel_canvas(pal: dict, ph: float | None = None) -> tuple[Image.Image, Image
     return canvas, d, ox, oy, pw, height
 
 
-def draw_search(d: ImageDraw.ImageDraw, ox: int, oy: int, pw: int, pal: dict, query: str, caret: bool = True) -> int:
-    sh = int(36 * S)
-    d.rectangle([ox, oy, ox + pw, oy + sh], fill=c(pal, "fill"))
-    d.rectangle([ox, oy + sh - STROKE, ox + pw, oy + sh], fill=c(pal, "label"))
-    label = f"⌕  {query}" if query else "⌕  Filter…"
-    col = c(pal, "label") if query else c(pal, "secondary")
-    d.text((ox + 12 * S, oy + 10 * S), label, font=font(12 * S), fill=col)
-    if caret and query is not None:
-        # block caret after query
-        prefix = f"⌕  {query}"
-        cw, ch = text_size(d, prefix, font(12 * S))
-        d.rectangle(
-            [ox + 12 * S + cw + 2, oy + 9 * S, ox + 12 * S + cw + 2 + 2 * S, oy + 9 * S + ch],
-            fill=c(pal, "label"),
-        )
-    return sh
-
-
-def draw_footer(d: ImageDraw.ImageDraw, ox: int, oy: int, pw: int, ph: int, pal: dict) -> None:
-    fh = int(28 * S)
-    fy = oy + ph - fh
-    d.rectangle([ox, fy, ox + pw, oy + ph], fill=c(pal, "fill"))
-    d.rectangle([ox, fy, ox + pw, fy + STROKE], fill=c(pal, "label"))
-    d.text((ox + 8 * S, fy + 8 * S), FOOTER, font=font(8.5 * S), fill=c(pal, "secondary"))
-
-
-def caption(canvas: Image.Image, pal: dict, text: str) -> None:
+def caption(canvas: Image.Image, text: str) -> None:
     d = ImageDraw.Draw(canvas)
     f = font(11 * S)
     tw, _ = text_size(d, text, f)
@@ -293,98 +421,61 @@ def caption(canvas: Image.Image, pal: dict, text: str) -> None:
 
 def render_default(pal: dict) -> Image.Image:
     canvas, d, ox, oy, pw, ph = panel_canvas(pal)
-    sh = draw_search(d, ox, oy, pw, pal, "", caret=False)
-    draw_rows(d, ox, oy + sh, pw, 40 * S, DEFAULT_ROWS, pal, selected=1)
+    hh = draw_header(d, ox, oy, pw, pal, "", focused=True)
+    draw_rows(d, canvas, ox, oy + hh, pw, DEFAULT_ROWS, pal, selected=1)
     draw_footer(d, ox, oy, pw, ph, pal)
-    caption(canvas, pal, "A · default · pinned top · ⌘⇧C")
+    caption(canvas, "A · refined · search focused · invert select")
     return canvas
 
 
 def render_selected(pal: dict) -> Image.Image:
     canvas, d, ox, oy, pw, ph = panel_canvas(pal)
-    sh = draw_search(d, ox, oy, pw, pal, "", caret=False)
-    draw_rows(d, ox, oy + sh, pw, 40 * S, DEFAULT_ROWS, pal, selected=3)
+    hh = draw_header(d, ox, oy, pw, pal, "", focused=True)
+    draw_rows(d, canvas, ox, oy + hh, pw, DEFAULT_ROWS, pal, selected=3)
     draw_footer(d, ox, oy, pw, ph, pal)
-    caption(canvas, pal, "A · selected row · ↑↓ / ⌃N ⌃P")
+    caption(canvas, "A · selected · solid invert")
     return canvas
 
 
 def render_search(pal: dict) -> Image.Image:
     query = "bevel"
-    filtered = [
-        {**r, "digit": f"⌘{i}"}
-        for i, r in enumerate(
-            [r for r in DEFAULT_ROWS + LONG_ROWS[7:9] if query.lower() in r["preview"].lower()],
-            start=1,
-        )
-    ]
-    # ensure we have a couple of bevel matches
+    filtered = [r for r in DEFAULT_ROWS + LONG_ROWS if query.lower() in r["preview"].lower()]
     if len(filtered) < 2:
         filtered = [
-            {"digit": "⌘1", "kind": "transcript", "preview": "okay so the island bevel should invert…", "tag": "words", "pinned": False},
-            {"digit": "⌘2", "kind": "text", "preview": "Ink.bevel offset 3pt hard shadow", "tag": "", "pinned": False},
+            {"kind": "transcript", "preview": "okay so the island bevel should invert in dark mode", "tag": "words", "pinned": False},
+            {"kind": "text", "preview": "Ink.bevel offset 3pt hard shadow", "tag": "", "pinned": False},
         ]
-    canvas, d, ox, oy, pw, ph = panel_canvas(pal, ph=320)
-    sh = draw_search(d, ox, oy, pw, pal, query, caret=True)
-    draw_rows(d, ox, oy + sh, pw, 40 * S, filtered, pal, selected=0, query=query)
+    canvas, d, ox, oy, pw, ph = panel_canvas(pal, ph=340)
+    hh = draw_header(d, ox, oy, pw, pal, query, focused=True)
+    draw_rows(d, canvas, ox, oy + hh, pw, filtered, pal, selected=0, query=query)
     draw_footer(d, ox, oy, pw, ph, pal)
-    caption(canvas, pal, "A · search · type-to-filter · match highlight")
+    caption(canvas, "A · type to search · match highlight")
     return canvas
 
 
 def render_empty(pal: dict) -> Image.Image:
     canvas, d, ox, oy, pw, ph = panel_canvas(pal, ph=280)
-    sh = draw_search(d, ox, oy, pw, pal, "", caret=False)
-    # empty body
-    body_top = oy + sh
-    body_bot = oy + ph - int(28 * S)
-    mid_y = (body_top + body_bot) / 2
-    msg = "No clipboard items yet"
-    sub = "Copy text or finish a session."
-    mw, mh = text_size(d, msg, font(13 * S))
+    hh = draw_header(d, ox, oy, pw, pal, "", focused=True)
+    body_top = oy + hh
+    body_bot = oy + ph - int(24 * S)
+    mid = (body_top + body_bot) / 2
+    msg, sub = "No clipboard items yet", "Copy text or finish a session."
+    mw, _ = text_size(d, msg, font(13 * S))
     sw, _ = text_size(d, sub, font(11 * S))
-    d.text((ox + (pw - mw) / 2, mid_y - 18 * S), msg, font=font(13 * S), fill=c(pal, "secondary"))
-    d.text((ox + (pw - sw) / 2, mid_y + 6 * S), sub, font=font(11 * S), fill=c(pal, "tertiary"))
+    d.text((ox + (pw - mw) / 2, mid - 16 * S), msg, font=font(13 * S), fill=c(pal, "secondary"))
+    d.text((ox + (pw - sw) / 2, mid + 8 * S), sub, font=font(11 * S), fill=c(pal, "tertiary"))
     draw_footer(d, ox, oy, pw, ph, pal)
-    caption(canvas, pal, "A · empty state")
+    caption(canvas, "A · empty")
     return canvas
 
 
 def render_scroll(pal: dict) -> Image.Image:
-    canvas, d, ox, oy, pw, ph = panel_canvas(pal, ph=420)
-    sh = draw_search(d, ox, oy, pw, pal, "", caret=False)
-    draw_rows(
-        d,
-        ox,
-        oy + sh,
-        pw,
-        40 * S,
-        LONG_ROWS,
-        pal,
-        selected=2,
-        max_rows=8,
-        fade_bottom=True,
-    )
+    canvas, d, ox, oy, pw, ph = panel_canvas(pal, ph=460)
+    hh = draw_header(d, ox, oy, pw, pal, "", focused=True)
+    draw_rows(d, canvas, ox, oy + hh, pw, LONG_ROWS, pal, selected=2, max_count=7, fade_bottom=True)
     draw_footer(d, ox, oy, pw, ph, pal)
-    caption(canvas, pal, "A · long list · scroll thumb")
+    caption(canvas, "A · long list · scroll")
     return canvas
-
-
-def _wrap_lines(draw: ImageDraw.ImageDraw, text: str, f: ImageFont.ImageFont, max_w: float) -> list[str]:
-    words = text.split()
-    if not words:
-        return [""]
-    lines: list[str] = []
-    cur = words[0]
-    for w in words[1:]:
-        trial = f"{cur} {w}"
-        if text_size(draw, trial, f)[0] <= max_w:
-            cur = trial
-        else:
-            lines.append(cur)
-            cur = w
-    lines.append(cur)
-    return lines
 
 
 def draw_preview_popover(
@@ -395,235 +486,192 @@ def draw_preview_popover(
     *,
     mode: str,
     body_lines: list[str] | None = None,
-    image_variant: int = 0,
+    thumb_variant: int = 0,
     source: str,
     first: str,
     last: str,
     copies: str,
 ) -> tuple[int, int]:
-    """Draw popover; returns (width, height) of popover face."""
     pop_w = int(300 * S)
     pad = int(14 * S)
-    meta_h = int(108 * S)
-    preview_h = int(160 * S) if mode == "image" else int(140 * S)
+    meta_h = int(100 * S)
+    preview_h = int(170 * S) if mode == "image" else int(130 * S)
     pop_h = pad + preview_h + int(10 * S) + meta_h + pad
     d = ImageDraw.Draw(canvas)
-    # bevel + face
     d.rectangle([px + BEVEL, py + BEVEL, px + pop_w + BEVEL, py + pop_h + BEVEL], fill=c(pal, "bevel"))
     d.rectangle([px, py, px + pop_w, py + pop_h], fill=c(pal, "front"), outline=c(pal, "label"), width=STROKE)
 
     ix, iy = px + pad, py + pad
     iw, ih = pop_w - 2 * pad, preview_h
     if mode == "image":
-        # faux screenshot preview
-        d.rectangle([ix, iy, ix + iw, iy + ih], fill=c(pal, "fill"), outline=c(pal, "label"), width=STROKE)
-        # inner "UI" chrome
-        d.rectangle([ix + 8 * S, iy + 8 * S, ix + iw - 8 * S, iy + 28 * S], fill=c(pal, "window"))
-        d.rectangle([ix + 8 * S, iy + 28 * S, ix + iw - 8 * S, iy + ih - 8 * S], fill=c(pal, "front"))
-        # accent blocks like a bento / island
-        colors = [c(pal, "thumb_a"), c(pal, "thumb_b"), c(pal, "thumb_c")]
-        bx = ix + 16 * S
-        by = iy + 40 * S
-        for i in range(3):
-            d.rectangle(
-                [bx + i * 70 * S, by, bx + i * 70 * S + 60 * S, by + 48 * S],
-                fill=colors[(i + image_variant) % 3],
-                outline=c(pal, "label"),
-                width=max(1, STROKE // 2),
-            )
-        d.rectangle(
-            [ix + 16 * S, by + 60 * S, ix + iw - 16 * S, iy + ih - 16 * S],
-            fill=c(pal, "fill"),
-            outline=c(pal, "hairline"),
-        )
-        d.text((ix + 24 * S, by + 72 * S), "Home · bento layout", font=font(11 * S), fill=c(pal, "label"))
+        # Large screenshot preview
+        big = make_thumb(pal, thumb_variant, h=ih - 4)
+        # scale width to fit
+        scale = min(iw / big.width, ih / big.height)
+        nw, nh = int(big.width * scale), int(big.height * scale)
+        big = big.resize((nw, nh), Image.Resampling.NEAREST)
+        bx = ix + (iw - nw) // 2
+        by = iy + (ih - nh) // 2
+        d.rectangle([ix, iy, ix + iw, iy + ih], fill=c(pal, "fill"))
+        canvas.paste(big, (bx, by))
+        d.rectangle([bx, by, bx + nw, by + nh], outline=c(pal, "label"))
     else:
         d.rectangle([ix, iy, ix + iw, iy + ih], fill=c(pal, "fill"), outline=c(pal, "hairline"))
         f = font(11 * S)
         ty = iy + 10 * S
-        lines = body_lines or []
-        for line in lines:
-            for wrapped in _wrap_lines(d, line, f, iw - 16 * S):
-                if ty + 14 * S > iy + ih - 8 * S:
-                    d.text((ix + 8 * S, ty), "…", font=f, fill=c(pal, "tertiary"))
-                    break
-                d.text((ix + 8 * S, ty), wrapped, font=f, fill=c(pal, "label"))
-                ty += 15 * S
+        for line in body_lines or []:
+            # wrap
+            words = line.split() or [""]
+            cur = ""
+            for w in words:
+                trial = w if not cur else f"{cur} {w}"
+                if text_size(d, trial, f)[0] <= iw - 16 * S:
+                    cur = trial
+                else:
+                    if ty + 14 * S > iy + ih - 8 * S:
+                        d.text((ix + 8 * S, ty), "…", font=f, fill=c(pal, "tertiary"))
+                        break
+                    d.text((ix + 8 * S, ty), cur, font=f, fill=c(pal, "label"))
+                    ty += 15 * S
+                    cur = w
             else:
-                continue
+                if cur:
+                    if ty + 14 * S > iy + ih - 8 * S:
+                        d.text((ix + 8 * S, ty), "…", font=f, fill=c(pal, "tertiary"))
+                        break
+                    d.text((ix + 8 * S, ty), cur, font=f, fill=c(pal, "label"))
+                    ty += 15 * S
+                    continue
             break
 
-    # metadata
     my = iy + preview_h + int(10 * S)
     d.rectangle([px + STROKE, my, px + pop_w - STROKE, my + 1], fill=c(pal, "hairline"))
     my += 10 * S
-    f_meta = font(10 * S)
-    rows = [
+    for label, value in [
         ("Source", source),
         ("First copy", first),
         ("Last copy", last),
         ("Copies", copies),
-        ("", "⌥P pin/unpin · ⌥⌫ delete"),
-    ]
-    for label, value in rows:
-        if label:
-            d.text((px + pad, my), f"{label}", font=f_meta, fill=c(pal, "tertiary"))
-            d.text((px + pad + 88 * S, my), value, font=f_meta, fill=c(pal, "label"))
-        else:
-            d.text((px + pad, my + 4 * S), value, font=font(9 * S), fill=c(pal, "secondary"))
+    ]:
+        d.text((px + pad, my), label, font=font(10 * S), fill=c(pal, "tertiary"))
+        draw_mixed(d, (px + pad + 88 * S, my), value, 10 * S, c(pal, "label"))
         my += 16 * S
+    draw_mixed(d, (px + pad, my + 2 * S), "⌥P pin/unpin · ⌥⌫ delete", 9 * S, c(pal, "secondary"))
     return pop_w, pop_h
 
 
 def render_preview_image(pal: dict) -> Image.Image:
-    """List + preview popover for a screenshot row."""
-    list_pw = int(360 * S)
-    list_ph = int(420 * S)
-    margin = 24
-    gap = int(10 * S)
-    pop_w = int(300 * S)
-    pop_h = int(300 * S)
+    list_pw, list_ph = int(380 * S), int(440 * S)
+    margin, gap = 24, int(10 * S)
+    pop_w, pop_h = int(300 * S), int(320 * S)
     W = margin * 2 + list_pw + BEVEL + gap + pop_w + BEVEL
     H = margin * 2 + max(list_ph + BEVEL, pop_h + BEVEL) + 40
     canvas = Image.new("RGB", (W, H), c(pal, "desk"))
     ox, oy = margin, margin
     d = draw_bevel_panel(canvas, ox, oy, list_pw, list_ph, pal)
-    sh = draw_search(d, ox, oy, list_pw, pal, "", caret=False)
-    # select screenshot row (index 4 in DEFAULT_ROWS)
-    draw_rows(d, ox, oy + sh, list_pw, 40 * S, DEFAULT_ROWS, pal, selected=4)
+    hh = draw_header(d, ox, oy, list_pw, pal, "", focused=True)
+    draw_rows(d, canvas, ox, oy + hh, list_pw, DEFAULT_ROWS, pal, selected=4)
     draw_footer(d, ox, oy, list_pw, list_ph, pal)
-
-    # popover to the right, aligned near selected row (~row 4)
-    row_y = oy + sh + 4 * 40 * S
+    # estimate row y for shot
+    y = oy + hh
+    for i, row in enumerate(DEFAULT_ROWS):
+        if i == 4:
+            break
+        y += row_height(row)
     px = ox + list_pw + BEVEL + gap
-    py = max(margin, min(row_y - 40 * S, H - margin - pop_h - 40))
+    py = max(margin, min(int(y - 20 * S), H - margin - pop_h - 40))
     draw_preview_popover(
-        canvas,
-        px,
-        int(py),
-        pal,
-        mode="image",
-        image_variant=1,
-        source="da transcribuh · screenshot",
-        first="Today 2:14 PM",
-        last="Today 2:14 PM",
-        copies="1",
+        canvas, px, py, pal, mode="image", thumb_variant=0,
+        source="da transcribuh · screenshot", first="Today 2:14 PM", last="Today 2:14 PM", copies="1",
     )
-    caption(canvas, pal, "A · preview popover · image · ~400ms after select")
+    caption(canvas, "A · preview · image · ~400ms")
     return canvas
 
 
 def render_preview_text(pal: dict) -> Image.Image:
-    """List + preview popover for a code/text row."""
-    list_pw = int(360 * S)
-    list_ph = int(420 * S)
-    margin = 24
-    gap = int(10 * S)
-    pop_w = int(300 * S)
-    pop_h = int(290 * S)
+    list_pw, list_ph = int(380 * S), int(440 * S)
+    margin, gap = 24, int(10 * S)
+    pop_w, pop_h = int(300 * S), int(300 * S)
     W = margin * 2 + list_pw + BEVEL + gap + pop_w + BEVEL
     H = margin * 2 + max(list_ph + BEVEL, pop_h + BEVEL) + 40
     canvas = Image.new("RGB", (W, H), c(pal, "desk"))
     ox, oy = margin, margin
     d = draw_bevel_panel(canvas, ox, oy, list_pw, list_ph, pal)
-    sh = draw_search(d, ox, oy, list_pw, pal, "", caret=False)
-    # select code row (index 1)
-    draw_rows(d, ox, oy + sh, list_pw, 40 * S, DEFAULT_ROWS, pal, selected=1)
+    hh = draw_header(d, ox, oy, list_pw, pal, "", focused=True)
+    draw_rows(d, canvas, ox, oy + hh, list_pw, DEFAULT_ROWS, pal, selected=1)
     draw_footer(d, ox, oy, list_pw, list_ph, pal)
-
-    row_y = oy + sh + 1 * 40 * S
+    y = oy + hh + row_height(DEFAULT_ROWS[0])
     px = ox + list_pw + BEVEL + gap
-    py = max(margin, min(row_y - 20 * S, H - margin - pop_h - 40))
-    code_body = [
-        "func paste() {",
-        "  simulateCommandV()",
-        "}",
-        "",
-        "// HotkeyChord.canRegister(allowingShift: true)",
-        "// ⌘⇧C opens history beside the cursor",
-    ]
+    py = max(margin, min(int(y - 10 * S), H - margin - pop_h - 40))
     draw_preview_popover(
-        canvas,
-        px,
-        int(py),
-        pal,
-        mode="text",
-        body_lines=code_body,
-        source="Cursor",
-        first="Yesterday 6:02 PM",
-        last="Today 11:08 AM",
-        copies="4",
+        canvas, px, py, pal, mode="text",
+        body_lines=[
+            "func paste() {",
+            "  simulateCommandV()",
+            "}",
+            "",
+            "// HotkeyChord.canRegister(allowingShift: true)",
+            "// ⌘⇧C opens history beside the cursor",
+        ],
+        source="Cursor", first="Yesterday 6:02 PM", last="Today 11:08 AM", copies="4",
     )
-    caption(canvas, pal, "A · preview popover · text/code · hover or ⌃N")
+    caption(canvas, "A · preview · text/code")
     return canvas
 
 
 def render_settings(pal: dict) -> Image.Image:
-    w, h = int(520 * S), int(360 * S)
+    w, h = int(520 * S), int(420 * S)
     img = Image.new("RGB", (w + 40, h + 60), c(pal, "desk"))
     d = ImageDraw.Draw(img)
     ox, oy = 20, 20
-    # page
     d.rectangle([ox, oy, ox + w, oy + h], fill=c(pal, "window"))
     d.text((ox + 24 * S, oy + 20 * S), "General", font=font(18 * S), fill=c(pal, "label"))
-    d.text(
-        (ox + 24 * S, oy + 48 * S),
-        "Shortcuts, launch behavior, and paste rules.",
-        font=font(11 * S),
-        fill=c(pal, "secondary"),
-    )
-    # card with bevel
+    d.text((ox + 24 * S, oy + 48 * S), "Shortcuts, launch behavior, and paste rules.", font=font(11 * S), fill=c(pal, "secondary"))
     cx, cy = ox + 24 * S, oy + 80 * S
-    cw, ch = w - 48 * S, int(220 * S)
+    cw, ch = w - 48 * S, int(280 * S)
     d.rectangle([cx + BEVEL, cy + BEVEL, cx + cw + BEVEL, cy + ch + BEVEL], fill=c(pal, "bevel"))
     d.rectangle([cx, cy, cx + cw, cy + ch], fill=c(pal, "card"), outline=c(pal, "label"), width=STROKE)
     d.text((cx + 16 * S, cy + 14 * S), "Clipboard", font=font(13 * S), fill=c(pal, "label"))
-    d.text(
-        (cx + 16 * S, cy + 36 * S),
-        "Maccy-style history. Uses Accessibility (already needed for paste).",
-        font=font(10 * S),
-        fill=c(pal, "secondary"),
-    )
-    # toggle row
+    draw_mixed(d, (cx + 16 * S, cy + 36 * S), "Maccy-style history. Uses Accessibility (already needed for paste).", 10 * S, c(pal, "secondary"))
+
     ry = cy + 64 * S
-    d.rectangle([cx, ry, cx + cw, ry + 1], fill=c(pal, "hairline"))
+    d.rectangle([cx + STROKE, ry, cx + cw - STROKE, ry + 1], fill=c(pal, "hairline"))
     d.text((cx + 16 * S, ry + 14 * S), "Enable clipboard history", font=font(12 * S), fill=c(pal, "label"))
-    d.text((cx + 16 * S, ry + 34 * S), "On by default. ⌘⇧C opens the panel near the pointer.", font=font(10 * S), fill=c(pal, "secondary"))
-    # fake toggle on
+    draw_mixed(d, (cx + 16 * S, ry + 34 * S), "On by default. ⌘⇧C opens the panel near the pointer.", 10 * S, c(pal, "secondary"))
     tx = cx + cw - 52 * S
     d.rectangle([tx, ry + 18 * S, tx + 36 * S, ry + 36 * S], fill=c(pal, "label"), outline=c(pal, "label"), width=STROKE)
     d.rectangle([tx + 18 * S, ry + 20 * S, tx + 34 * S, ry + 34 * S], fill=c(pal, "front"))
 
-    ry2 = ry + 56 * S
-    d.rectangle([cx, ry2, cx + cw, ry2 + 1], fill=c(pal, "hairline"))
+    ry2 = ry + 60 * S
+    d.rectangle([cx + STROKE, ry2, cx + cw - STROKE, ry2 + 1], fill=c(pal, "hairline"))
     d.text((cx + 16 * S, ry2 + 14 * S), "Shortcut", font=font(12 * S), fill=c(pal, "label"))
     d.text((cx + 16 * S, ry2 + 34 * S), "click to rebind", font=font(10 * S), fill=c(pal, "secondary"))
-    # keycaps
     caps = ["⌘", "⇧", "C"]
-    kx = cx + cw - 16 * S - len(caps) * 28 * S
-    for i, cap in enumerate(caps):
-        x = kx + i * 28 * S
-        d.rectangle([x, ry2 + 16 * S, x + 24 * S, ry2 + 40 * S], fill=c(pal, "front"), outline=c(pal, "label"), width=STROKE)
-        tw, th = text_size(d, cap, font(11 * S))
-        d.text((x + (24 * S - tw) / 2, ry2 + 16 * S + (24 * S - th) / 2), cap, font=font(11 * S), fill=c(pal, "label"))
+    widths = [keycap_width(d, cap, 24 * S) for cap in caps]
+    kx = cx + cw - 16 * S - (sum(widths) + 6 * S * (len(caps) - 1))
+    for cap, ww in zip(caps, widths):
+        draw_keycap(d, kx, ry2 + 14 * S, cap, pal, h=24 * S)
+        kx += ww + 6 * S
 
-    ry3 = ry2 + 56 * S
-    d.rectangle([cx, ry3, cx + cw, ry3 + 1], fill=c(pal, "hairline"))
+    ry3 = ry2 + 64 * S
+    d.rectangle([cx + STROKE, ry3, cx + cw - STROKE, ry3 + 1], fill=c(pal, "hairline"))
     d.text((cx + 16 * S, ry3 + 14 * S), "History limit", font=font(12 * S), fill=c(pal, "label"))
     d.text((cx + cw - 48 * S, ry3 + 14 * S), "200", font=font(12 * S), fill=c(pal, "label"))
-    d.text((cx + 16 * S, ry3 + 44 * S), "Reset to ⌘⇧C", font=font(11 * S), fill=c(pal, "secondary"))
-    d.text((cx + 140 * S, ry3 + 44 * S), "Clear history", font=font(11 * S), fill=c(pal, "secondary"))
 
-    caption(img, pal, "settings · General · Clipboard")
+    ry4 = ry3 + 48 * S
+    d.rectangle([cx + STROKE, ry4, cx + cw - STROKE, ry4 + 1], fill=c(pal, "hairline"))
+    draw_mixed(d, (cx + 16 * S, ry4 + 16 * S), "Reset to ⌘⇧C", 11 * S, c(pal, "secondary"))
+    d.text((cx + 160 * S, ry4 + 16 * S), "Clear history", font=font(11 * S), fill=c(pal, "secondary"))
+    assert ry4 + 40 * S < cy + ch
+
+    caption(img, "settings · General · Clipboard")
     return img
 
 
 def render_onboarding_keybinds(pal: dict) -> Image.Image:
-    w, h = int(560 * S), int(480 * S)
+    w, h = int(560 * S), int(500 * S)
     img = Image.new("RGB", (w, h), c(pal, "window"))
     d = ImageDraw.Draw(img)
-    # title strip
-    d.text((0, 0), "", font=font(1))  # warm font cache
     tw, th = text_size(d, "da transcribuh", font(13 * S))
     d.text(((w - tw) / 2, (40 * S - th) / 2), "da transcribuh", font=font(13 * S), fill=c(pal, "label"))
     d.rectangle([0, 40 * S - STROKE, w, 40 * S], fill=c(pal, "label"))
@@ -639,43 +687,26 @@ def render_onboarding_keybinds(pal: dict) -> Image.Image:
         x += lw + 14 * S
 
     d.text((36 * S, 90 * S), "Keybinds", font=font(18 * S), fill=c(pal, "label"))
-    d.text(
-        (36 * S, 122 * S),
-        "Recording defaults to ⌥Space. Clipboard history uses ⌘⇧C.",
-        font=font(12 * S),
-        fill=c(pal, "secondary"),
-    )
-    d.text(
-        (36 * S, 146 * S),
-        "⌘Space and ⌥⌘Space stay with the system.",
-        font=font(12 * S),
-        fill=c(pal, "secondary"),
-    )
+    draw_mixed(d, (36 * S, 122 * S), "Recording defaults to ⌥Space. Clipboard history uses ⌘⇧C.", 12 * S, c(pal, "secondary"))
+    draw_mixed(d, (36 * S, 146 * S), "⌘Space and ⌥⌘Space stay with the system.", 12 * S, c(pal, "secondary"))
 
     def chord_card(cy: float, title: str, hint: str, caps: list[str]) -> None:
         cw = w - 72 * S
-        ch = 88 * S
+        ch = 96 * S
         d.rectangle([36 * S + BEVEL, cy + BEVEL, 36 * S + cw + BEVEL, cy + ch + BEVEL], fill=c(pal, "bevel"))
         d.rectangle([36 * S, cy, 36 * S + cw, cy + ch], fill=c(pal, "front"), outline=c(pal, "label"), width=STROKE)
         d.text((36 * S + 16 * S, cy + 14 * S), title, font=font(12 * S), fill=c(pal, "label"))
-        d.text((36 * S + 16 * S, cy + 36 * S), hint, font=font(10 * S), fill=c(pal, "secondary"))
-        kx = 36 * S + cw - 16 * S - len(caps) * 28 * S
-        for i, cap in enumerate(caps):
-            x0 = kx + i * 28 * S
-            d.rectangle(
-                [x0, cy + 28 * S, x0 + 24 * S, cy + 52 * S],
-                fill=c(pal, "front"),
-                outline=c(pal, "label"),
-                width=STROKE,
-            )
-            tw2, th2 = text_size(d, cap, font(11 * S))
-            d.text((x0 + (24 * S - tw2) / 2, cy + 28 * S + (24 * S - th2) / 2), cap, font=font(11 * S), fill=c(pal, "label"))
-        d.text((36 * S + 16 * S, cy + 62 * S), "Change", font=font(11 * S), fill=c(pal, "secondary"))
+        d.text((36 * S + 16 * S, cy + 38 * S), hint, font=font(10 * S), fill=c(pal, "secondary"))
+        widths = [keycap_width(d, cap, 26 * S) for cap in caps]
+        kx = 36 * S + cw - 16 * S - (sum(widths) + 6 * S * (len(caps) - 1))
+        for cap, ww in zip(caps, widths):
+            draw_keycap(d, kx, cy + 32 * S, cap, pal, h=26 * S)
+            kx += ww + 6 * S
+        d.text((36 * S + 16 * S, cy + 70 * S), "Change", font=font(11 * S), fill=c(pal, "secondary"))
 
     chord_card(180 * S, "Recording", "click to rebind", ["⌥", "Space"])
-    chord_card(286 * S, "Clipboard history", "click to rebind", ["⌘", "⇧", "C"])
+    chord_card(300 * S, "Clipboard history", "click to rebind", ["⌘", "⇧", "C"])
 
-    # footer buttons
     d.rectangle([0, h - 56 * S, w, h], fill=c(pal, "window"))
     d.rectangle([0, h - 56 * S, w, h - 56 * S + 1], fill=c(pal, "hairline"))
     d.text((36 * S, h - 36 * S), "3 / 8", font=font(11 * S), fill=c(pal, "secondary"))
@@ -685,7 +716,7 @@ def render_onboarding_keybinds(pal: dict) -> Image.Image:
 
 
 def render_onboarding_clipboard(pal: dict) -> Image.Image:
-    w, h = int(560 * S), int(480 * S)
+    w, h = int(560 * S), int(500 * S)
     img = Image.new("RGB", (w, h), c(pal, "window"))
     d = ImageDraw.Draw(img)
     tw, th = text_size(d, "da transcribuh", font(13 * S))
@@ -703,20 +734,16 @@ def render_onboarding_clipboard(pal: dict) -> Image.Image:
         x += lw + 14 * S
 
     d.text((36 * S, 90 * S), "Clipboard history", font=font(18 * S), fill=c(pal, "label"))
-    lines = [
+    for i, line in enumerate([
         "Compact list at the cursor. Type to search, Enter pastes.",
         "Copies, transcripts, and screenshots land here.",
         "Accessibility for paste already covers this — nothing new to grant.",
-    ]
-    by = 122 * S
-    for line in lines:
-        d.text((36 * S, by), line, font=font(12 * S), fill=c(pal, "secondary"))
-        by += 22 * S
+    ]):
+        d.text((36 * S, 122 * S + i * 22 * S), line, font=font(12 * S), fill=c(pal, "secondary"))
 
-    # card: toggle + mini panel teaser
-    cy = by + 12 * S
+    cy = 200 * S
     cw = w - 72 * S
-    ch = 180 * S
+    ch = 190 * S
     d.rectangle([36 * S + BEVEL, cy + BEVEL, 36 * S + cw + BEVEL, cy + ch + BEVEL], fill=c(pal, "bevel"))
     d.rectangle([36 * S, cy, 36 * S + cw, cy + ch], fill=c(pal, "front"), outline=c(pal, "label"), width=STROKE)
     d.text((36 * S + 16 * S, cy + 16 * S), "Enable clipboard history", font=font(12 * S), fill=c(pal, "label"))
@@ -727,16 +754,15 @@ def render_onboarding_clipboard(pal: dict) -> Image.Image:
 
     d.rectangle([36 * S, cy + 56 * S, 36 * S + cw, cy + 56 * S + 1], fill=c(pal, "hairline"))
     d.text((36 * S + 16 * S, cy + 70 * S), "Keyboard", font=font(11 * S), fill=c(pal, "label"))
-    d.text((36 * S + 16 * S, cy + 92 * S), "Type → filter   ↑↓ → move   ↩ → paste   Esc → clear / close", font=font(10 * S), fill=c(pal, "secondary"))
-    d.text((36 * S + 16 * S, cy + 118 * S), "⌘1–9 instant pick · ⌥↩ copy only · ⌥P pin · ⌘, settings", font=font(10 * S), fill=c(pal, "secondary"))
-    d.text((36 * S + 16 * S, cy + 148 * S), "Default shortcut", font=font(11 * S), fill=c(pal, "label"))
+    draw_mixed(d, (36 * S + 16 * S, cy + 94 * S), "Type → filter   ↑↓ → move   ↩ → paste   Esc → clear / close", 10 * S, c(pal, "secondary"))
+    draw_mixed(d, (36 * S + 16 * S, cy + 118 * S), "⌘1–9 instant pick · ⌥↩ copy only · ⌥P pin · ⌘, settings", 10 * S, c(pal, "secondary"))
+    d.text((36 * S + 16 * S, cy + 150 * S), "Default shortcut", font=font(11 * S), fill=c(pal, "label"))
     caps = ["⌘", "⇧", "C"]
-    kx = 36 * S + cw - 16 * S - len(caps) * 28 * S
-    for i, cap in enumerate(caps):
-        x0 = kx + i * 28 * S
-        d.rectangle([x0, cy + 140 * S, x0 + 24 * S, cy + 164 * S], fill=c(pal, "front"), outline=c(pal, "label"), width=STROKE)
-        tw2, th2 = text_size(d, cap, font(11 * S))
-        d.text((x0 + (24 * S - tw2) / 2, cy + 140 * S + (24 * S - th2) / 2), cap, font=font(11 * S), fill=c(pal, "label"))
+    widths = [keycap_width(d, cap, 24 * S) for cap in caps]
+    kx = 36 * S + cw - 16 * S - (sum(widths) + 6 * S * (len(caps) - 1))
+    for cap, ww in zip(caps, widths):
+        draw_keycap(d, kx, cy + 142 * S, cap, pal, h=24 * S)
+        kx += ww + 6 * S
 
     d.rectangle([0, h - 56 * S, w, h], fill=c(pal, "window"))
     d.rectangle([0, h - 56 * S, w, h - 56 * S + 1], fill=c(pal, "hairline"))
@@ -751,11 +777,7 @@ def contact_sheet(images: list[Image.Image], cols: int, label: str, pal: dict) -
     cw = max(im.width for im in images)
     ch = max(im.height for im in images)
     rows = (len(images) + cols - 1) // cols
-    sheet = Image.new(
-        "RGB",
-        (cols * cw + (cols + 1) * gap, rows * ch + (rows + 1) * gap + 48),
-        c(pal, "desk"),
-    )
+    sheet = Image.new("RGB", (cols * cw + (cols + 1) * gap, rows * ch + (rows + 1) * gap + 48), c(pal, "desk"))
     d = ImageDraw.Draw(sheet)
     d.text((gap, 14), label, font=font(14), fill=(220, 220, 220) if pal is DARK else (30, 30, 30))
     for i, im in enumerate(images):
@@ -766,7 +788,21 @@ def contact_sheet(images: list[Image.Image], cols: int, label: str, pal: dict) -
     return sheet
 
 
+def assert_usable(img: Image.Image, name: str) -> None:
+    extrema = img.convert("L").getextrema()
+    if extrema[0] == extrema[1]:
+        raise SystemExit(f"FAIL {name}: blank")
+    hist = img.convert("L").histogram()
+    tones = sum(1 for v in hist if v > 0)
+    if tones < 8:
+        raise SystemExit(f"FAIL {name}: too few tones ({tones})")
+    if img.width < 200 or img.height < 80:
+        raise SystemExit(f"FAIL {name}: too small {img.size}")
+    print(f"ok {name}: {img.size[0]}x{img.size[1]} tones={tones}")
+
+
 def save(name: str, img: Image.Image) -> None:
+    assert_usable(img, name)
     OUT.mkdir(parents=True, exist_ok=True)
     OUT_MOCKS.mkdir(parents=True, exist_ok=True)
     img.save(OUT / f"{name}-2x.png")
@@ -775,7 +811,8 @@ def save(name: str, img: Image.Image) -> None:
 
 
 def main() -> None:
-    assert DEPARTURE.exists(), f"missing font {DEPARTURE}"
+    assert DEPARTURE.exists(), DEPARTURE
+    assert SYMBOL.exists() or SYMBOL_SANS.exists(), "DejaVu missing"
     for mode, pal in (("light", LIGHT), ("dark", DARK)):
         states = {
             f"clipboard-a-default-{mode}": render_default(pal),
@@ -792,31 +829,33 @@ def main() -> None:
         for name, img in states.items():
             save(name, img)
 
-        panel_states = [
-            states[f"clipboard-a-default-{mode}"],
-            states[f"clipboard-a-selected-{mode}"],
-            states[f"clipboard-a-search-{mode}"],
-            states[f"clipboard-a-empty-{mode}"],
-            states[f"clipboard-a-scroll-{mode}"],
-        ]
-        sheet = contact_sheet(panel_states, cols=3, label=f"clipboard A · states · {mode}", pal=pal)
+        sheet = contact_sheet(
+            [states[f"clipboard-a-{s}-{mode}"] for s in ("default", "selected", "search", "empty", "scroll")],
+            cols=3,
+            label=f"clipboard A · refined states · {mode}",
+            pal=pal,
+        )
         save(f"clipboard-a-states-{mode}", sheet)
 
-        previews = [
-            states[f"clipboard-a-preview-image-{mode}"],
-            states[f"clipboard-a-preview-text-{mode}"],
-        ]
-        sheet_p = contact_sheet(previews, cols=2, label=f"clipboard A · preview popover · {mode}", pal=pal)
+        sheet_p = contact_sheet(
+            [states[f"clipboard-a-preview-image-{mode}"], states[f"clipboard-a-preview-text-{mode}"]],
+            cols=2,
+            label=f"clipboard A · preview popover · {mode}",
+            pal=pal,
+        )
         save(f"clipboard-a-preview-{mode}", sheet_p)
 
-        onb = [
-            states[f"clipboard-a-onboarding-keybinds-{mode}"],
-            states[f"clipboard-a-onboarding-clipboard-{mode}"],
-            states[f"clipboard-a-settings-{mode}"],
-        ]
-        sheet2 = contact_sheet(onb, cols=3, label=f"clipboard A · onboarding + settings · {mode}", pal=pal)
+        sheet2 = contact_sheet(
+            [
+                states[f"clipboard-a-onboarding-keybinds-{mode}"],
+                states[f"clipboard-a-onboarding-clipboard-{mode}"],
+                states[f"clipboard-a-settings-{mode}"],
+            ],
+            cols=3,
+            label=f"clipboard A · onboarding + settings · {mode}",
+            pal=pal,
+        )
         save(f"clipboard-a-onboarding-{mode}", sheet2)
-
     print("done")
 
 

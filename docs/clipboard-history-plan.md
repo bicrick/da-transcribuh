@@ -60,17 +60,18 @@ Narrow floating non-activating panel (~360pt) near the pointer. Double-pane beve
 
 ### Layout (top → bottom)
 
-1. **Search field** — always key-focus when the panel opens. No click required to type.
-2. **List** — pinned items first (pin glyph), then recents. Mixed rows: plain text, code, URL, transcript tag, screenshot thumbnail.
-3. **One-line key-hint footer** — condensed chords (see below).
+1. **Header** — muted `clipboard` (or `da transcribuh`) label on the left + a proper **search field** (magnifier, placeholder `type to search…`, visible caret). Focused on open; typing goes straight here. Not a separate “Filter…” bar.
+2. **List** — pinned first, then recents. Calm Maccy-like rows (no boxed type icons).
+3. **One-line key-hint footer** — short muted chords (DejaVu fallback for ⌘⌥⇧↩⌫↑↓).
 
 ### Row anatomy
 
-- Leading: optional `⌘1`…`⌘9` digit (first nine visible / filtered rows)
-- Kind glyph in a 2pt square: `T` text, `{` code, `⌘` URL hint, or a tiny screenshot thumb
-- Preview (single line, truncated)
-- Trailing: source tag (`words` / `tile` / empty for plain copies) and pin mark when pinned
-- Selected row: 2pt `Ink.label` outline + fill well
+- Text / code / URL: single line, **middle-truncated**, left-aligned to one padding edge
+- Image: ~**48pt**-tall thumbnail (natural aspect) + short caption
+- `⌘1`…`⌘9` **right-aligned**, muted (first nine visible / filtered rows)
+- Optional tiny muted source tag **only for transcripts**
+- Pinned: small pin mark (not a red dot)
+- Selected: **solid invert** (light: black fill / white text; dark: light fill / dark text) — not an outline
 
 ### Sample content (mocks)
 
@@ -103,11 +104,11 @@ Panel opens from **⌘⇧C** (customizable). Focus is on search immediately. Cha
 
 ### Footer (one line)
 
-Always visible, secondary ink, Departure Mono ~9–10pt:
+Always visible, tertiary/muted, short:
 
-`↑↓ ⌃N⌃P · ↩ paste · ⌥↩ copy · ⌘1–9 · ⌥P pin · ⌥⌫ · Esc · ⌘,`
+`↑↓  ↩ paste  ⌥↩ copy  ⌘1–9  ⌥P pin  Esc`
 
-(Exact glyph packing may tighten in implementation; mocks use this model.)
+(Modifier glyphs via DejaVu in mocks; Departure for ASCII.)
 
 ### Focus / activation notes
 
