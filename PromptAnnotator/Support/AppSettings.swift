@@ -150,10 +150,13 @@ final class AppSettings: ObservableObject {
         capitalizeTranscript = defaults.bool(forKey: Keys.capitalize)
         speechModel = SpeechModelChoice.stored(defaults.string(forKey: Keys.speechModel)).variant
         speechEngine = SpeechEngineKind.stored(defaults.string(forKey: Keys.speechEngine))
-        customModels = CustomWhisperCatalog.load(defaults: defaults)
+        let loadedModels = CustomWhisperCatalog.load(defaults: defaults)
+        customModels = loadedModels
         let customID = CustomWhisperCatalog.selectedCustomID(defaults: defaults)
-        customModelID = customID.flatMap { id in
-            customModels.contains(where: { $0.id == id }) ? id : nil
+        if let customID, loadedModels.contains(where: { $0.id == customID }) {
+            customModelID = customID
+        } else {
+            customModelID = nil
         }
         openAIBaseURL = OpenAICompatibleTranscriber.storedBaseURL(defaults: defaults)
         openAIModel = OpenAICompatibleTranscriber.storedModel(defaults: defaults)
