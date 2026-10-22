@@ -81,7 +81,7 @@ struct DTScrollView<Content: View>: View {
                 }
             }
             .onAppear { viewportHeight = vh }
-            .onChange(of: viewport.size.height) { height in
+            .onChange(of: viewport.size.height) { _, height in
                 viewportHeight = height
             }
         }

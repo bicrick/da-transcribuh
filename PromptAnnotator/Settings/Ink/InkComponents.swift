@@ -308,6 +308,208 @@ struct InkCheck: View {
     }
 }
 
+/// B/W switch — flat track + sliding block. Shared across Settings / onboarding.
+struct InkToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            HStack(alignment: .center, spacing: Ink.space3) {
+                configuration.label
+                Spacer(minLength: 0)
+                InkSwitch(isOn: configuration.isOn)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+struct InkSwitch: View {
+    var isOn: Bool
+
+    var body: some View {
+        ZStack(alignment: isOn ? .trailing : .leading) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(isOn ? Ink.label : Ink.window)
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .strokeBorder(Ink.label, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                .fill(isOn ? Ink.onAccent : Ink.label)
+                .frame(width: 12, height: 12)
+                .padding(2)
+        }
+        .frame(width: 34, height: 18)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Title + caption + B/W switch, terminal-row padding.
+struct InkToggleRow: View {
+    var title: String
+    var detail: String?
+    @Binding var isOn: Bool
+    var enabled: Bool = true
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                Text(title)
+                    .font(Ink.rowTitleFont)
+                    .foregroundStyle(enabled ? Ink.label : Ink.tertiary)
+                if let detail {
+                    Text(detail)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .toggleStyle(InkToggleStyle())
+        .disabled(!enabled)
+        .padding(.horizontal, Ink.rowHPad)
+        .padding(.vertical, Ink.rowVPad)
+        .opacity(enabled ? 1 : 0.55)
+    }
+}
+
+/// Interactive checkbox (InkCheck) for discrete on/off rows.
+struct InkCheckboxStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            HStack(alignment: .top, spacing: Ink.space3) {
+                InkCheck(done: configuration.isOn)
+                    .padding(.top, 1)
+                configuration.label
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Flat B/W volume / fraction control (no system blue).
+struct InkSlider: View {
+    @Binding var value: Double
+    var range: ClosedRange<Double> = 0...1
+    var enabled: Bool = true
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = max(1, geo.size.width)
+            let fraction = CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound))
+            let thumb = max(0, min(1, fraction))
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Ink.fill)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                Rectangle()
+                    .fill(Ink.label)
+                    .frame(width: max(2, width * thumb))
+                Rectangle()
+                    .fill(Ink.window)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                    .frame(width: 10, height: 16)
+                    .offset(x: max(0, min(width - 10, width * thumb - 5)))
+            }
+            .frame(height: 16)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { drag in
+                        guard enabled else { return }
+                        let t = min(1, max(0, drag.location.x / width))
+                        value = range.lowerBound + Double(t) * (range.upperBound - range.lowerBound)
+                    }
+            )
+        }
+        .frame(height: 16)
+        .opacity(enabled ? 1 : 0.45)
+        .allowsHitTesting(enabled)
+        .accessibilityValue(Text("\(Int((value * 100).rounded())) percent"))
+    }
+}
+
+/// Menu-style picker with Ink chrome (avoids system Form / blue).
+struct InkMenuPicker<Selection: Hashable>: View {
+    var title: String
+    @Binding var selection: Selection
+    var options: [(Selection, String)]
+
+    var body: some View {
+        Menu {
+            ForEach(options, id: \.0) { option in
+                Button {
+                    selection = option.0
+                } label: {
+                    HStack {
+                        Text(option.1)
+                        if selection == option.0 {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: Ink.space2) {
+                Text(labelText)
+                    .font(Ink.buttonSmallFont)
+                    .foregroundStyle(Ink.label)
+                    .lineLimit(1)
+                Text("▾")
+                    .font(Ink.headingFont)
+                    .foregroundStyle(Ink.label)
+            }
+            .padding(.horizontal, 11)
+            .frame(height: 24)
+            .background(Ink.window, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
+                    .strokeBorder(Ink.label, lineWidth: 1)
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .accessibilityLabel(title)
+    }
+
+    private var labelText: String {
+        options.first(where: { $0.0 == selection })?.1 ?? title
+    }
+}
+
+/// Title / detail / trailing control — shared settings row.
+struct InkSettingRow<Trailing: View>: View {
+    var title: String
+    var detail: String?
+    @ViewBuilder var trailing: () -> Trailing
+
+    var body: some View {
+        HStack(alignment: .center, spacing: Ink.space3) {
+            VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                Text(title)
+                    .font(Ink.rowTitleFont)
+                    .foregroundStyle(Ink.label)
+                if let detail {
+                    Text(detail)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            Spacer(minLength: Ink.space2)
+            trailing()
+        }
+        .padding(.horizontal, Ink.rowHPad)
+        .padding(.vertical, Ink.rowVPad)
+    }
+}
+
 struct InkStepDots: View {
     var current: Int
     var total: Int
