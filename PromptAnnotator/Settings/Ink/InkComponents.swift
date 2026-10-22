@@ -212,6 +212,50 @@ struct InkKeycapRow: View {
     }
 }
 
+/// Paint keycap field — click, press a combo, it saves. Listening state pulses the border.
+struct InkShortcutRecorder: View {
+    var keys: [String]
+    var listening: Bool
+    var emptyLabel: String = "None"
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Group {
+                if listening {
+                    Text("press keys…")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 26)
+                } else if keys.isEmpty {
+                    Text(emptyLabel)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 26)
+                } else {
+                    InkKeycapRow(keys: keys, compact: true)
+                }
+            }
+            .padding(4)
+            .background(Ink.fill, in: RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
+                    .strokeBorder(listening ? Ink.paintCyan : Ink.label, lineWidth: listening ? 2 : 1.5)
+            )
+            .background(
+                RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
+                    .fill(Ink.label)
+                    .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(listening ? "Listening for shortcut" : keys.isEmpty ? emptyLabel : keys.joined(separator: " "))
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
 /// 10-segment block meter for Speed / Quality / Size.
 struct InkSegmentMeter: View {
     var label: String

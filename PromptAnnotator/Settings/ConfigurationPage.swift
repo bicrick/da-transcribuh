@@ -88,11 +88,13 @@ struct ConfigurationPage: View {
                         ? "Hold \(settings.chord.display) to talk. Release to stop."
                         : "\(settings.chord.display) starts a session. Press it again to stop."
                 ) {
-                    Button(capture == .toggle ? "Press shortcut" : settings.chord.display) {
+                    InkShortcutRecorder(
+                        keys: settings.chord.keycaps,
+                        listening: capture == .toggle
+                    ) {
                         capture = .toggle
                         message = nil
                     }
-                    .buttonStyle(InkSecondaryButtonStyle())
                 }
                 InkDivider(leading: 0)
                 InkSettingRow(
@@ -101,11 +103,14 @@ struct ConfigurationPage: View {
                         "\($0.display) drops the session without a transcript or screenshot."
                     } ?? "Optional. Set a shortcut to drop a take without saving."
                 ) {
-                    Button(capture == .cancel ? "Press shortcut" : (settings.cancelChord?.display ?? "None")) {
+                    InkShortcutRecorder(
+                        keys: settings.cancelChord?.keycaps ?? [],
+                        listening: capture == .cancel,
+                        emptyLabel: "None"
+                    ) {
                         capture = .cancel
                         message = nil
                     }
-                    .buttonStyle(InkSecondaryButtonStyle())
                 }
                 InkDivider(leading: 0)
                 InkToggleRow(
@@ -123,7 +128,7 @@ struct ConfigurationPage: View {
                         .padding(.horizontal, Ink.rowHPad)
                         .padding(.bottom, Ink.space2)
                 }
-                Text("The menu bar repeats this shortcut under Start Session. Shift stays free for drawing. Option-Space, Command-Space, and Option-Command-Space stay with the system. Press Escape while capturing Cancel to clear it.")
+                Text("Click the keycaps, press a new combo (needs a modifier, or a function key). It re-registers live — no relaunch. Shift stays free for drawing. Option-Space, Command-Space, and Option-Command-Space stay with the system. Escape while capturing Cancel clears it.")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)

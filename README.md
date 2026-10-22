@@ -67,7 +67,7 @@ macos 14 or later. the first build fetches whisperkit.
 
 ## what it does
 
-- lives in the menu bar. press the shortcut, talk, press it again. words land on the clipboard (and paste into the front app when that makes sense).
+- lives in the menu bar. press the shortcut (yours, not stuck on ⌃⌥Space), talk, press it again. words land on the clipboard (and paste into the front app when that makes sense).
 - hold **shift** and drag to grab a piece of the screen. release shift to keep the tile. stop the session and you get the picture with the words.
 - sessions save under `~/Documents/PromptAnnotator/Sessions/` (folder name stays put so your history doesn’t vanish).
 - on-device speech via whisperkit. bring your own core ml folder or hugging face variant if you want. optional openai-compatible server for the final transcript only.
@@ -77,10 +77,10 @@ macos 14 or later. the first build fetches whisperkit.
 
 | | |
 | --- | --- |
-| start / stop | control-option-space (changeable) |
+| start / stop | ⌃⌥Space by default — click the paint keycaps in **general** to rebind (needs a modifier, or a function key). re-registers live. |
 | mark / capture | hold shift, drag, release |
 | paste image + text | control-option-v |
-| cancel take | optional; set one in configuration |
+| cancel take | optional; set one in general (escape clears it while listening) |
 
 ## permissions
 

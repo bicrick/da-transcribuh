@@ -32,13 +32,18 @@ struct HotkeyChord: Equatable, Codable {
         }
     }
 
+    /// F1–F12 may register without a modifier; everything else needs at least one.
+    var isFunctionKey: Bool {
+        (UInt32(kVK_F1)...UInt32(kVK_F12)).contains(keyCode)
+    }
+
     var canRegister: Bool {
-        normalizedModifiers != 0 && !includesShift && !takesOverSystemShortcut
+        (normalizedModifiers != 0 || isFunctionKey) && !includesShift && !takesOverSystemShortcut
     }
 
     var rejection: String? {
-        if normalizedModifiers == 0 {
-            return "Add at least one modifier."
+        if normalizedModifiers == 0 && !isFunctionKey {
+            return "Add at least one modifier, or use a function key."
         }
         if includesShift {
             return "Shift is held to draw, so the shortcut cannot include Shift."

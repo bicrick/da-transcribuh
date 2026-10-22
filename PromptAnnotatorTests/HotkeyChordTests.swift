@@ -46,4 +46,17 @@ final class HotkeyChordTests: XCTestCase {
         XCTAssertEqual(chord.display, "⌃⌥K")
         XCTAssertNil(chord.rejection)
     }
+
+    func testFunctionKeyMayOmitModifiers() {
+        let bare = HotkeyChord(keyCode: UInt32(kVK_F8), carbonModifiers: 0)
+        XCTAssertTrue(bare.isFunctionKey)
+        XCTAssertTrue(bare.canRegister)
+        XCTAssertNil(bare.rejection)
+        XCTAssertEqual(bare.keycaps, ["F8"])
+
+        let letter = HotkeyChord(keyCode: UInt32(kVK_ANSI_K), carbonModifiers: 0)
+        XCTAssertFalse(letter.isFunctionKey)
+        XCTAssertFalse(letter.canRegister)
+        XCTAssertEqual(letter.rejection, "Add at least one modifier, or use a function key.")
+    }
 }
