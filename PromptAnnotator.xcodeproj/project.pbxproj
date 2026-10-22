@@ -20,7 +20,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A1000000000000000000000F /* Mutter.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mutter.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000000000000000000000F /* da transcribuh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "da transcribuh.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000010 /* PromptAnnotatorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PromptAnnotatorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -68,7 +68,7 @@
 		A10000000000000000000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A1000000000000000000000F /* Mutter.app */,
+				A1000000000000000000000F /* da transcribuh.app */,
 				A10000000000000000000010 /* PromptAnnotatorTests.xctest */,
 			);
 			name = Products;
@@ -97,7 +97,7 @@
 				A10000000000000000000014 /* WhisperKit */,
 			);
 			productName = PromptAnnotator;
-			productReference = A1000000000000000000000F /* Mutter.app */;
+			productReference = A1000000000000000000000F /* da transcribuh.app */;
 			productType = "com.apple.product-type.application";
 		};
 		A10000000000000000000007 /* PromptAnnotatorTests */ = {
@@ -350,7 +350,7 @@
 				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bicrick.PromptAnnotator;
 				PRODUCT_MODULE_NAME = PromptAnnotator;
-				PRODUCT_NAME = Mutter;
+				PRODUCT_NAME = "da transcribuh";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 5.0;
@@ -380,7 +380,7 @@
 				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bicrick.PromptAnnotator;
 				PRODUCT_MODULE_NAME = PromptAnnotator;
-				PRODUCT_NAME = Mutter;
+				PRODUCT_NAME = "da transcribuh";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 5.0;
@@ -407,7 +407,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mutter.app/Contents/MacOS/Mutter";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/da transcribuh.app/Contents/MacOS/da transcribuh";
 			};
 			name = Debug;
 		};
@@ -431,7 +431,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mutter.app/Contents/MacOS/Mutter";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/da transcribuh.app/Contents/MacOS/da transcribuh";
 			};
 			name = Release;
 		};
