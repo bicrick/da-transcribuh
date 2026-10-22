@@ -34,6 +34,8 @@
 	<string>NSApplication</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>da transcribuh captures the display when you release shift so it can save a still with your marks baked in.</string>
+	<key>ATSApplicationFontsPath</key>
+	<string>Fonts</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<false/>
 	<key>NSSupportsSuddenTermination</key>

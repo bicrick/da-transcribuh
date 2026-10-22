@@ -143,6 +143,9 @@ struct ShortcutBadge: View {
             .foregroundStyle(Ink.label)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(Ink.fill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
+                    .strokeBorder(Ink.label, lineWidth: 1)
+            )
     }
 }

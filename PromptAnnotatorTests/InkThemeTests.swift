@@ -3,32 +3,33 @@ import XCTest
 @testable import PromptAnnotator
 
 final class InkThemeTests: XCTestCase {
-    func testPaletteHexesParse() {
-        let lightAccent = Ink.nsColor(hex: "#E5432F")
-        let darkAccent = Ink.nsColor(hex: "#FF6A55")
-        XCTAssertEqual(round(lightAccent.redComponent * 255), 229)
-        XCTAssertEqual(round(lightAccent.greenComponent * 255), 67)
-        XCTAssertEqual(round(lightAccent.blueComponent * 255), 47)
-        XCTAssertEqual(round(darkAccent.redComponent * 255), 255)
-        XCTAssertEqual(round(darkAccent.greenComponent * 255), 106)
-        XCTAssertEqual(round(darkAccent.blueComponent * 255), 85)
+    func testBWPaletteHexesParse() {
+        let black = Ink.nsColor(hex: "#000000")
+        let white = Ink.nsColor(hex: "#FFFFFF")
+        let hair = Ink.nsColor(hex: "#DADADA")
+        let fill = Ink.nsColor(hex: "#F2F2F2")
+        XCTAssertEqual(round(black.redComponent * 255), 0)
+        XCTAssertEqual(round(white.redComponent * 255), 255)
+        XCTAssertEqual(round(hair.redComponent * 255), 218)
+        XCTAssertEqual(round(fill.greenComponent * 255), 242)
     }
 
-    func testLayoutTokensMatchSpec() {
-        XCTAssertEqual(Ink.cardRadius, 12)
-        XCTAssertEqual(Ink.tileRadius, 14)
-        XCTAssertEqual(Ink.buttonRadius, 7)
-        XCTAssertEqual(Ink.buttonLargeRadius, 9)
-        XCTAssertEqual(Ink.fieldRadius, 7)
-        XCTAssertEqual(Ink.sidebarRowRadius, 8)
-        XCTAssertEqual(Ink.keycapRadius, 8)
-        XCTAssertEqual(Ink.sidebarWidth, 220)
-        // Post–title-bar breathing room only (system safe area already clears the chrome).
+    func testLayoutTokensMatchBWSpec() {
+        XCTAssertEqual(Ink.cardRadius, 3)
+        XCTAssertEqual(Ink.tileRadius, 3)
+        XCTAssertEqual(Ink.buttonRadius, 3)
+        XCTAssertEqual(Ink.fieldRadius, 2)
+        XCTAssertEqual(Ink.sidebarRowRadius, 3)
+        XCTAssertEqual(Ink.sidebarWidth, 108)
+        XCTAssertEqual(Ink.sidebarTileSize, 72)
         XCTAssertEqual(Ink.pageTop, 22)
-        XCTAssertEqual(Ink.pageSide, 36)
-        XCTAssertEqual(Ink.maxContentWidth, 680)
-        XCTAssertEqual(Ink.sectionGap, 28)
-        XCTAssertEqual(Ink.gridGap, 12)
+        XCTAssertEqual(Ink.pageSide, 28)
+        XCTAssertEqual(Ink.maxContentWidth, 660)
+        XCTAssertEqual(Ink.sectionGap, 24)
+        XCTAssertEqual(Ink.gridGap, 10)
+        XCTAssertEqual(Ink.statusBarHeight, 24)
+        XCTAssertEqual(Ink.hardShadow, 3)
+        XCTAssertEqual(Ink.selectedBorder, 2)
     }
 
     func testSettingsMetricsAliasInkTokens() {
@@ -46,7 +47,6 @@ final class InkThemeTests: XCTestCase {
     }
 
     func testSegmentMeterClampsFraction() {
-        // Constructing the view must not trap on out-of-range fractions.
         let low = InkSegmentMeter(label: "Speed", fraction: -1)
         let high = InkSegmentMeter(label: "Quality", fraction: 2)
         XCTAssertEqual(low.label, "Speed")
@@ -64,13 +64,21 @@ final class InkThemeTests: XCTestCase {
         darkAqua.performAsCurrentDrawingAppearance {
             darkHex = hexRGB(resolved: Ink.windowNSColor)
         }
-        XCTAssertEqual(lightHex.uppercased(), "F6F2EC")
-        XCTAssertEqual(darkHex.uppercased(), "1D1A17")
+        XCTAssertEqual(lightHex.uppercased(), "FFFFFF")
+        XCTAssertEqual(darkHex.uppercased(), "000000")
         XCTAssertNotEqual(lightHex, darkHex)
     }
 
+    func testWordmarkUsesSeparateBlockCursorNotInvertedH() {
+        // Pure logic: the displayed name string must be the full lowercase word;
+        // the cursor is a separate view, not an inverted trailing letter.
+        let name = "da transcribuh"
+        XCTAssertFalse(name.hasSuffix(" "))
+        XCTAssertEqual(name.last, "h")
+        XCTAssertEqual(Ink.monoName, "DepartureMono-Regular")
+    }
+
     private func hexRGB(resolved color: NSColor) -> String {
-        // cgColor resolves dynamic providers against the current drawing appearance.
         guard let rgb = NSColor(cgColor: color.cgColor)?.usingColorSpace(.sRGB) else {
             return ""
         }

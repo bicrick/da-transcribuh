@@ -31,11 +31,9 @@ struct HomePage: View {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top, spacing: 16) {
                     AppLogo(side: 56)
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text("da transcribuh")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundStyle(Ink.label)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 10) {
+                            DTWordmark(size: 22)
                             InkBadge(text: AppVersion.label)
                         }
                         Text("Dictation in the menu bar. Capture the screen when you want the picture with the words.")
@@ -44,12 +42,12 @@ struct HomePage: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .padding(.horizontal, 22)
-                .padding(.top, 22)
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
 
                 InkDivider(leading: 0)
 
-                HStack(alignment: .center, spacing: 16) {
+                HStack(alignment: .center, spacing: 14) {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 8) {
                             statusDot
@@ -77,28 +75,17 @@ struct HomePage: View {
                     .accessibilityLabel(session.phase == .recording ? "Stop session" : "Start session")
                     .accessibilityHint("Shortcut \(settings.chord.display)")
                 }
-                .padding(.horizontal, 22)
-                .padding(.bottom, 20)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
             }
-            .background(
-                LinearGradient(
-                    colors: [Ink.accentSoft, Color.clear],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
         }
     }
 
     private var statusDot: some View {
-        Circle()
-            .fill(session.isBusy || session.phase == .recording ? Ink.accent : Ink.success)
+        Rectangle()
+            .fill(Ink.label)
             .frame(width: 8, height: 8)
-            .overlay(
-                Circle()
-                    .stroke(Ink.success.opacity(0.25), lineWidth: 3)
-                    .opacity(session.phase == .idle && !session.isBusy ? 1 : 0)
-            )
+            .opacity(session.isBusy || session.phase == .recording ? 1 : 1)
     }
 
     private var stats: some View {
@@ -119,7 +106,7 @@ struct HomePage: View {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Ink.accent)
+                    .foregroundStyle(Ink.label)
                 Text("\(value)")
                     .font(Ink.statValueFont)
                     .monospacedDigit()

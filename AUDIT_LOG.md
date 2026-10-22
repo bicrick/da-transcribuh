@@ -6,7 +6,14 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–15)
+## Final summary (Runs 1–16)
+
+### Run 16 — B&W “da transcribuh” chrome
+
+- Replaced Ink red theme with strict B/W tokens (1px lines, 3px radii, hard shadows, Departure Mono for wordmark/status).
+- Settings: single-column square tool-palette sidebar (icon above label, selected inverted); 24pt mono status bar; wordmark uses **separate block cursor** (not inverted h).
+- Onboarding welcome wordmark blinks (Reduce Motion respected). Menu bar uses `MenuBarIcon` dt template; standard `MenuBarExtra` menu kept (custom styled panel deferred). System traffic lights kept.
+- AppIcon / AppMark regenerated from dt 1024. Island/overlay untouched.
 
 ### Run 15a — README + brand assets (da transcribuh)
 
@@ -29,10 +36,18 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 | **Paste hold (Run 14)** | Skip synthetic ⌘V when no editable focus; stage multi-rep clipboard; menu “Ready to paste”; ⌃⌥V still sequential. Cancel discards. |
 | **Brand / README (Run 15a)** | da transcribuh README + `assets/brand/` (banner, logo, social previews, bubble16). |
 | **In-app rename (Run 15b)** | User-facing strings → “da transcribuh”; CFBundleDisplayName/Name; release URLs. Bundle ID / PromptAnnotator paths / PRODUCT_NAME=Mutter.app unchanged. |
+| **B&W chrome (Run 16)** | Settings/onboarding/menu-bar B/W restyle; single-column tile sidebar; status bar; Departure Mono; dt AppIcon. Island unchanged. |
 
 ### Reverted (Run 9, still gone)
 
 - **Quiet-room calibration** — fixed SpeechGate **0.28** (matches `main`). No dangling Swift/pbxproj refs.
+
+### Run 16 (B&W chrome)
+
+- Tokens: light `#FFF/#000/#DADADA/#F2F2F2/#666/#A3A3A3`; dark inverted. Font: `DepartureMono-Regular.otf` + OFL under `PromptAnnotator/Fonts/`, `ATSApplicationFontsPath=Fonts`.
+- Sidebar: **one column** of square tiles (not 2-col, not compact rows); width ~108. Status bar cells: state / model / sessions / shortcut / version.
+- Deferred: custom outlined traffic lights; custom styled menu-bar panel (functional MenuBarExtra kept).
+- Tests: `InkThemeTests` updated for B/W tokens + wordmark cursor rule.
 
 ### Run 15b (in-app rename)
 
@@ -123,6 +138,19 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 - [ ] Optional: >10 min under PCM retain cap → file merge OK.
 - [ ] Display plug/unplug while marking; double Paste Image and Text once only.
 - [ ] Quit while recording → volume restored; PTT works after relaunch.
+
+---
+
+## Run 16 — B&W Settings / onboarding chrome
+
+See summary. Mac checklist:
+
+1. Build tip; Settings sidebar is **one** column of square tiles; selected tile inverted.
+2. Status bar at bottom shows idle/model/sessions/shortcut/version in mono.
+3. Wordmark is `da transcribuh` + solid block cursor (h not inverted); onboarding cursor blinks unless Reduce Motion.
+4. Menu bar shows dt template glyph; menu still works.
+5. Light + dark; record a session — island unchanged.
+6. Run `InkThemeTests`.
 
 ---
 
@@ -672,7 +700,7 @@ Static re-audit of Runs 5–6 (~+2300 lines vs `main`) that have never been Xcod
 - [ ] **Very long session (optional):** record >10 minutes with speech → stop → full transcript (file path) still OK; menu shows words / No speech detected as appropriate.
 - [ ] **Island during record:** waveform stays smooth (no multi-second freezes) while live transcription runs.
 - [ ] **Idle:** sit in menu bar with Settings closed for a minute → CPU near idle (no spin from speech timers).
-- [ ] **Copy Last Again:** finish a session → copy something else in another app → menu **Copy Last Again** → Mutter image/transcript restored; Paste Image and Text still works.
+- [ ] **Copy Last Again:** finish a session → copy something else in another app → menu **Copy Last Again** → image/transcript restored; Paste Image and Text still works.
 - [ ] Performance page: open it, watch Refresh; leaving it open should not peg CPU from folder walks.
 
 ### Proposed polish / features (ranked)

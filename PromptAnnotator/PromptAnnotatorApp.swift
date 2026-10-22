@@ -16,9 +16,15 @@ struct PromptAnnotatorApp: App {
         MenuBarExtra {
             SessionMenu(session: session, settings: AppSettings.shared)
         } label: {
-            // A system image. A custom drawing in this label does not show up in the menu bar.
-            Image(systemName: session.menuIcon)
-                .accessibilityLabel(session.menuAccessibilityLabel)
+            // Template dt glyph (assets). SF Symbol fallback if the imageset is missing.
+            Label {
+                Text(session.menuAccessibilityLabel)
+            } icon: {
+                Image("MenuBarIcon")
+                    .renderingMode(.template)
+            }
+            .labelStyle(.iconOnly)
+            .accessibilityLabel(session.menuAccessibilityLabel)
         }
     }
 }

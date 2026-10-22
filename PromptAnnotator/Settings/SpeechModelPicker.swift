@@ -126,7 +126,7 @@ struct SpeechModelPicker: View {
                         Spacer(minLength: 4)
                         if selected {
                             ZStack {
-                                Circle().fill(Ink.accent).frame(width: 20, height: 20)
+                                Rectangle().fill(Ink.label).frame(width: 18, height: 18)
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundStyle(Ink.onAccent)

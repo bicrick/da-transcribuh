@@ -141,9 +141,7 @@ struct OnboardingFlow: View {
             HStack(spacing: 12) {
                 AppLogo(side: 44)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("da transcribuh")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(Ink.label)
+                    DTWordmark(size: 18, blinks: true)
                     Text(AppVersion.label)
                         .font(Ink.captionFont)
                         .foregroundStyle(Ink.secondary)

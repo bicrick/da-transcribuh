@@ -17,21 +17,25 @@ struct SettingsRoot: View {
         NavigationSplitView {
             VStack(spacing: 0) {
                 SettingsSidebar(selection: $page)
-                footer
+                sidebarFooter
             }
             .background(Ink.sidebar)
             .navigationSplitViewColumnWidth(
-                min: Ink.sidebarWidth - 24,
+                min: Ink.sidebarWidth - 8,
                 ideal: Ink.sidebarWidth,
-                max: Ink.sidebarWidth + 20
+                max: Ink.sidebarWidth + 16
             )
         } detail: {
-            detail
-                // Avoid an empty detail toolbar band stacking on top of pageTop.
-                .toolbar(.hidden, for: .automatic)
+            VStack(spacing: 0) {
+                detail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .toolbar(.hidden, for: .automatic)
+                DTStatusBar(cells: statusCells, trailing: AppVersion.label)
+            }
+            .background(Ink.window)
         }
         .navigationSplitViewStyle(.balanced)
-        .tint(Ink.accent)
+        .tint(Ink.label)
         .background(Ink.window)
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSettingsShown)) { _ in
@@ -63,25 +67,43 @@ struct SettingsRoot: View {
         }
     }
 
-    private var footer: some View {
-        HStack(spacing: 8) {
-            AppLogo(side: 22)
-            VStack(alignment: .leading, spacing: 0) {
-                Text("da transcribuh")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Ink.label)
-                Text(AppVersion.label)
-                    .font(.system(size: 10))
-                    .foregroundStyle(Ink.secondary)
-            }
-            Spacer()
+    private var statusCells: [String] {
+        var cells: [String] = []
+        let state: String = {
+            if !session.statusText.isEmpty { return session.statusText.lowercased() }
+            if let hint = session.pasteReadyHint, !hint.isEmpty { return "ready to paste" }
+            return "idle"
+        }()
+        cells.append("■ \(state)")
+        cells.append(settings.speechModel)
+        let n = sessions.count
+        cells.append("\(n) session\(n == 1 ? "" : "s")")
+        cells.append(settings.chord.display)
+        return cells
+    }
+
+    private var sidebarFooter: some View {
+        VStack(spacing: 4) {
+            Image("AppMark")
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 28, height: 28)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .strokeBorder(Ink.label, lineWidth: 1)
+                )
+            Text(AppVersion.label)
+                .font(.system(size: 9))
+                .foregroundStyle(Ink.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
         }
-        .padding(.horizontal, SettingsMetrics.sidebarFooterPadding)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 8)
         .padding(.vertical, 10)
         .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Ink.hairline)
-                .frame(height: 1)
+            Rectangle().fill(Ink.hairline).frame(height: 1)
         }
     }
 
@@ -90,62 +112,68 @@ struct SettingsRoot: View {
     }
 }
 
-/// Custom sidebar so selection uses Ink tint (List + `.sidebar` forces the system accent pill).
+/// Single-column tool-palette sidebar: square tiles (icon above label), selected = inverted.
 struct SettingsSidebar: View {
     @Binding var selection: SettingsPage
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .center, spacing: 2) {
                 ForEach(SettingsPage.sidebarSections, id: \.title) { section in
-                    Text(section.title)
+                    Text(section.title.uppercased())
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Ink.tertiary)
-                        .padding(.horizontal, 10)
-                        .padding(.top, 16)
-                        .padding(.bottom, 6)
+                        .foregroundStyle(Ink.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 2)
+                        .padding(.top, 12)
+                        .padding(.bottom, 6)
 
-                    ForEach(section.pages) { item in
-                        sidebarRow(item)
+                    VStack(spacing: 6) {
+                        ForEach(section.pages) { item in
+                            toolTile(item)
+                        }
                     }
+                    .frame(maxWidth: .infinity)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
-            .padding(.bottom, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 8)
+            .frame(maxWidth: .infinity, alignment: .top)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Settings")
     }
 
-    private func sidebarRow(_ item: SettingsPage) -> some View {
+    private func toolTile(_ item: SettingsPage) -> some View {
         let selected = selection == item
         return Button {
             selection = item
         } label: {
-            HStack(spacing: 9) {
+            VStack(spacing: 6) {
                 Image(systemName: item.symbol)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(selected ? Ink.accent : Ink.secondary)
-                    .frame(width: 18, alignment: .center)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(selected ? Ink.onAccent : Ink.label)
                 Text(item.title)
-                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? Ink.accent : Ink.label)
-                Spacer(minLength: 0)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(selected ? Ink.onAccent : Ink.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
-            .padding(.horizontal, 10)
-            .frame(height: 30)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: Ink.sidebarTileSize, height: Ink.sidebarTileSize)
             .background(
+                (selected ? Ink.label : Ink.window),
+                in: RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
+            )
+            .overlay(
                 RoundedRectangle(cornerRadius: Ink.sidebarRowRadius, style: .continuous)
-                    .fill(selected ? Ink.sidebarSelection : Color.clear)
+                    .strokeBorder(Ink.label, lineWidth: 1)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
         .accessibilityLabel(item.title)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
     }
