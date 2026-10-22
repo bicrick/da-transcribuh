@@ -14,6 +14,7 @@ struct ConfigurationPage: View {
     private enum CaptureTarget {
         case toggle
         case cancel
+        case clipboard
     }
 
     var body: some View {
@@ -23,6 +24,12 @@ struct ConfigurationPage: View {
         ) {
             SettingsSection(title: "Keyboard shortcuts") {
                 shortcutCard
+            }
+            SettingsSection(
+                title: "Clipboard history",
+                footer: "Maccy-style history. Uses Accessibility (already needed for paste). Default shortcut ⌘⇧C."
+            ) {
+                clipboardCard
             }
             SettingsSection(title: "Application") {
                 applicationCard
@@ -113,6 +120,68 @@ struct ConfigurationPage: View {
                     Button("Reset to ⌥Space") {
                         capture = nil
                         message = settings.setChord(.default) ? nil : "macOS would not register the default shortcut."
+                    }
+                    .buttonStyle(InkSecondaryButtonStyle())
+                }
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.bottom, Ink.rowVPad)
+            }
+        }
+    }
+
+    private var clipboardCard: some View {
+        InkCard {
+            VStack(alignment: .leading, spacing: 0) {
+                InkToggleRow(
+                    title: "Clipboard history",
+                    detail: "On by default. \(settings.clipboardChord.display) opens the panel near the pointer.",
+                    isOn: Binding(
+                        get: { settings.clipboardHistoryEnabled },
+                        set: { settings.setClipboardHistoryEnabled($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkSettingRow(
+                    title: "History shortcut",
+                    detail: "Paste with Enter; ⌥Enter copies only. Shares Accessibility with paste — no extra permission."
+                ) {
+                    InkShortcutRecorder(
+                        keys: settings.clipboardChord.keycaps,
+                        listening: capture == .clipboard
+                    ) {
+                        capture = .clipboard
+                        message = nil
+                    }
+                }
+                InkDivider(leading: 0)
+                InkSettingRow(
+                    title: "History size",
+                    detail: "Keep up to \(settings.clipboardHistoryLimit) items (pinned survive Clear)."
+                ) {
+                    Stepper(
+                        value: Binding(
+                            get: { settings.clipboardHistoryLimit },
+                            set: { settings.setClipboardHistoryLimit($0) }
+                        ),
+                        in: 20...500,
+                        step: 20
+                    ) {
+                        Text("\(settings.clipboardHistoryLimit)")
+                            .font(Ink.mono(12))
+                            .monospacedDigit()
+                    }
+                }
+                HStack {
+                    Spacer()
+                    Button("Reset to ⌘⇧C") {
+                        capture = nil
+                        message = settings.setClipboardChord(.clipboardDefault)
+                            ? nil
+                            : "macOS would not register the default shortcut."
+                    }
+                    .buttonStyle(InkSecondaryButtonStyle())
+                    Button("Clear history") {
+                        ClipboardHistoryStore.shared.clearHistory(keepingPinned: true)
                     }
                     .buttonStyle(InkSecondaryButtonStyle())
                 }
@@ -340,6 +409,23 @@ struct ConfigurationPage: View {
                 return
             }
             message = settings.setCancelChord(chord)
+                ? nil
+                : "That shortcut is already used, or macOS would not register it."
+        case .clipboard:
+            let bare = event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty
+            if bare, event.keyCode == 53 { return }
+            if bare, event.keyCode == 51 || event.keyCode == 117 {
+                message = settings.setClipboardChord(.clipboardDefault)
+                    ? nil
+                    : "macOS would not register the default shortcut."
+                return
+            }
+            let chord = HotkeyChord(event: event)
+            if let rejection = chord.rejection(allowingShift: true) {
+                message = rejection
+                return
+            }
+            message = settings.setClipboardChord(chord)
                 ? nil
                 : "That shortcut is already used, or macOS would not register it."
         case nil:

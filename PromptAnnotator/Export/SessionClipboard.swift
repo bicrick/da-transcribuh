@@ -19,6 +19,7 @@ enum SessionClipboard {
                         transcript: text,
                         changeCount: changeCount
                     )
+                    ClipboardHistoryController.shared.ingestSession(transcript: text, imagePNG: png)
                 }
             }
             return true
@@ -29,6 +30,7 @@ enum SessionClipboard {
             let changeCount = board.changeCount
             MainActor.assumeIsolated {
                 PasteFollowUp.shared.arm(png: nil, tiff: nil, transcript: text, changeCount: changeCount)
+                ClipboardHistoryController.shared.ingestSession(transcript: text, imagePNG: nil)
             }
         }
         return true
@@ -43,6 +45,16 @@ enum SessionClipboard {
         let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let png = pngData(from: image)
         guard png != nil || !text.isEmpty else { return false }
+
+        let isGeneral = board === NSPasteboard.general
+        if isGeneral {
+            MainActor.assumeIsolated { ClipboardHistoryStore.shared.beginOwnWrite() }
+        }
+        defer {
+            if isGeneral {
+                MainActor.assumeIsolated { ClipboardHistoryStore.shared.endOwnWrite() }
+            }
+        }
 
         board.clearContents()
 
@@ -60,36 +72,43 @@ enum SessionClipboard {
                 item.setData(html, forType: .html)
             }
             guard board.writeObjects([item]) else { return false }
-            if board === NSPasteboard.general {
+            if isGeneral {
                 MainActor.assumeIsolated {
                     PasteFollowUp.shared.armPending(
                         png: png,
                         tiff: image.tiffRepresentation,
                         transcript: text
                     )
+                    ClipboardHistoryController.shared.ingestSession(transcript: text, imagePNG: png)
                 }
             }
             return true
         }
 
         if let png {
-            guard writeImage(png: png, tiff: image?.tiffRepresentation, to: board) else { return false }
-            if board === NSPasteboard.general {
+            // Already inside own-write suppress; write without nested begin/end.
+            guard board.setData(png, forType: .png) else { return false }
+            if let tiff = image?.tiffRepresentation {
+                board.setData(tiff, forType: .tiff)
+            }
+            if isGeneral {
                 MainActor.assumeIsolated {
                     PasteFollowUp.shared.armPending(
                         png: png,
                         tiff: image?.tiffRepresentation,
                         transcript: text
                     )
+                    ClipboardHistoryController.shared.ingestSession(transcript: text, imagePNG: png)
                 }
             }
             return true
         }
 
-        guard writeTranscript(text, to: board) else { return false }
-        if board === NSPasteboard.general {
+        guard board.setString(text, forType: .string) else { return false }
+        if isGeneral {
             MainActor.assumeIsolated {
                 PasteFollowUp.shared.armPending(png: nil, tiff: nil, transcript: text)
+                ClipboardHistoryController.shared.ingestSession(transcript: text, imagePNG: nil)
             }
         }
         return true
@@ -97,6 +116,14 @@ enum SessionClipboard {
 
     @discardableResult
     static func writeImage(png: Data, tiff: Data?, to board: NSPasteboard) -> Bool {
+        if board === NSPasteboard.general {
+            MainActor.assumeIsolated { ClipboardHistoryStore.shared.beginOwnWrite() }
+        }
+        defer {
+            if board === NSPasteboard.general {
+                MainActor.assumeIsolated { ClipboardHistoryStore.shared.endOwnWrite() }
+            }
+        }
         board.clearContents()
         guard board.setData(png, forType: .png) else { return false }
         if let tiff {
@@ -108,6 +135,14 @@ enum SessionClipboard {
     @discardableResult
     static func writeTranscript(_ text: String, to board: NSPasteboard) -> Bool {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        if board === NSPasteboard.general {
+            MainActor.assumeIsolated { ClipboardHistoryStore.shared.beginOwnWrite() }
+        }
+        defer {
+            if board === NSPasteboard.general {
+                MainActor.assumeIsolated { ClipboardHistoryStore.shared.endOwnWrite() }
+            }
+        }
         board.clearContents()
         return board.setString(text, forType: .string)
     }

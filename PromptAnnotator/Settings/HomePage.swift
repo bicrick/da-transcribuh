@@ -54,6 +54,7 @@ struct HomePage: View {
             syncGetStartedFlag()
         }
         .onChange(of: sessions.count) { _, _ in syncGetStartedFlag() }
+        .onChange(of: settings.clipboardHistoryEnabled) { _, _ in syncGetStartedFlag() }
         .onReceive(permissions.objectWillChange) { _ in
             DispatchQueue.main.async { syncGetStartedFlag() }
         }
@@ -649,6 +650,14 @@ struct HomePage: View {
                             .buttonStyle(InkSecondaryButtonStyle())
                     }
                 )
+            ),
+            ChecklistItem(
+                done: settings.clipboardHistoryEnabled,
+                title: "Clipboard history",
+                detail: settings.clipboardHistoryEnabled
+                    ? "\(settings.clipboardChord.display) opens history. Off anytime in General."
+                    : "Turn on in General — or finish welcome setup. Uses Accessibility you already grant for paste.",
+                trail: nil
             ),
             ChecklistItem(
                 done: modelReady,

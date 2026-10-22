@@ -24,6 +24,10 @@ final class ChromePanel: NSPanel {
         cornerRadius = radius
     }
 
+    /// Recording island resigns key after click so the target app stays frontmost.
+    /// Clipboard history keeps key so search / local key monitor keep working.
+    var resignKeyOnMouseUp: Bool = true
+
     var cornerRadius: CGFloat = 3 {
         didSet { applyShape() }
     }
@@ -75,7 +79,7 @@ final class ChromePanel: NSPanel {
 
     override func sendEvent(_ event: NSEvent) {
         super.sendEvent(event)
-        if event.type == .leftMouseUp {
+        if resignKeyOnMouseUp, event.type == .leftMouseUp {
             resignKey()
         }
     }
