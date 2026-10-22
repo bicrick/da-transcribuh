@@ -54,11 +54,12 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.titleStripHeight, 40)
         XCTAssertEqual(Ink.scrollerWidth, 5)
         XCTAssertEqual(Ink.paintSwatches.count, 16)
-        XCTAssertEqual(SettingsPage.tabOrder.count, 7)
+        XCTAssertEqual(SettingsPage.tabOrder.count, 8)
         XCTAssertEqual(SettingsPage.tabOrder.first, .home)
         XCTAssertEqual(SettingsPage.tabOrder[1], .appearance)
         XCTAssertEqual(SettingsPage.tabOrder[2], .history)
-        XCTAssertEqual(SettingsPage.tabOrder[3], .model)
+        XCTAssertEqual(SettingsPage.tabOrder[3], .clipboard)
+        XCTAssertEqual(SettingsPage.tabOrder[4], .model)
     }
 
     func testSettingsMetricsAliasInkTokens() {
@@ -232,8 +233,9 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(SettingsPage.home.tabAccent, Ink.tabStrokeRed)
         XCTAssertEqual(SettingsPage.appearance.tabAccent, Ink.tabStrokePurple)
         XCTAssertEqual(SettingsPage.history.tabAccent, Ink.tabStrokeBlue)
+        XCTAssertEqual(SettingsPage.clipboard.tabAccent, Ink.tabStrokeGreen)
         XCTAssertEqual(SettingsPage.model.tabAccent, Ink.tabStrokeOrange)
-        XCTAssertEqual(SettingsPage.performance.tabAccent, Ink.tabStrokePink)
+        XCTAssertEqual(SettingsPage.performance.tabAccent, Ink.tabStrokeBlue)
         XCTAssertEqual(FolderTabShape.corner, 0, "Tabs are square Paint chrome")
         XCTAssertEqual(FolderTabShape.foot, 0, "No cove feet — tabs have no bevel")
         XCTAssertEqual(Ink.stroke, 2)

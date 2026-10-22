@@ -39,6 +39,11 @@ final class ClipboardWatcher {
 
     private func tick() {
         guard isEnabled() else { return }
+        let settings = AppSettings.shared
+        guard !settings.clipboardCapturePaused else {
+            acknowledgePasteboard()
+            return
+        }
         guard store.suppressWatcher == 0 else {
             acknowledgePasteboard()
             return
@@ -51,11 +56,18 @@ final class ClipboardWatcher {
     }
 
     func capture(from board: NSPasteboard) {
-        guard !ClipboardPasteboardTypes.isSensitive(board) else { return }
+        let settings = AppSettings.shared
+        if settings.clipboardIgnoreConcealed, ClipboardPasteboardTypes.isSensitive(board) { return }
 
-        if let urls = board.readObjects(forClasses: [NSURL.self], options: [
+        if let frontID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+           settings.clipboardIgnoredApps.contains(frontID) {
+            return
+        }
+
+        if settings.clipboardSaveFiles,
+           let urls = board.readObjects(forClasses: [NSURL.self], options: [
             .urlReadingFileURLsOnly: true
-        ]) as? [URL], !urls.isEmpty {
+           ]) as? [URL], !urls.isEmpty {
             let paths = urls.map(\.path)
             _ = store.ingest(
                 kind: .fileURL,
@@ -63,12 +75,14 @@ final class ClipboardWatcher {
                 text: paths.joined(separator: "\n"),
                 imagePNG: nil,
                 filePaths: paths,
-                fingerprint: ClipboardFingerprint.files(paths)
+                fingerprint: ClipboardFingerprint.files(paths),
+                applicationName: NSWorkspace.shared.frontmostApplication?.localizedName
             )
             return
         }
 
-        if let image = NSImage(pasteboard: board),
+        if settings.clipboardSaveImages,
+           let image = NSImage(pasteboard: board),
            let tiff = image.tiffRepresentation,
            let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
@@ -78,10 +92,13 @@ final class ClipboardWatcher {
                 text: nil,
                 imagePNG: png,
                 filePaths: nil,
-                fingerprint: ClipboardFingerprint.image(png)
+                fingerprint: ClipboardFingerprint.image(png),
+                applicationName: NSWorkspace.shared.frontmostApplication?.localizedName
             )
             return
         }
+
+        guard settings.clipboardSaveText else { return }
 
         if let str = board.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
            !str.isEmpty {
@@ -91,7 +108,8 @@ final class ClipboardWatcher {
                 text: str,
                 imagePNG: nil,
                 filePaths: nil,
-                fingerprint: ClipboardFingerprint.text(str)
+                fingerprint: ClipboardFingerprint.text(str),
+                applicationName: NSWorkspace.shared.frontmostApplication?.localizedName
             )
             return
         }
@@ -111,7 +129,8 @@ final class ClipboardWatcher {
                 text: str,
                 imagePNG: nil,
                 filePaths: nil,
-                fingerprint: ClipboardFingerprint.text(str)
+                fingerprint: ClipboardFingerprint.text(str),
+                applicationName: NSWorkspace.shared.frontmostApplication?.localizedName
             )
         }
     }

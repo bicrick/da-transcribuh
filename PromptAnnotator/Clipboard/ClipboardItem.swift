@@ -36,10 +36,13 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
     var copyCount: Int
     var imageWidth: Int?
     var imageHeight: Int?
+    var pinTitle: String?
+    var pinKey: String?
 
     enum CodingKeys: String, CodingKey {
         case id, createdAt, kind, source, text, imageFileName, filePaths, pinned, fingerprint
         case applicationName, firstCopiedAt, lastCopiedAt, copyCount, imageWidth, imageHeight
+        case pinTitle, pinKey
     }
 
     init(
@@ -57,7 +60,9 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
         lastCopiedAt: Date? = nil,
         copyCount: Int = 1,
         imageWidth: Int? = nil,
-        imageHeight: Int? = nil
+        imageHeight: Int? = nil,
+        pinTitle: String? = nil,
+        pinKey: String? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -74,6 +79,8 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
         self.copyCount = max(1, copyCount)
         self.imageWidth = imageWidth
         self.imageHeight = imageHeight
+        self.pinTitle = pinTitle
+        self.pinKey = pinKey
     }
 
     init(from decoder: Decoder) throws {
@@ -93,9 +100,12 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
         copyCount = try c.decodeIfPresent(Int.self, forKey: .copyCount) ?? 1
         imageWidth = try c.decodeIfPresent(Int.self, forKey: .imageWidth)
         imageHeight = try c.decodeIfPresent(Int.self, forKey: .imageHeight)
+        pinTitle = try c.decodeIfPresent(String.self, forKey: .pinTitle)
+        pinKey = try c.decodeIfPresent(String.self, forKey: .pinKey)
     }
 
     var previewLine: String {
+        if let pinTitle, !pinTitle.isEmpty { return pinTitle }
         switch kind {
         case .text:
             let raw = (text ?? "").replacingOccurrences(of: "\n", with: " ")

@@ -90,6 +90,8 @@ final class ClipboardHistoryController {
     /// Returns whether the pasteboard write succeeded (paste is skipped on failure).
     @discardableResult
     func pick(_ item: ClipboardItem, paste: Bool) -> Bool {
+        let settings = AppSettings.shared
+        let shouldPaste = paste && settings.clipboardPasteAutomatically
         store.beginOwnWrite()
         defer { store.endOwnWrite() }
 
@@ -97,6 +99,8 @@ final class ClipboardHistoryController {
         switch item.kind {
         case .text:
             let text = item.text ?? ""
+            // Plain string always — “without formatting” is the default staging path.
+            _ = settings.clipboardPasteWithoutFormatting
             wrote = SessionClipboard.writeTranscript(text, to: .general)
         case .image:
             if let image = store.image(for: item),
@@ -112,7 +116,7 @@ final class ClipboardHistoryController {
             wrote = board.writeObjects(urls)
         }
 
-        if paste, wrote {
+        if shouldPaste, wrote {
             PasteFollowUp.shared.simulateCommandV()
         }
         return wrote

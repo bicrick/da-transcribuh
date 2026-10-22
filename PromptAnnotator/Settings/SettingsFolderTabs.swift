@@ -203,7 +203,7 @@ struct FolderTabShape: Shape {
 extension SettingsPage {
     static var tabGroups: [[SettingsPage]] {
         [
-            [.home, .appearance, .history],
+            [.home, .appearance, .history, .clipboard],
             [.model],
             [.configuration, .sound, .performance],
         ]
@@ -216,10 +216,11 @@ extension SettingsPage {
         case .home: return "1"
         case .appearance: return "2"
         case .history: return "3"
-        case .model: return "4"
-        case .configuration: return "5"
-        case .sound: return "6"
-        case .performance: return "7"
+        case .clipboard: return "4"
+        case .model: return "5"
+        case .configuration: return "6"
+        case .sound: return "7"
+        case .performance: return "8"
         }
     }
 
@@ -228,10 +229,11 @@ extension SettingsPage {
         case .home: return Ink.tabStrokeRed
         case .appearance: return Ink.tabStrokePurple
         case .history: return Ink.tabStrokeBlue
+        case .clipboard: return Ink.tabStrokeGreen
         case .model: return Ink.tabStrokeOrange
-        case .configuration: return Ink.tabStrokeGreen
-        case .sound: return Ink.tabStrokeTeal
-        case .performance: return Ink.tabStrokePink
+        case .configuration: return Ink.tabStrokeTeal
+        case .sound: return Ink.tabStrokePink
+        case .performance: return Ink.tabStrokeBlue
         }
     }
 }

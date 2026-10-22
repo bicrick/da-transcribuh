@@ -81,6 +81,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         HotkeyCenter.shared.remove()
         MainActor.assumeIsolated {
+            if AppSettings.shared.clipboardClearOnQuit {
+                ClipboardHistoryStore.shared.clearHistoryFully(
+                    clearSystem: AppSettings.shared.clipboardClearSystemClipboard
+                )
+            }
             PasteFollowUp.shared.remove()
             ClipboardHistoryController.shared.remove()
         }

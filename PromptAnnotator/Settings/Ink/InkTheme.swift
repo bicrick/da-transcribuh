@@ -27,6 +27,9 @@ enum Ink {
     static let meter = label
     static let secondary = color(light: "#666666", dark: "#A8A8AD")
     static let tertiary = color(light: "#999999", dark: "#7A7A80")
+    /// Soft list selection (clipboard / future tables). Hard black/white stay on bevels only.
+    static let rowSelect = color(light: "#E6E6E6", dark: "#454548")
+    static let rowHover = color(light: "#F0F0F0", dark: "#3F3F42")
     /// Selected tab + content front pane (slightly above window).
     static let front = color(light: "#FFFFFF", dark: "#3A3A3D")
     /// Cards / raised panels.

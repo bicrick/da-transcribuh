@@ -40,7 +40,7 @@ enum OnboardingStep: Int, CaseIterable {
         case .shortcut:
             return "Recording defaults to ⌥Space; clipboard history to ⌘⇧C. Both are rebindable. ⌘Space / ⌥⌘Space stay with the system."
         case .clipboard:
-            return "Maccy-style history of text, images, and files. Default shortcut ⌘⇧C — uses Accessibility you already granted for paste."
+            return "Maccy-style history of text, images, and files. Default shortcut ⌘⇧C. Tune capture and paste on the Clipboard settings tab."
         case .appearance:
             return "Light, dark graphite, or follow the system. Same control as the Appearance tab."
         case .model:

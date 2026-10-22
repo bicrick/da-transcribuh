@@ -9,9 +9,15 @@ final class ClipboardHistoryPanelController {
     private var panel: ChromePanel?
     private var host: NSHostingView<ClipboardHistoryView>?
     private let store = ClipboardHistoryStore.shared
+    private var outsideMonitor: Any?
+    private var resignObserver: NSObjectProtocol?
 
     var isVisible: Bool {
         panel?.isVisible == true
+    }
+
+    var listFrame: NSRect {
+        panel?.frame ?? .zero
     }
 
     func toggle() {
@@ -27,16 +33,33 @@ final class ClipboardHistoryPanelController {
             store: store,
             onPick: { [weak self] item, paste in
                 let wrote = ClipboardHistoryController.shared.pick(item, paste: paste)
-                // Enter / paste closes; ⌥Enter copy-only keeps the panel open (Maccy).
+                // Enter / click paste closes; ⌥Enter copy-only keeps the panel open.
                 if paste, wrote {
                     self?.hide()
                 }
             },
-            onClose: { [weak self] in self?.hide() }
+            onClose: { [weak self] in self?.hide() },
+            onOpenPreferences: { [weak self] in
+                self?.hide()
+                SettingsPresenter.shared.show(page: .clipboard)
+            },
+            onPreview: { item in
+                if let item {
+                    ClipboardPreviewPanelController.shared.show(
+                        item: item,
+                        image: ClipboardHistoryStore.shared.image(for: item),
+                        beside: ClipboardHistoryPanelController.shared.listFrame
+                    )
+                } else {
+                    ClipboardPreviewPanelController.shared.hide()
+                }
+            }
         )
         if panel == nil {
-            let panel = ChromePanel(radius: Ink.cardRadius)
+            let panel = ChromePanel(radius: 0)
             panel.resignKeyOnMouseUp = false
+            panel.isOpaque = false
+            panel.backgroundColor = .clear
             let host = NSHostingView(rootView: root)
             host.frame = NSRect(origin: .zero, size: ClipboardHistoryView.preferredSize)
             panel.contentView = host
@@ -48,30 +71,106 @@ final class ClipboardHistoryPanelController {
         }
         guard let panel else { return }
         let size = ClipboardHistoryView.preferredSize
-        // Chrome size includes double-pane gutter.
         let chrome = CGSize(width: size.width + Ink.bevelOffset, height: size.height + Ink.bevelOffset)
-        placeNearMouse(panel: panel, size: chrome, visual: size)
-        panel.alphaValue = 1
+        place(panel: panel, size: chrome, visual: size)
+        panel.alphaValue = 0.95
         panel.orderFrontRegardless()
-        // Focus search without activating the app.
         panel.makeFirstResponder(host)
+        installOutsideClickMonitor()
+        installResignObserver()
     }
 
     func hide() {
+        removeOutsideClickMonitor()
+        removeResignObserver()
+        ClipboardPreviewPanelController.shared.hide()
         panel?.orderOut(nil)
     }
 
-    private func placeNearMouse(panel: ChromePanel, size: CGSize, visual: CGSize) {
-        let mouse = NSEvent.mouseLocation
-        let screen = ScreenGeometry.screen(containingAppKitPoint: mouse)
-            ?? NSScreen.main
-            ?? NSScreen.screens.first
+    private func installOutsideClickMonitor() {
+        removeOutsideClickMonitor()
+        outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            MainActor.assumeIsolated {
+                self?.handleOutsideClick(event)
+            }
+        }
+    }
+
+    private func handleOutsideClick(_ event: NSEvent) {
+        guard isVisible, let panel else { return }
+        let point = event.locationInWindow
+        // Global monitor: location is in screen coords for mouse events.
+        let screenPoint = NSEvent.mouseLocation
+        let listHit = panel.frame.contains(screenPoint)
+        let previewHit = ClipboardPreviewPanelController.shared.frame?.contains(screenPoint) == true
+        if !listHit && !previewHit {
+            hide()
+        }
+        _ = point
+    }
+
+    private func removeOutsideClickMonitor() {
+        if let outsideMonitor {
+            NSEvent.removeMonitor(outsideMonitor)
+            self.outsideMonitor = nil
+        }
+    }
+
+    private func installResignObserver() {
+        removeResignObserver()
+        resignObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                // Delay so a click that activates another app still closes us.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    MainActor.assumeIsolated {
+                        guard let self, self.isVisible else { return }
+                        if self.panel?.isKeyWindow != true {
+                            self.hide()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func removeResignObserver() {
+        if let resignObserver {
+            NotificationCenter.default.removeObserver(resignObserver)
+            self.resignObserver = nil
+        }
+    }
+
+    private func place(panel: ChromePanel, size: CGSize, visual: CGSize) {
+        let settings = AppSettings.shared
+        let screen = NSScreen.main ?? NSScreen.screens.first
         guard let screen else { return }
         let visible = screen.visibleFrame
-        var origin = NSPoint(
-            x: mouse.x - visual.width / 2,
-            y: mouse.y - visual.height - 12
-        )
+        var origin: NSPoint
+        switch settings.clipboardPopupPosition {
+        case .cursor:
+            let mouse = NSEvent.mouseLocation
+            let mouseScreen = ScreenGeometry.screen(containingAppKitPoint: mouse) ?? screen
+            let vis = mouseScreen.visibleFrame
+            origin = NSPoint(x: mouse.x - visual.width / 2, y: mouse.y - visual.height - 12)
+            origin.x = min(max(origin.x, vis.minX + 8), vis.maxX - size.width - 8)
+            origin.y = min(max(origin.y, vis.minY + 8), vis.maxY - size.height - 8)
+            panel.adopt(frame: NSRect(origin: origin, size: size), animated: false)
+            return
+        case .menuBar:
+            origin = NSPoint(
+                x: visible.midX - visual.width / 2,
+                y: visible.maxY - size.height - 24
+            )
+        case .screenCenter:
+            origin = NSPoint(
+                x: visible.midX - visual.width / 2,
+                y: visible.midY - visual.height / 2
+            )
+        }
         origin.x = min(max(origin.x, visible.minX + 8), visible.maxX - size.width - 8)
         origin.y = min(max(origin.y, visible.minY + 8), visible.maxY - size.height - 8)
         panel.adopt(frame: NSRect(origin: origin, size: size), animated: false)

@@ -4,24 +4,25 @@ import SwiftUI
 /// Maccy-structured clipboard panel in Paint ink (Departure Mono, square, 2pt stroke).
 struct ClipboardHistoryView: View {
     @ObservedObject var store: ClipboardHistoryStore
+    @ObservedObject private var settings = AppSettings.shared
     var onPick: (ClipboardItem, Bool) -> Void
     var onClose: () -> Void
     var onOpenPreferences: () -> Void = {
         ClipboardHistoryPanelController.shared.hide()
-        SettingsPresenter.shared.show()
+        SettingsPresenter.shared.show(page: .clipboard)
     }
+    var onPreview: (ClipboardItem?) -> Void = { _ in }
 
     @State private var filter = ""
     @State private var selection: UUID?
     @State private var hovered: UUID?
-    @State private var previewItem: ClipboardItem?
     @State private var previewTask: Task<Void, Never>?
     @FocusState private var searchFocused: Bool
 
     /// Maccy Popup-ish width; Paint chrome around it.
     static let preferredSize = CGSize(width: 450, height: 480)
     private let rowHeight: CGFloat = 22
-    private let imageMaxHeight: CGFloat = 40
+    private var imageMaxHeight: CGFloat { CGFloat(settings.clipboardImageHeight) }
     private let hPad: CGFloat = 5
 
     private var rows: [ClipboardItem] {
@@ -33,21 +34,19 @@ struct ClipboardHistoryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            Rectangle().fill(Ink.label).frame(height: Ink.stroke)
+            if settings.clipboardShowSearchField {
+                header
+                Rectangle().fill(Ink.label).frame(height: Ink.stroke)
+            }
             listBody
-            Rectangle().fill(Ink.hairline).frame(height: 1)
-            footer
-        }
-        .frame(width: Self.preferredSize.width, height: Self.preferredSize.height)
-        .background(Ink.front)
-        .inkDoublePane(cornerRadius: 0, fill: Ink.front)
-        .overlay(alignment: .trailing) {
-            if let previewItem {
-                ClipboardPreviewPopover(item: previewItem, image: store.image(for: previewItem))
-                    .offset(x: Self.preferredSize.width / 2 + 8)
+            if settings.clipboardShowFooter {
+                Rectangle().fill(Ink.hairline).frame(height: 1)
+                footer
             }
         }
+        .frame(width: Self.preferredSize.width, height: Self.preferredSize.height)
+        .background(Ink.front.opacity(0.95))
+        .inkDoublePane(cornerRadius: 0, fill: Ink.front.opacity(0.95))
         .onAppear {
             searchFocused = true
             selection = rows.first?.id
@@ -62,7 +61,7 @@ struct ClipboardHistoryView: View {
         }
         .onDisappear {
             previewTask?.cancel()
-            previewItem = nil
+            onPreview(nil)
         }
         .background(KeyboardMonitor(
             onMove: moveSelection,
@@ -142,31 +141,28 @@ struct ClipboardHistoryView: View {
 
     private func row(_ item: ClipboardItem, shortcutIndex: Int) -> some View {
         let selected = item.id == selection
-        let fg = selected ? Ink.window : Ink.label
-        let bg = selected ? Ink.label : Color.clear
-        // Click selects; double-click pastes (Enter / ⌘1–9 also paste) — Maccy plan.
+        let hovering = item.id == hovered
+        let bg: Color = selected ? Ink.rowSelect : (hovering ? Ink.rowHover : Color.clear)
+        // Click pastes + dismisses (Maccy). ⌥Enter keeps open via keyboard path.
         return HStack(spacing: 6) {
-            rowBody(item, foreground: fg)
+            rowBody(item, foreground: Ink.label)
             Spacer(minLength: 0)
             if shortcutIndex < 9 {
-                Text("⌘\(shortcutIndex + 1)")
+                Text(item.pinKey.map { "⌥\($0)" } ?? "⌘\(shortcutIndex + 1)")
                     .font(Ink.mono(10))
-                    .foregroundStyle(selected ? Ink.window.opacity(0.7) : Ink.secondary.opacity(0.7))
+                    .foregroundStyle(Ink.secondary.opacity(0.7))
             }
         }
         .padding(.horizontal, hPad + 4)
         .frame(height: item.kind == .image ? max(rowHeight, imageMaxHeight + 4) : rowHeight)
         .background(bg)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
+        .onTapGesture {
             selection = item.id
             onPick(item, true)
         }
-        .onTapGesture(count: 1) {
-            selection = item.id
-        }
-        .onHover { hovering in
-            if hovering {
+        .onHover { isHovering in
+            if isHovering {
                 hovered = item.id
                 selection = item.id
             } else if hovered == item.id {
@@ -182,14 +178,16 @@ struct ClipboardHistoryView: View {
             if let image = store.image(for: item) {
                 Image(nsImage: image)
                     .resizable()
+                    .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
-                    .frame(maxHeight: imageMaxHeight)
+                    .frame(height: imageMaxHeight)
                     .frame(maxWidth: 120, alignment: .leading)
+                    .clipped()
             } else {
                 Rectangle()
                     .fill(Ink.fill)
-                    .frame(width: 40, height: 28)
-                    .overlay(Rectangle().strokeBorder(foreground, lineWidth: 1))
+                    .frame(width: 48, height: imageMaxHeight)
+                    .overlay(Rectangle().strokeBorder(Ink.hairline, lineWidth: 1))
             }
         case .text, .fileURL:
             Text(middleTruncated(item.previewLine))
@@ -239,12 +237,15 @@ struct ClipboardHistoryView: View {
 
     private func schedulePreview(for id: UUID?) {
         previewTask?.cancel()
-        previewItem = nil
+        onPreview(nil)
         guard let id, let item = rows.first(where: { $0.id == id }) else { return }
+        let delay = UInt64(max(0, settings.clipboardPreviewDelayMs)) * 1_000_000
         previewTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 400_000_000)
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: delay)
+            }
             guard !Task.isCancelled, selection == id else { return }
-            previewItem = item
+            onPreview(item)
         }
     }
 
@@ -299,7 +300,7 @@ struct ClipboardHistoryView: View {
 
 // MARK: - Preview popover
 
-private struct ClipboardPreviewPopover: View {
+struct ClipboardPreviewPopover: View {
     var item: ClipboardItem
     var image: NSImage?
 

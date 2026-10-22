@@ -159,6 +159,7 @@ final class ClipboardHistoryStore: ObservableObject {
 
     func orderedForDisplay(filter: String) -> [ClipboardItem] {
         let q = filter.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let settings = AppSettings.shared
         let base = items
         let filtered: [ClipboardItem]
         if q.isEmpty {
@@ -168,17 +169,69 @@ final class ClipboardHistoryStore: ObservableObject {
                 $0.previewLine.lowercased().contains(q)
                     || ($0.text?.lowercased().contains(q) ?? false)
                     || ($0.applicationName?.lowercased().contains(q) ?? false)
+                    || ($0.pinTitle?.lowercased().contains(q) ?? false)
             }
         }
+        let pinFirst = settings.clipboardPinEdge == .top
+        let mode = settings.clipboardSortMode
         return filtered.sorted { lhs, rhs in
-            if lhs.pinned != rhs.pinned { return lhs.pinned && !rhs.pinned }
-            return lhs.lastCopiedAt > rhs.lastCopiedAt
+            if lhs.pinned != rhs.pinned {
+                return pinFirst ? (lhs.pinned && !rhs.pinned) : (!lhs.pinned && rhs.pinned)
+            }
+            switch mode {
+            case .lastCopy: return lhs.lastCopiedAt > rhs.lastCopiedAt
+            case .firstCopy: return lhs.firstCopiedAt > rhs.firstCopiedAt
+            case .copyCount: return lhs.copyCount > rhs.copyCount
+            }
         }
     }
 
     func image(for item: ClipboardItem) -> NSImage? {
         guard let name = item.imageFileName else { return nil }
         return NSImage(contentsOf: imagesURL.appendingPathComponent(name))
+    }
+
+    /// Approximate on-disk size of the history folder (index + images).
+    func diskUsageBytes() -> Int64 {
+        var total: Int64 = 0
+        let urls = (try? fileManager.contentsOfDirectory(
+            at: folderURL,
+            includingPropertiesForKeys: [.fileSizeKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        for url in urls {
+            if let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey]),
+               values.isDirectory == true {
+                let nested = (try? fileManager.contentsOfDirectory(
+                    at: url,
+                    includingPropertiesForKeys: [.fileSizeKey],
+                    options: [.skipsHiddenFiles]
+                )) ?? []
+                for child in nested {
+                    if let size = try? child.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                        total += Int64(size)
+                    }
+                }
+            } else if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                total += Int64(size)
+            }
+        }
+        return total
+    }
+
+    func updatePinMetadata(id: UUID, title: String?, key: String?) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items[index].pinTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let trimmed = key?.trimmingCharacters(in: .whitespacesAndNewlines)
+        items[index].pinKey = trimmed.flatMap { $0.isEmpty ? nil : String($0.prefix(1)).uppercased() }
+        persist()
+    }
+
+    func clearHistoryFully(clearSystem: Bool) {
+        clearHistory(keepingPinned: false)
+        if clearSystem {
+            NSPasteboard.general.clearContents()
+        }
     }
 
     // MARK: - Persistence
@@ -223,6 +276,10 @@ final class ClipboardHistoryStore: ObservableObject {
             return lhs.lastCopiedAt > rhs.lastCopiedAt
         }
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
 // MARK: - Fingerprints (testable, pure)

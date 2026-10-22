@@ -1,0 +1,459 @@
+import AppKit
+import SwiftUI
+
+/// Clipboard preferences — partial Maccy parity in Paint ink sections.
+struct ClipboardPage: View {
+    @ObservedObject var settings: AppSettings
+    @ObservedObject private var store = ClipboardHistoryStore.shared
+    @State private var ignoreDraft = ""
+    @State private var confirmClear = false
+    @State private var message: String?
+    @State private var captureChord = false
+
+    var body: some View {
+        SettingsPageStack(
+            title: "Clipboard",
+            subtitle: "History panel, capture, and paste — Maccy-shaped, Paint chrome."
+        ) {
+            if let message {
+                Text(message)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+            }
+            SettingsSection(title: "General") { generalCard }
+            SettingsSection(title: "Storage") { storageCard }
+            SettingsSection(title: "Appearance") { appearanceCard }
+            SettingsSection(title: "Pins", footer: "Pin from the panel with ⌥P, then edit titles here.") { pinsCard }
+            SettingsSection(title: "Ignore") { ignoreCard }
+            SettingsSection(title: "Advanced") { advancedCard }
+        }
+    }
+
+    private var generalCard: some View {
+        InkCard {
+            VStack(alignment: .leading, spacing: 0) {
+                InkToggleRow(
+                    title: "Enable clipboard history",
+                    detail: "\(settings.clipboardChord.display) opens the panel.",
+                    isOn: Binding(
+                        get: { settings.clipboardHistoryEnabled },
+                        set: { settings.setClipboardHistoryEnabled($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkSettingRow(
+                    title: "Open shortcut",
+                    detail: "Default ⌘⇧C. Shift is allowed for clipboard."
+                ) {
+                    InkShortcutRecorder(
+                        keys: settings.clipboardChord.keycaps,
+                        listening: captureChord
+                    ) {
+                        captureChord = true
+                        message = nil
+                    }
+                }
+                HStack {
+                    Spacer()
+                    Button("Reset to ⌘⇧C") {
+                        captureChord = false
+                        message = settings.setClipboardChord(.clipboardDefault)
+                            ? nil
+                            : "macOS would not register the shortcut."
+                    }
+                    .buttonStyle(InkSecondaryButtonStyle())
+                }
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.bottom, Ink.rowVPad)
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Paste automatically",
+                    detail: "Selecting a row pastes into the frontmost app.",
+                    isOn: Binding(
+                        get: { settings.clipboardPasteAutomatically },
+                        set: { settings.setClipboardPasteAutomatically($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Paste without formatting",
+                    detail: "Stage plain text when pasting history text.",
+                    isOn: Binding(
+                        get: { settings.clipboardPasteWithoutFormatting },
+                        set: { settings.setClipboardPasteWithoutFormatting($0) }
+                    )
+                )
+            }
+        }
+        .background(clipboardChordCapture)
+    }
+
+    private var clipboardChordCapture: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onAppear {}
+            .background(
+                KeyCaptureView(isActive: captureChord) { event in
+                    captureChord = false
+                    if event.keyCode == 53 {
+                        message = nil
+                        return
+                    }
+                    let chord = HotkeyChord(event: event)
+                    if let rejection = chord.rejection(allowingShift: true) {
+                        message = rejection
+                        return
+                    }
+                    message = settings.setClipboardChord(chord)
+                        ? nil
+                        : "Could not register."
+                }
+            )
+    }
+
+    private var storageCard: some View {
+        InkCard {
+            VStack(alignment: .leading, spacing: 0) {
+                InkToggleRow(
+                    title: "Save files",
+                    detail: "Capture file URLs from the pasteboard.",
+                    isOn: Binding(
+                        get: { settings.clipboardSaveFiles },
+                        set: { settings.setClipboardSaveFiles($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Save images",
+                    detail: "Capture image pasteboard types.",
+                    isOn: Binding(
+                        get: { settings.clipboardSaveImages },
+                        set: { settings.setClipboardSaveImages($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Save text",
+                    detail: "Capture plain text and RTF as text.",
+                    isOn: Binding(
+                        get: { settings.clipboardSaveText },
+                        set: { settings.setClipboardSaveText($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkSettingRow(
+                    title: "History size",
+                    detail: "On disk: \(ByteCountFormatter.string(fromByteCount: store.diskUsageBytes(), countStyle: .file))"
+                ) {
+                    Stepper(
+                        value: Binding(
+                            get: { settings.clipboardHistoryLimit },
+                            set: { settings.setClipboardHistoryLimit($0) }
+                        ),
+                        in: 20...500,
+                        step: 10
+                    ) {
+                        Text("\(settings.clipboardHistoryLimit)")
+                            .font(Ink.mono(12))
+                    }
+                }
+                InkDivider(leading: 0)
+                VStack(alignment: .leading, spacing: Ink.space2) {
+                    Text("Sort by")
+                        .font(Ink.labelFont)
+                        .foregroundStyle(Ink.label)
+                    Picker("", selection: Binding(
+                        get: { settings.clipboardSortMode },
+                        set: { settings.setClipboardSortMode($0) }
+                    )) {
+                        ForEach(ClipboardSortMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.radioGroup)
+                }
+                .padding(Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
+            }
+        }
+    }
+
+    private var appearanceCard: some View {
+        InkCard {
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: Ink.space2) {
+                    Text("Popup position")
+                        .font(Ink.labelFont)
+                    Picker("", selection: Binding(
+                        get: { settings.clipboardPopupPosition },
+                        set: { settings.setClipboardPopupPosition($0) }
+                    )) {
+                        ForEach(ClipboardPopupPosition.allCases) { pos in
+                            Text(pos.title).tag(pos)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.radioGroup)
+                }
+                .padding(Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
+                InkDivider(leading: 0)
+                VStack(alignment: .leading, spacing: Ink.space2) {
+                    Text("Pinned section")
+                        .font(Ink.labelFont)
+                    Picker("", selection: Binding(
+                        get: { settings.clipboardPinEdge },
+                        set: { settings.setClipboardPinEdge($0) }
+                    )) {
+                        ForEach(ClipboardPinEdge.allCases) { edge in
+                            Text(edge.title).tag(edge)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.radioGroup)
+                }
+                .padding(Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
+                InkDivider(leading: 0)
+                InkSettingRow(title: "Image height", detail: "List thumbnail max height.") {
+                    HStack {
+                        Slider(
+                            value: Binding(
+                                get: { settings.clipboardImageHeight },
+                                set: { settings.setClipboardImageHeight($0) }
+                            ),
+                            in: 24...120,
+                            step: 1
+                        )
+                        .frame(width: 120)
+                        Text("\(Int(settings.clipboardImageHeight))pt")
+                            .font(Ink.mono(11))
+                    }
+                }
+                InkDivider(leading: 0)
+                InkSettingRow(title: "Preview delay", detail: "Hover / selection preview wait.") {
+                    Stepper(
+                        value: Binding(
+                            get: { settings.clipboardPreviewDelayMs },
+                            set: { settings.setClipboardPreviewDelayMs($0) }
+                        ),
+                        in: 0...2000,
+                        step: 50
+                    ) {
+                        Text("\(settings.clipboardPreviewDelayMs) ms")
+                            .font(Ink.mono(11))
+                    }
+                }
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Show search field",
+                    detail: "Header search above the list.",
+                    isOn: Binding(
+                        get: { settings.clipboardShowSearchField },
+                        set: { settings.setClipboardShowSearchField($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Show footer",
+                    detail: "Clear / Preferences… / Quit.",
+                    isOn: Binding(
+                        get: { settings.clipboardShowFooter },
+                        set: { settings.setClipboardShowFooter($0) }
+                    )
+                )
+            }
+        }
+    }
+
+    private var pinsCard: some View {
+        InkCard {
+            let pinned = store.items.filter(\.pinned)
+            if pinned.isEmpty {
+                Text("No pinned items yet.")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .padding(Ink.rowHPad)
+                    .padding(.vertical, Ink.rowVPad)
+            } else {
+                VStack(alignment: .leading, spacing: Ink.space2) {
+                    ForEach(pinned) { item in
+                        PinEditorRow(item: item) { title, key in
+                            store.updatePinMetadata(id: item.id, title: title, key: key)
+                        }
+                    }
+                }
+                .padding(Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
+            }
+        }
+    }
+
+    private var ignoreCard: some View {
+        InkCard {
+            VStack(alignment: .leading, spacing: 0) {
+                InkToggleRow(
+                    title: "Ignore concealed and password types",
+                    detail: "Skip transient / confidential pasteboard marks.",
+                    isOn: Binding(
+                        get: { settings.clipboardIgnoreConcealed },
+                        set: { settings.setClipboardIgnoreConcealed($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                VStack(alignment: .leading, spacing: Ink.space2) {
+                    Text("Ignored apps (bundle IDs)")
+                        .font(Ink.labelFont)
+                    ForEach(settings.clipboardIgnoredApps, id: \.self) { id in
+                        HStack {
+                            Text(id)
+                                .font(Ink.mono(11))
+                            Spacer()
+                            Button("−") { settings.removeClipboardIgnoredApp(id) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    HStack {
+                        TextField("com.example.app", text: $ignoreDraft)
+                            .textFieldStyle(.plain)
+                            .font(Ink.mono(12))
+                            .padding(6)
+                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
+                        Button("+") {
+                            settings.addClipboardIgnoredApp(ignoreDraft)
+                            ignoreDraft = ""
+                        }
+                        .buttonStyle(InkSecondaryButtonStyle())
+                    }
+                }
+                .padding(Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
+            }
+        }
+    }
+
+    private var advancedCard: some View {
+        InkCard {
+            VStack(alignment: .leading, spacing: 0) {
+                InkToggleRow(
+                    title: "Pause capture",
+                    detail: "Keep history; stop watching the pasteboard.",
+                    isOn: Binding(
+                        get: { settings.clipboardCapturePaused },
+                        set: { settings.setClipboardCapturePaused($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Clear history on quit",
+                    detail: "Wipe stored items when the app exits.",
+                    isOn: Binding(
+                        get: { settings.clipboardClearOnQuit },
+                        set: { settings.setClipboardClearOnQuit($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Also clear system clipboard",
+                    detail: "When clearing history, empty the general pasteboard.",
+                    isOn: Binding(
+                        get: { settings.clipboardClearSystemClipboard },
+                        set: { settings.setClipboardClearSystemClipboard($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                HStack {
+                    Button(confirmClear ? "Click again to confirm" : "Clear history…") {
+                        if confirmClear {
+                            store.clearHistoryFully(clearSystem: settings.clipboardClearSystemClipboard)
+                            confirmClear = false
+                            message = "History cleared."
+                        } else {
+                            confirmClear = true
+                        }
+                    }
+                    .buttonStyle(InkSecondaryButtonStyle())
+                    Spacer()
+                }
+                .padding(Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
+            }
+        }
+    }
+}
+
+private struct PinEditorRow: View {
+    let item: ClipboardItem
+    var onSave: (String?, String?) -> Void
+    @State private var title: String = ""
+    @State private var key: String = ""
+
+    var body: some View {
+        HStack(spacing: Ink.space2) {
+            Text(item.previewLine)
+                .font(Ink.mono(11))
+                .lineLimit(1)
+                .frame(maxWidth: 140, alignment: .leading)
+            TextField("Title", text: $title)
+                .textFieldStyle(.plain)
+                .font(Ink.mono(11))
+                .frame(width: 120)
+                .padding(4)
+                .overlay(Rectangle().strokeBorder(Ink.hairline, lineWidth: 1))
+            TextField("Key", text: $key)
+                .textFieldStyle(.plain)
+                .font(Ink.mono(11))
+                .frame(width: 36)
+                .padding(4)
+                .overlay(Rectangle().strokeBorder(Ink.hairline, lineWidth: 1))
+            Button("Save") { onSave(title, key) }
+                .buttonStyle(.plain)
+                .font(Ink.captionFont)
+        }
+        .onAppear {
+            title = item.pinTitle ?? ""
+            key = item.pinKey ?? ""
+        }
+    }
+}
+
+/// Minimal key capture host for rebinding the clipboard chord on this page.
+private struct KeyCaptureView: NSViewRepresentable {
+    var isActive: Bool
+    var onEvent: (NSEvent) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = Monitor()
+        view.onEvent = onEvent
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard let view = nsView as? Monitor else { return }
+        view.onEvent = onEvent
+        view.setActive(isActive)
+    }
+
+    final class Monitor: NSView {
+        var onEvent: ((NSEvent) -> Void)?
+        private var monitor: Any?
+
+        func setActive(_ active: Bool) {
+            if active {
+                guard monitor == nil else { return }
+                monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                    self?.onEvent?(event)
+                    return nil
+                }
+            } else if let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+        }
+
+        deinit {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+        }
+    }
+}

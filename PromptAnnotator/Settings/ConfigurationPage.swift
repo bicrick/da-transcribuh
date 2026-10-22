@@ -27,9 +27,18 @@ struct ConfigurationPage: View {
             }
             SettingsSection(
                 title: "Clipboard history",
-                footer: "Maccy-style history. Uses Accessibility (already needed for paste). Default shortcut ⌘⇧C."
+                footer: "Full controls live on the Clipboard tab."
             ) {
-                clipboardCard
+                InkCard {
+                    InkSettingRow(
+                        title: "Clipboard tab",
+                        detail: "Enable, shortcut, storage, appearance, pins, ignore, and advanced."
+                    ) {
+                        Text("→")
+                            .font(Ink.mono(12))
+                            .foregroundStyle(Ink.secondary)
+                    }
+                }
             }
             SettingsSection(title: "Application") {
                 applicationCard

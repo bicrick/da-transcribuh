@@ -4,6 +4,7 @@ import SwiftUI
 extension Notification.Name {
     static let promptAnnotatorSettingsShown = Notification.Name("promptAnnotatorSettingsShown")
     static let promptAnnotatorSessionsChanged = Notification.Name("promptAnnotatorSessionsChanged")
+    static let promptAnnotatorSettingsSelectPage = Notification.Name("promptAnnotatorSettingsSelectPage")
 }
 
 struct SettingsRoot: View {
@@ -68,6 +69,11 @@ struct SettingsRoot: View {
             permissions.refresh()
             SettingsPresenter.shared.applyChrome()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSettingsSelectPage)) { note in
+            if let raw = note.object as? String, let next = SettingsPage(rawValue: raw) {
+                page = next
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSessionsChanged)) { _ in
             reload()
         }
@@ -125,6 +131,8 @@ struct SettingsRoot: View {
             )
         case .appearance:
             AppearancePage(settings: settings, session: session)
+        case .clipboard:
+            ClipboardPage(settings: settings)
         case .configuration:
             ConfigurationPage(settings: settings)
         case .sound:
@@ -238,6 +246,11 @@ final class SettingsPresenter {
         window.makeKeyAndOrderFront(nil)
         applyChrome()
         NotificationCenter.default.post(name: .promptAnnotatorSettingsShown, object: nil)
+    }
+
+    func show(page: SettingsPage) {
+        show()
+        NotificationCenter.default.post(name: .promptAnnotatorSettingsSelectPage, object: page.rawValue)
     }
 
     private func ensure() -> NSWindow {
