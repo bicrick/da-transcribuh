@@ -233,8 +233,8 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(SettingsPage.history.tabAccent, Ink.tabStrokeBlue)
         XCTAssertEqual(SettingsPage.model.tabAccent, Ink.tabStrokeOrange)
         XCTAssertEqual(SettingsPage.performance.tabAccent, Ink.tabStrokePink)
-        XCTAssertEqual(FolderTabShape.corner, 6)
-        XCTAssertEqual(FolderTabShape.foot, 8)
+        XCTAssertEqual(FolderTabShape.corner, 0, "Tabs are square Paint chrome")
+        XCTAssertEqual(FolderTabShape.foot, 0, "No cove feet — bevel uses Ink.bevelOffset")
         XCTAssertEqual(Ink.stroke, 2)
         XCTAssertEqual(Ink.bevelOffset, 3)
         XCTAssertEqual(Ink.hairlineWidth, 1)
@@ -246,16 +246,18 @@ final class InkThemeTests: XCTestCase {
     }
 
     func testFolderTabLayoutSizeIgnoresSelection() {
-        // Feet are paint-only overlays — layout width is label-based and identical
-        // whether the tab is selected or not (Chrome-stable frames).
+        // Bevel gutter is trailing padding outside layoutSize — face width is
+        // label-based and identical whether selected or not.
         let home = FolderTabShape.layoutSize(titleWidth: 40)
         let appearance = FolderTabShape.layoutSize(titleWidth: 90)
         XCTAssertEqual(home.height, Ink.folderTabHeight)
         XCTAssertEqual(appearance.height, Ink.folderTabHeight)
         XCTAssertGreaterThan(appearance.width, home.width)
-        // Foot overhang is not part of layoutSize.
         XCTAssertEqual(home.width, 10 + (Ink.space1 + 1) + 40 + Ink.space3 * 2)
         XCTAssertEqual(FolderTabMetrics.intraGroupGap, 2)
+        // Square open-bottom path: four corners, no curves.
+        let outline = FolderTabShape(closeBottom: false).path(in: CGRect(x: 0, y: 0, width: 80, height: 30))
+        XCTAssertFalse(outline.isEmpty)
     }
 
     func testWordmarkUsesSeparateBlockCursorNotInvertedH() {
