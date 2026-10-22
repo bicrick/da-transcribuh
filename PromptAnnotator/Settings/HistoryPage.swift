@@ -142,6 +142,8 @@ struct HistoryPage: View {
                 .frame(width: Col.actions, alignment: .trailing)
                 .padding(.trailing, Ink.space2)
         }
+        // Match DTScrollView's reserved scroller gutter so ACT lines up with row buttons.
+        .padding(.trailing, Ink.scrollerGutter)
         .frame(height: 28)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Ink.label).frame(height: 1)
