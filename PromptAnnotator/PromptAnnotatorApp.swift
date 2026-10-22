@@ -53,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DockPresence.apply(show: settings.showInDock)
         }
         PasteFollowUp.shared.install()
+        ClipboardHistoryController.shared.install()
         if OnboardingStore.isFinished() {
             SettingsPresenter.shared.show()
         } else {
@@ -79,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotkeyCenter.shared.remove()
         MainActor.assumeIsolated {
             PasteFollowUp.shared.remove()
+            ClipboardHistoryController.shared.remove()
         }
         MainActor.assumeIsolated {
             SessionController.shared.abandonIfRecording()

@@ -46,14 +46,25 @@ struct HotkeyChord: Equatable, Codable {
     }
 
     var canRegister: Bool {
-        (normalizedModifiers != 0 || isFunctionKey) && !includesShift && !takesOverSystemShortcut
+        canRegister(allowingShift: false)
+    }
+
+    /// Clipboard chords may include Shift (e.g. ⌘⇧C). Recording chords may not.
+    func canRegister(allowingShift: Bool) -> Bool {
+        (normalizedModifiers != 0 || isFunctionKey)
+            && (allowingShift || !includesShift)
+            && !takesOverSystemShortcut
     }
 
     var rejection: String? {
+        rejection(allowingShift: false)
+    }
+
+    func rejection(allowingShift: Bool) -> String? {
         if normalizedModifiers == 0 && !isFunctionKey {
             return "Add at least one modifier, or use a function key."
         }
-        if includesShift {
+        if includesShift && !allowingShift {
             return "Shift is held to draw, so the shortcut cannot include Shift."
         }
         if takesOverSystemShortcut {
@@ -61,6 +72,12 @@ struct HotkeyChord: Equatable, Codable {
         }
         return nil
     }
+
+    /// Default clipboard-history chord: ⌘⇧C.
+    static let clipboardDefault = HotkeyChord(
+        keyCode: UInt32(kVK_ANSI_C),
+        carbonModifiers: UInt32(cmdKey | shiftKey)
+    )
 
     var display: String {
         var symbols = ""
