@@ -178,10 +178,11 @@ def draw_table(pal: dict, scroll_frac: float, label: str) -> Image.Image:
         fill=c(pal, "window"),
     )
 
-    # Gutter + track + thumb (never over content)
+    # Gutter + track + thumb (full height of scroll area — flush with header
+    # divider and bottom border; no scrollerInset gaps).
     gx = tx + content_w + GUTTER_GAP
-    track_top = view_top + int(2 * S)
-    track_h = VIEW_H - int(4 * S)
+    track_top = view_top
+    track_h = VIEW_H
     d.rectangle(
         [gx, track_top, gx + TRACK_W, track_top + track_h],
         fill=c(pal, "window"),

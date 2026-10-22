@@ -167,7 +167,6 @@ enum Ink {
     /// Dedicated track width inside the reserved gutter (content never draws under it).
     static let scrollerWidth: CGFloat = 10
     static let scrollerThumbMin: CGFloat = 24
-    static let scrollerInset: CGFloat = 2
     /// Gap between scroll content and the track.
     static let scrollerGutterGap: CGFloat = 4
     /// Total trailing gutter reserved beside content (`gap + track`).

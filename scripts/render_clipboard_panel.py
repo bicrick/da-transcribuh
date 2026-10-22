@@ -18,7 +18,6 @@ BEVEL = int(3 * S)
 # Match Ink scroller tokens
 SCROLLER_W = int(10 * S)
 SCROLLER_GAP = int(4 * S)
-SCROLLER_INSET = int(2 * S)
 THUMB_MIN = int(24 * S)
 
 LIGHT = {
@@ -157,10 +156,10 @@ def draw_panel(pal: dict, scroll_frac: float) -> Image.Image:
             )
         y += row_h
 
-    # Scroller track in reserved gutter
-    track_x = ox + pw - SCROLLER_W - SCROLLER_INSET
-    track_top = list_top + SCROLLER_INSET
-    track_bot = list_bottom - SCROLLER_INSET
+    # Scroller track: full height of list (flush with header divider + footer)
+    track_x = ox + pw - SCROLLER_W - int(2 * S)
+    track_top = list_top
+    track_bot = list_bottom
     track_h = max(track_bot - track_top, 1)
     d.rectangle(
         [track_x, track_top, track_x + SCROLLER_W, track_bot],
