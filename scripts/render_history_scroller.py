@@ -188,15 +188,26 @@ def draw_table(pal: dict, scroll_frac: float, label: str) -> Image.Image:
         outline=c(pal, "label"),
         width=STROKE,
     )
-    ratio = min(1, VIEW_H / max(content_h, 1))
+    # Same formula as DTScrollGeometry.thumbHeight / thumbY
+    ratio = min(1.0, VIEW_H / max(content_h, 1))
     thumb_h = max(THUMB_MIN, track_h * ratio)
-    travel = max(track_h - thumb_h, 1)
-    thumb_y = track_top + scroll_frac * travel
+    scrollable = max(content_h - VIEW_H, 0)
+    travel = max(track_h - thumb_h, 0)
+    offset = scroll_frac * scrollable
+    fraction = (offset / scrollable) if scrollable > 0 else 0.0
+    thumb_y = track_top + fraction * travel
     d.rectangle(
         [gx, thumb_y, gx + TRACK_W, thumb_y + thumb_h],
         fill=c(pal, "label"),
         outline=c(pal, "label"),
         width=STROKE,
+    )
+    # Prove thumb moved: encode expected Y in a side label for reviewers.
+    d.text(
+        (pad, H - 20 * S),
+        f"offset={offset:.0f} thumbY={fraction * travel:.0f} content={content_h:.0f} view={VIEW_H:.0f}",
+        font=font(9 * S),
+        fill=c(pal, "secondary"),
     )
 
     # Outer stroke again

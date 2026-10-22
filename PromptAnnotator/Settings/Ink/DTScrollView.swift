@@ -3,40 +3,33 @@ import SwiftUI
 
 // MARK: - DTScrollView
 
-/// Scroll view with a **reserved trailing gutter** for a Paint ink scroller.
+/// Scroll view with a reserved trailing gutter and a Paint ink scroller.
 ///
-/// Content never draws under the thumb: width shrinks by `Ink.scrollerGutter`.
-/// Offset / sizes come from the hosting `NSScrollView` clip-view
-/// (`boundsDidChange`), not a GeometryReader preference (those stay stuck at 0
-/// under AppKit-driven scrolls and trackpad momentum).
+/// Metrics come from the hosted `NSScrollView` after layout (`boundsDidChange` /
+/// document `frameDidChange`). GeometryReader preferences stay at 0 under
+/// AppKit-driven scrolls — do not bring them back.
+///
+/// Root cause of a static thumb: `NSHostingView` without
+/// `sizingOptions = [.intrinsicContentSize]` collapses the document to the
+/// clip height, so `contentHeight == viewportHeight` and travel is zero.
 struct DTScrollView<Content: View>: View {
     var axes: Axis.Set = .vertical
     var showsIndicators: Bool = true
-    /// Extra bottom inset so content clears a sticky footer (sidebar).
     var bottomInset: CGFloat = 0
     @ViewBuilder var content: () -> Content
 
-    @State private var offset: CGFloat = 0
-    @State private var contentHeight: CGFloat = 0
-    @State private var viewportHeight: CGFloat = 0
+    @State private var geometry = DTScrollGeometry(contentHeight: 0, viewportHeight: 0, offset: 0)
     @State private var hovering = false
     @State private var dragging = false
     @State private var visible = false
     @State private var fadeTask: Task<Void, Never>?
     @State private var scrollView: NSScrollView?
 
-    private var needsScroller: Bool {
-        showsIndicators && contentHeight > viewportHeight + 1
-    }
-
     var body: some View {
-        // Content | gap | track — content width never includes the gutter.
         HStack(alignment: .top, spacing: showsIndicators ? Ink.scrollerGutterGap : 0) {
             DTAppKitScrollHost(
                 bottomInset: bottomInset,
-                offset: $offset,
-                contentHeight: $contentHeight,
-                viewportHeight: $viewportHeight,
+                geometry: $geometry,
                 scrollView: $scrollView,
                 onScroll: { flash() }
             ) {
@@ -44,15 +37,12 @@ struct DTScrollView<Content: View>: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Keep the gutter even when content fits so headers/columns don't jump.
             if showsIndicators {
                 ZStack {
                     Color.clear
-                    if needsScroller {
+                    if geometry.needsScroller {
                         DTScrollerRail(
-                            offset: offset,
-                            contentHeight: contentHeight,
-                            viewportHeight: max(viewportHeight, 1),
+                            geometry: geometry,
                             scrollView: scrollView,
                             onDragging: { active in
                                 dragging = active
@@ -88,31 +78,23 @@ struct DTScrollView<Content: View>: View {
     }
 }
 
-// MARK: - Rail + thumb (square, 2pt stroke)
+// MARK: - Rail
 
 private struct DTScrollerRail: View {
-    var offset: CGFloat
-    var contentHeight: CGFloat
-    var viewportHeight: CGFloat
+    var geometry: DTScrollGeometry
     var scrollView: NSScrollView?
     var onDragging: (Bool) -> Void
 
     var body: some View {
         GeometryReader { geo in
             let trackH = max(geo.size.height, 1)
-            let ratio = min(1, viewportHeight / max(contentHeight, 1))
-            let thumbH = max(Ink.scrollerThumbMin, trackH * ratio)
-            let scrollable = max(contentHeight - viewportHeight, 1)
-            let travel = max(trackH - thumbH, 1)
-            let thumbY = min(max(offset / scrollable, 0), 1) * travel
+            let thumbH = geometry.thumbHeight(trackH: trackH, minH: Ink.scrollerThumbMin)
+            let thumbY = geometry.thumbY(trackH: trackH, minH: Ink.scrollerThumbMin)
 
             ZStack(alignment: .top) {
                 Rectangle()
                     .fill(Ink.window)
-                    .overlay(
-                        Rectangle()
-                            .strokeBorder(Ink.label, lineWidth: Ink.stroke)
-                    )
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
                     .overlay {
                         DTDitherGrip()
                             .opacity(0.28)
@@ -122,17 +104,13 @@ private struct DTScrollerRail: View {
 
                 Rectangle()
                     .fill(Ink.label)
-                    .overlay(
-                        Rectangle()
-                            .strokeBorder(Ink.label, lineWidth: Ink.stroke)
-                    )
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
                     .frame(height: thumbH)
                     .offset(y: thumbY)
                     .allowsHitTesting(false)
 
                 DTScrollDragSurface(
-                    contentHeight: contentHeight,
-                    viewportHeight: viewportHeight,
+                    geometry: geometry,
                     scrollView: scrollView,
                     onDragging: onDragging
                 )
@@ -147,9 +125,7 @@ private struct DTScrollerRail: View {
 
 private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
     var bottomInset: CGFloat
-    @Binding var offset: CGFloat
-    @Binding var contentHeight: CGFloat
-    @Binding var viewportHeight: CGFloat
+    @Binding var geometry: DTScrollGeometry
     @Binding var scrollView: NSScrollView?
     var onScroll: () -> Void
     @ViewBuilder var content: () -> Content
@@ -161,28 +137,26 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
     func makeNSView(context: Context) -> DTScrollHostView {
         let host = DTScrollHostView()
         context.coordinator.install(in: host)
-        DispatchQueue.main.async {
-            scrollView = host.scrollView
-        }
+        // Synchronous — drag surface must see the scroll view on first paint.
+        scrollView = host.scrollView
         return host
     }
 
     func updateNSView(_ nsView: DTScrollHostView, context: Context) {
         context.coordinator.parent = self
         context.coordinator.updateContent(content(), bottomInset: bottomInset)
-        DispatchQueue.main.async {
-            if scrollView !== nsView.scrollView {
-                scrollView = nsView.scrollView
-            }
+        if scrollView !== nsView.scrollView {
+            scrollView = nsView.scrollView
         }
     }
 
     final class Coordinator: NSObject {
         var parent: DTAppKitScrollHost
         private var hosting: NSHostingView<AnyView>?
+        private weak var document: DTFlippedDocumentView?
         private weak var observedClip: NSClipView?
         private weak var observedDoc: NSView?
-        private var lastMetrics: DTScrollMetrics?
+        private var lastGeometry: DTScrollGeometry?
 
         init(parent: DTAppKitScrollHost) {
             self.parent = parent
@@ -196,6 +170,9 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
         func install(in host: DTScrollHostView) {
             let root = AnyView(parent.content().padding(.bottom, parent.bottomInset))
             let hosting = NSHostingView(rootView: root)
+            // Without this, the document collapses to the clip height and the
+            // thumb never travels (contentHeight == viewportHeight).
+            hosting.sizingOptions = [.intrinsicContentSize]
             hosting.translatesAutoresizingMaskIntoConstraints = false
             self.hosting = hosting
 
@@ -208,6 +185,7 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
                 hosting.topAnchor.constraint(equalTo: document.topAnchor),
                 hosting.bottomAnchor.constraint(equalTo: document.bottomAnchor),
             ])
+            self.document = document
             host.scrollView.documentView = document
 
             let clip = host.scrollView.contentView
@@ -215,17 +193,14 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
                 document.widthAnchor.constraint(equalTo: clip.widthAnchor),
             ])
             attach(to: host.scrollView)
-            publish(from: host.scrollView)
+            relayoutAndPublish(from: host.scrollView)
         }
 
         func updateContent(_ content: Content, bottomInset: CGFloat) {
             hosting?.rootView = AnyView(content.padding(.bottom, bottomInset))
             hosting?.invalidateIntrinsicContentSize()
-            if let scroll = hosting?.enclosingScrollView {
-                DispatchQueue.main.async { [weak self] in
-                    self?.publish(from: scroll)
-                }
-            }
+            guard let scroll = hosting?.enclosingScrollView else { return }
+            relayoutAndPublish(from: scroll)
         }
 
         func attach(to scroll: NSScrollView) {
@@ -278,25 +253,65 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
             publish(from: scroll)
         }
 
+        private func relayoutAndPublish(from scroll: NSScrollView) {
+            if let hosting {
+                hosting.invalidateIntrinsicContentSize()
+                hosting.layoutSubtreeIfNeeded()
+            }
+            document?.layoutSubtreeIfNeeded()
+            scroll.layoutSubtreeIfNeeded()
+            // Apply intrinsic height so frame matches content (AL can still
+            // leave the document at clip height without an explicit size).
+            if let hosting, let document {
+                let fitting = hosting.fittingSize
+                let width = scroll.contentView.bounds.width
+                let height = max(fitting.height, hosting.intrinsicContentSize.height)
+                if height > 0, width > 0 {
+                    var frame = document.frame
+                    frame.size = CGSize(width: width, height: height)
+                    if abs(frame.height - document.frame.height) > 0.5
+                        || abs(frame.width - document.frame.width) > 0.5 {
+                        document.frame = frame
+                    }
+                }
+            }
+            publish(from: scroll)
+        }
+
         func publish(from scroll: NSScrollView) {
-            let metrics = DTScrollMetrics.metrics(from: scroll)
-            guard metrics != lastMetrics else { return }
-            lastMetrics = metrics
-            DispatchQueue.main.async { [weak self] in
+            let next = Self.readGeometry(from: scroll)
+            guard next != lastGeometry else { return }
+            let scrolled = abs(next.offset - (lastGeometry?.offset ?? -1)) > 0.5
+            lastGeometry = next
+            let apply = { [weak self] in
                 guard let self else { return }
-                let scrolled = abs(metrics.offset - self.parent.offset) > 0.5
-                self.parent.offset = metrics.offset
-                self.parent.contentHeight = metrics.contentHeight
-                self.parent.viewportHeight = metrics.viewportHeight
+                self.parent.geometry = next
                 if scrolled {
                     self.parent.onScroll()
                 }
             }
+            if Thread.isMainThread {
+                apply()
+            } else {
+                DispatchQueue.main.async(execute: apply)
+            }
+        }
+
+        static func readGeometry(from scroll: NSScrollView) -> DTScrollGeometry {
+            let clip = scroll.contentView
+            let doc = scroll.documentView
+            let viewport = clip.bounds.height
+            // Do not max with viewport — that hid the collapsed-document bug.
+            let content = doc?.frame.height ?? 0
+            return DTScrollGeometry.fromFlippedClip(
+                contentHeight: content,
+                viewportHeight: viewport,
+                originY: clip.bounds.origin.y
+            )
         }
     }
 }
 
-/// Flipped document so y=0 is the top — matches SwiftUI scroll direction.
 private final class DTFlippedDocumentView: NSView {
     override var isFlipped: Bool { true }
 }
@@ -328,59 +343,30 @@ private final class DTScrollHostView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
-// MARK: - Metrics
-
-private struct DTScrollMetrics: Equatable {
-    var offset: CGFloat
-    var contentHeight: CGFloat
-    var viewportHeight: CGFloat
-
-    static func metrics(from scroll: NSScrollView) -> DTScrollMetrics {
-        let clip = scroll.contentView
-        let doc = scroll.documentView
-        let viewport = clip.bounds.height
-        let content = max(doc?.frame.height ?? 0, viewport)
-        let originY = clip.bounds.origin.y
-        let offset: CGFloat
-        if clip.isFlipped || doc?.isFlipped == true {
-            offset = max(0, originY)
-        } else {
-            let scrollable = max(content - viewport, 0)
-            offset = max(0, scrollable - originY)
-        }
-        return DTScrollMetrics(
-            offset: offset,
-            contentHeight: content,
-            viewportHeight: viewport
-        )
-    }
-}
-
-// MARK: - Drag / click track
+// MARK: - Drag
 
 private struct DTScrollDragSurface: NSViewRepresentable {
-    var contentHeight: CGFloat
-    var viewportHeight: CGFloat
+    var geometry: DTScrollGeometry
     var scrollView: NSScrollView?
     var onDragging: (Bool) -> Void
 
     func makeNSView(context: Context) -> DTScrollDragNSView {
         let view = DTScrollDragNSView()
         view.onDragging = onDragging
+        view.boundScrollView = scrollView
+        view.geometry = geometry
         return view
     }
 
     func updateNSView(_ nsView: DTScrollDragNSView, context: Context) {
-        nsView.contentHeight = contentHeight
-        nsView.viewportHeight = viewportHeight
+        nsView.geometry = geometry
         nsView.boundScrollView = scrollView
         nsView.onDragging = onDragging
     }
 }
 
 private final class DTScrollDragNSView: NSView {
-    var contentHeight: CGFloat = 0
-    var viewportHeight: CGFloat = 0
+    var geometry = DTScrollGeometry(contentHeight: 0, viewportHeight: 0, offset: 0)
     weak var boundScrollView: NSScrollView?
     var onDragging: ((Bool) -> Void)?
     private var dragThumb = false
@@ -391,24 +377,26 @@ private final class DTScrollDragNSView: NSView {
     override func mouseDown(with event: NSEvent) {
         onDragging?(true)
         let local = convert(event.locationInWindow, from: nil)
-        let metrics = thumbMetrics()
-        if local.y >= metrics.thumbY, local.y <= metrics.thumbY + metrics.thumbH {
+        let trackH = max(bounds.height, 1)
+        let thumbH = geometry.thumbHeight(trackH: trackH, minH: Ink.scrollerThumbMin)
+        let thumbY = geometry.thumbY(trackH: trackH, minH: Ink.scrollerThumbMin)
+        if local.y >= thumbY, local.y <= thumbY + thumbH {
             dragThumb = true
-            grabOffsetInThumb = local.y - metrics.thumbY
+            grabOffsetInThumb = local.y - thumbY
         } else {
             dragThumb = false
-            jump(to: local.y)
+            jump(to: local.y, trackH: trackH, thumbH: thumbH)
         }
     }
 
     override func mouseDragged(with event: NSEvent) {
         let local = convert(event.locationInWindow, from: nil)
+        let trackH = max(bounds.height, 1)
+        let thumbH = geometry.thumbHeight(trackH: trackH, minH: Ink.scrollerThumbMin)
         if dragThumb {
-            let metrics = thumbMetrics()
-            let thumbTop = local.y - grabOffsetInThumb
-            jump(to: thumbTop + metrics.thumbH / 2)
+            jump(to: local.y - grabOffsetInThumb + thumbH / 2, trackH: trackH, thumbH: thumbH)
         } else {
-            jump(to: local.y)
+            jump(to: local.y, trackH: trackH, thumbH: thumbH)
         }
     }
 
@@ -417,67 +405,17 @@ private final class DTScrollDragNSView: NSView {
         onDragging?(false)
     }
 
-    private struct ThumbMetrics {
-        var trackH: CGFloat
-        var thumbH: CGFloat
-        var thumbY: CGFloat
-        var scrollable: CGFloat
-        var travel: CGFloat
-    }
-
-    private func thumbMetrics() -> ThumbMetrics {
-        let trackH = max(bounds.height, 1)
-        let ratio = min(1, viewportHeight / max(contentHeight, 1))
-        let thumbH = max(Ink.scrollerThumbMin, trackH * ratio)
-        let scrollable = max(contentHeight - viewportHeight, 1)
+    private func jump(to trackY: CGFloat, trackH: CGFloat, thumbH: CGFloat) {
+        guard let scroll = boundScrollView else { return }
         let travel = max(trackH - thumbH, 1)
-        let offset = currentOffset()
-        let thumbY = min(max(offset / scrollable, 0), 1) * travel
-        return ThumbMetrics(
-            trackH: trackH,
-            thumbH: thumbH,
-            thumbY: thumbY,
-            scrollable: scrollable,
-            travel: travel
-        )
-    }
-
-    private func resolvedScrollView() -> NSScrollView? {
-        boundScrollView ?? enclosingScrollView()
-    }
-
-    private func currentOffset() -> CGFloat {
-        guard let scroll = resolvedScrollView() else { return 0 }
-        return DTScrollMetrics.metrics(from: scroll).offset
-    }
-
-    private func jump(to trackY: CGFloat) {
-        guard let scroll = resolvedScrollView() else { return }
-        let metrics = thumbMetrics()
-        let yInTrack = trackY - metrics.thumbH / 2
-        let fraction = min(max(yInTrack / max(metrics.travel, 1), 0), 1)
+        let yInTrack = trackY - thumbH / 2
+        let fraction = min(max(yInTrack / travel, 0), 1)
         let clip = scroll.contentView
-        let doc = scroll.documentView
-        let viewport = clip.bounds.height
-        let content = max(doc?.frame.height ?? contentHeight, viewport)
-        let scrollable = max(content - viewport, 0)
+        let scrollable = geometry.scrollable
         let target = scrollable * fraction
         var bounds = clip.bounds
-        if clip.isFlipped || doc?.isFlipped == true {
-            bounds.origin.y = target
-        } else {
-            bounds.origin.y = scrollable - target
-        }
+        bounds.origin.y = target
         clip.setBoundsOrigin(bounds.origin)
         scroll.reflectScrolledClipView(clip)
-    }
-
-    private func enclosingScrollView() -> NSScrollView? {
-        var current: NSView? = self
-        while let node = current {
-            if let scroll = node as? NSScrollView { return scroll }
-            current = node.superview
-        }
-        return nil
     }
 }
