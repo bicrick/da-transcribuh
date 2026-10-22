@@ -8,6 +8,10 @@ Settings, onboarding, and the menu-bar panel share the **Ink** design system (`P
 
 The whole app is an **MS Paint** theme: manila **folder tabs** (not a toolbox sidebar), flat classic swatches where functional, chunky outlines, hard shadows, Departure Mono chrome. Decorative palette strips are gone from the title bar, status bar, onboarding chrome, and menu panel. The **recording island**, **waveform**, **markup toolbar**, and **selection overlay** share that language. Keep hit targets, animations, and annotation ink colors intact; do not add timers or heavy per-frame effects to the waveform/overlay path.
 
+**Functional colors on the island:** record square stays `Ink.record` (Paint red). Live waveform bars use `Ink.label` (black in light, `#F2F2F2` in graphite) — not cyan — so they follow the island’s own appearance tokens.
+
+Home Start-row keycaps are an inline chord editor (`HomeChordEditor` + shared `RecordingChordCapture` / `ShortcutCapture` / `AppSettings.setChord`) — same binding as General. Esc cancels; Delete restores ⌃⌥Space.
+
 ### Brand mark
 
 `InkDtMark` / AppIcon: Departure Mono lowercase **d** + inverted **t** block inside a square with a hard-offset bevel.

@@ -267,6 +267,92 @@ struct InkKeycapRow: View {
     }
 }
 
+/// Home Start-row chord editor — same `ShortcutCapture` + `AppSettings.setChord` as General.
+/// Hover: label border + pointing hand. Click: dashed “press keys…”; Esc cancels;
+/// Delete restores ⌃⌥Space. Conflicts show as a brief red caption under the caps.
+struct HomeChordEditor: View {
+    @ObservedObject var settings: AppSettings
+    @State private var listening = false
+    @State private var hovering = false
+    @State private var cursorPushed = false
+    @State private var message: String?
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: Ink.space1) {
+            Button {
+                beginListening()
+            } label: {
+                Group {
+                    if listening {
+                        Text("press keys…")
+                            .font(Ink.mono(11))
+                            .foregroundStyle(Ink.secondary)
+                            .padding(.horizontal, Ink.space3)
+                            .padding(.vertical, Ink.space2)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
+                                    .strokeBorder(Ink.label, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                            )
+                    } else {
+                        InkKeycapRow(keys: settings.chord.keycaps)
+                            .padding(3)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
+                                    .strokeBorder(hovering ? Ink.label : Color.clear, lineWidth: 1)
+                            )
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(listening ? "Press a shortcut — Esc cancels, Delete restores ⌃⌥Space" : "Edit recording shortcut")
+            .accessibilityLabel(listening ? "Listening for shortcut" : "Recording shortcut \(settings.chord.display)")
+            .accessibilityHint("Click to change the Start and stop shortcut")
+            .onHover { over in
+                hovering = over && !listening
+                syncCursor(wantHand: over && !listening)
+            }
+
+            if let message {
+                Text(message)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.error)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 220, alignment: .trailing)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: message)
+        .background(
+            ShortcutCapture(active: $listening) { event in
+                let outcome = RecordingChordCapture.applyToggleEvent(event, settings: settings)
+                listening = false
+                hovering = false
+                syncCursor(wantHand: false)
+                message = RecordingChordCapture.message(for: outcome)
+            }
+        )
+    }
+
+    private func beginListening() {
+        listening = true
+        message = nil
+        hovering = false
+        syncCursor(wantHand: false)
+    }
+
+    private func syncCursor(wantHand: Bool) {
+        if wantHand, !cursorPushed {
+            NSCursor.pointingHand.push()
+            cursorPushed = true
+        } else if !wantHand, cursorPushed {
+            NSCursor.pop()
+            cursorPushed = false
+        }
+    }
+}
+
 /// Paint keycap field — click, press a combo, it saves. Listening state pulses the border.
 struct InkShortcutRecorder: View {
     var keys: [String]

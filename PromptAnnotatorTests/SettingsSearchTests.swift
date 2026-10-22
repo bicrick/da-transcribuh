@@ -29,6 +29,16 @@ final class SettingsSearchTests: XCTestCase {
         XCTAssertEqual(island.first?.highlightTitle, "Recording window")
     }
 
+    func testChangeRecordingShortcutJumpsToHome() {
+        let hits = SettingsSearch.search(
+            query: "Change recording shortcut",
+            sessions: [],
+            modelTitles: []
+        )
+        XCTAssertEqual(hits.first?.page, .home)
+        XCTAssertEqual(hits.first?.highlightTitle, "Change recording shortcut")
+    }
+
     func testModelTitleMatches() {
         let hits = SettingsSearch.search(
             query: "Balanced",

@@ -23,8 +23,8 @@ struct LiveWaveform: View {
     @ObservedObject var display: WaveformDisplay
     var slotWidth: CGFloat = 188
     var slotHeight: CGFloat = 26
-    /// Single Paint ink for the comb — no per-bar palette cycling (keeps the frame cheap).
-    var ink: Color = Ink.paintCyan
+    /// Ink label for the comb (black in light, `#F2F2F2` in graphite) — follows island appearance.
+    var ink: Color = Ink.label
 
     var body: some View {
         WaveformBars(levels: display.levels, slotWidth: slotWidth, slotHeight: slotHeight, ink: ink)

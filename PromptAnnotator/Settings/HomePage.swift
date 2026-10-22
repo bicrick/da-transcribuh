@@ -13,9 +13,13 @@ struct HomePage: View {
 
     @State private var getStartedComplete = HomeGetStartedStore.isComplete()
     @State private var hoveredRecentID: String?
+    /// Measured content-column width (inside page padding). Seed wide so the first
+    /// frame doesn’t flash the stacked layout before the probe runs.
+    @State private var contentWidth: CGFloat = 2400
 
     /// Bento gutters — airy but tighter than sectionGap so cells read as one composition.
     private var cellGap: CGFloat { Ink.space3 }
+    private var isNarrow: Bool { HomeBentoLayout.isNarrow(contentWidth: contentWidth) }
 
     var body: some View {
         DTScrollView {
@@ -26,8 +30,23 @@ struct HomePage: View {
             .padding(.top, Ink.pageTop)
             .padding(.horizontal, Ink.pageSide)
             .padding(.bottom, Ink.pageBottom)
+            // One content column: same max as other Settings pages so hero divider
+            // and bento edges share one alignment.
             .frame(maxWidth: Ink.maxContentWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
+            .background {
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: HomeContentWidthKey.self,
+                        value: geo.size.width
+                    )
+                }
+            }
+            .onPreferenceChange(HomeContentWidthKey.self) { width in
+                if width > 1, abs(width - contentWidth) > 0.5 {
+                    contentWidth = width
+                }
+            }
         }
         .inkPageChrome()
         .onAppear {
@@ -71,7 +90,7 @@ struct HomePage: View {
                         .foregroundStyle(Ink.label)
                 }
                 Spacer(minLength: Ink.space2)
-                InkKeycapRow(keys: settings.chord.keycaps)
+                HomeChordEditor(settings: settings)
                 Button {
                     session.toggle()
                 } label: {
@@ -119,6 +138,10 @@ struct HomePage: View {
     }
 
     /// Row 1: four equal stat cells. Narrow → 2×2.
+    ///
+    /// Do **not** use `ViewThatFits` here: long ideal widths from sibling rows
+    /// aren’t the issue for stats, but a measured breakpoint keeps all bento
+    /// rows on one consistent rule (`stackBreakpoint`).
     private var statsRow: some View {
         let numbers = SessionLibrary.stats(from: sessions)
         let items: [(Int, String)] = [
@@ -127,20 +150,23 @@ struct HomePage: View {
             (numbers.words, numbers.words == 1 ? "Word" : "Words"),
             (numbers.minutes, numbers.minutes == 1 ? "Minute" : "Minutes"),
         ]
-        return ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: cellGap) {
-                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                    statCell(value: item.0, label: item.1)
+        return Group {
+            if isNarrow {
+                VStack(spacing: cellGap) {
+                    HStack(alignment: .top, spacing: cellGap) {
+                        statCell(value: items[0].0, label: items[0].1)
+                        statCell(value: items[1].0, label: items[1].1)
+                    }
+                    HStack(alignment: .top, spacing: cellGap) {
+                        statCell(value: items[2].0, label: items[2].1)
+                        statCell(value: items[3].0, label: items[3].1)
+                    }
                 }
-            }
-            VStack(spacing: cellGap) {
+            } else {
                 HStack(alignment: .top, spacing: cellGap) {
-                    statCell(value: items[0].0, label: items[0].1)
-                    statCell(value: items[1].0, label: items[1].1)
-                }
-                HStack(alignment: .top, spacing: cellGap) {
-                    statCell(value: items[2].0, label: items[2].1)
-                    statCell(value: items[3].0, label: items[3].1)
+                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                        statCell(value: item.0, label: item.1)
+                    }
                 }
             }
         }
@@ -165,17 +191,27 @@ struct HomePage: View {
     }
 
     /// Row 2: RECENT (~2/3) + THIS WEEK (~1/3). Narrow → stack.
+    ///
+    /// Root cause of the false-narrow bug: `ViewThatFits` compares each child’s
+    /// *ideal* width to the proposal. RECENT preview strings and CAPTURE body
+    /// copy have huge untruncated ideal widths, so the horizontal alternative
+    /// always “didn’t fit” and SwiftUI picked the stacked VStack even at ~1000pt.
     private var recentAndWeekRow: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: cellGap) {
-                recentCell
-                    .frame(maxWidth: .infinity)
-                thisWeekCell
-                    .frame(width: 220)
-            }
-            VStack(alignment: .leading, spacing: cellGap) {
-                recentCell
-                thisWeekCell
+        Group {
+            if isNarrow {
+                VStack(alignment: .leading, spacing: cellGap) {
+                    recentCell
+                    thisWeekCell
+                }
+            } else {
+                HStack(alignment: .top, spacing: cellGap) {
+                    recentCell
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    thisWeekCell
+                        .frame(width: 220, maxHeight: .infinity, alignment: .topLeading)
+                }
+                // Stretch both cells to the taller sibling (RECENT).
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -212,6 +248,7 @@ struct HomePage: View {
         let maxCount = max(counts.max() ?? 0, 1)
         let best = counts.max() ?? 0
         let initials = weekDayInitials()
+        let chartHeight: CGFloat = 56
         return HomeBentoCell(
             title: "THIS WEEK",
             trailing: AnyView(
@@ -222,23 +259,27 @@ struct HomePage: View {
             )
         ) {
             VStack(alignment: .leading, spacing: Ink.space3) {
+                Spacer(minLength: 0)
                 HStack(alignment: .bottom, spacing: 6) {
                     ForEach(0..<7, id: \.self) { index in
                         let value = counts[index]
                         let isToday = index == 6
+                        let barHeight: CGFloat = {
+                            if value <= 0 {
+                                return 2 // faint baseline tick for empty days
+                            }
+                            return max(2, CGFloat(value) / CGFloat(maxCount) * chartHeight)
+                        }()
                         VStack(spacing: 4) {
                             RoundedRectangle(cornerRadius: 1, style: .continuous)
                                 .fill(isToday ? Ink.paintRed : Ink.label)
-                                .frame(
-                                    width: 12,
-                                    height: max(4, CGFloat(value) / CGFloat(maxCount) * 48)
-                                )
-                                .opacity(value == 0 && !isToday ? 0.22 : (isToday ? 1 : 0.75))
+                                .frame(width: 12, height: barHeight)
+                                .opacity(value == 0 ? 0.22 : (isToday ? 1 : 0.75))
                             Text(initials[index])
                                 .font(Ink.captionFont)
                                 .foregroundStyle(isToday ? Ink.label : Ink.tertiary)
                         }
-                        .frame(width: 14)
+                        .frame(width: 14, height: chartHeight + 18, alignment: .bottom)
                         .accessibilityLabel("\(initials[index]), \(value) words")
                     }
                 }
@@ -253,22 +294,28 @@ struct HomePage: View {
                         .font(Ink.captionFont)
                         .foregroundStyle(Ink.tertiary)
                 }
+                Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
     }
 
     /// Row 3: two action cells; status caption lives under the capture cell (least clutter).
     private var actionsAndStatusRow: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: cellGap) {
-                captureActionCell
-                    .frame(maxWidth: .infinity)
-                folderActionCell
-                    .frame(maxWidth: .infinity)
-            }
-            VStack(alignment: .leading, spacing: cellGap) {
-                captureActionCell
-                folderActionCell
+        Group {
+            if isNarrow {
+                VStack(alignment: .leading, spacing: cellGap) {
+                    captureActionCell
+                    folderActionCell
+                }
+            } else {
+                HStack(alignment: .top, spacing: cellGap) {
+                    captureActionCell
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    folderActionCell
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -280,10 +327,13 @@ struct HomePage: View {
                 Text("Talk, or drag to capture")
                     .font(Ink.labelFont)
                     .foregroundStyle(Ink.label)
+                    .lineLimit(2)
                 Text("Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
+                    .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(-1)
                 statusCaption
                     .padding(.top, Ink.space2)
             }
@@ -297,11 +347,13 @@ struct HomePage: View {
                 Text("Sessions folder")
                     .font(Ink.labelFont)
                     .foregroundStyle(Ink.label)
+                    .lineLimit(1)
                 Text(SessionStore.displayPath())
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .truncationMode(.middle)
+                    .layoutPriority(-1)
                 Button("Show") {
                     if let root = try? SessionPaths.sessionsRoot() {
                         NSWorkspace.shared.open(root)
@@ -374,7 +426,9 @@ struct HomePage: View {
                         .font(Ink.captionFont)
                         .foregroundStyle(summary.preview.isEmpty ? Ink.tertiary : Ink.label)
                         .lineLimit(1)
+                        .truncationMode(.tail)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(-1)
 
                     Text("\(summary.words)")
                         .font(Ink.captionFont)
@@ -665,6 +719,22 @@ struct HomePage: View {
 
 // MARK: - Bento cell
 
+/// Measured width of the Home content column (inside page padding).
+private struct HomeContentWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+/// Whether Home bento rows should stack. Pure helper for tests / snapshot logic.
+enum HomeBentoLayout {
+    static let stackBreakpoint: CGFloat = 720
+    static func isNarrow(contentWidth: CGFloat) -> Bool {
+        contentWidth < stackBreakpoint
+    }
+}
+
 /// Paint/Ink bordered cell: `Ink.front` face, 1pt label border, subtle bevel offset.
 private struct HomeBentoCell<Content: View>: View {
     var title: String
@@ -684,9 +754,10 @@ private struct HomeBentoCell<Content: View>: View {
                 }
             }
             content()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .padding(compact ? Ink.space3 : Ink.space4)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Ink.front)
         .overlay(
             Rectangle()

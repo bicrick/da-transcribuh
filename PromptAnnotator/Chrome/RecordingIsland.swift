@@ -36,7 +36,7 @@ struct RecordingIslandView: View {
                 display: session.waveform,
                 slotWidth: layout.wave.width,
                 slotHeight: layout.wave.height,
-                ink: Ink.paintCyan
+                ink: Ink.label
             )
             Color.clear.frame(width: layout.sideGapTrailing)
             trailing(layout)

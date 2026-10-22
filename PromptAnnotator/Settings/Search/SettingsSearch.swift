@@ -61,6 +61,7 @@ enum SettingsSearch {
         hit("home.permissions", .home, "Permissions", "Screen Recording, Microphone, Accessibility"),
         hit("home.model", .home, "Speech model", "WhisperKit on this Mac"),
         hit("home.first", .home, "First take", "Start a session"),
+        hit("home.shortcut", .home, "Change recording shortcut", "Edit Start/Stop chord on Home"),
         // Appearance (theme + former Recording page)
         hit("app.theme", .appearance, "Theme", "System, Light, Dark"),
         hit("app.style", .appearance, "Recording window", "Default, Compact, Minimal, Hidden"),
