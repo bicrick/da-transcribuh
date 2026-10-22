@@ -24,13 +24,13 @@
 
 ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset shadows, and manila **folder tabs** across the top of settings (no toolbox sidebar). departure mono for every “da transcribuh” wordmark and chrome label (lowercase, block cursor only after the h — never italic). sf mono for longer copy. custom thin scrollers. chrome keeps decorative palette strips out of the title bar and status bar.
 
-appearance is system / light / dark from **general**, or mash `theme: …` in the menu bar to cycle. light stays white; dark is soft graphite (window `#2C2C2E`, raised `#353538`, front `#3A3A3D`, hairline `#4A4A4E`, text `#F2F2F2` / `#A8A8AD`, bevel floor `#1A1A1C`) — never midnight black. paint accents stay vivid.
+appearance is system / light / dark from **general**, or mash `theme: …` in the menu bar to cycle. light stays white; dark is soft graphite (window `#2C2C2E`, raised `#353538`, front `#3A3A3D`, hairline `#4A4A4E`, text `#F2F2F2` / `#A8A8AD`, bevel `#F2F2F2` theme-inverted) — never midnight black. paint accents stay vivid.
 
 the start/stop chord lives in **general** as paint keycaps — click, press a combo (modifier required, or a function key), it rebinds live. reset drops you back on ⌃⌥Space. home, the status bar, the menu panel, and onboarding all read the same stored shortcut.
 
 the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform, screenshot-count chip on the right when you’ve grabbed a tile (the chip slot fully collapses when there are none). default size is the everyday footprint; compact is the same layout, tighter. same double-pane hard offset as selected chrome (`Ink.bevel` block down-right) — no palette strip, no extra chrome.
 
-the app mark is Departure Mono **d** + inverted **t** block inside a square with a hard-offset bevel. light keeps the white plate; dark inverts to a graphite tile with a light border / “d” and a light “t” block (bevel stays `#1A1A1C`). keycaps / tip tiles / secondary chrome follow graphite invert; **Start** stays high-contrast (black in light, light fill in dark) with the red bevel. folder tabs carry quiet per-page Paint accents on the top stripe. regenerate AppIcon (always the light plate) with `scripts/render_dt_icon.py`.
+the app mark is Departure Mono **d** + inverted **t** block inside a square with a hard-offset bevel. light keeps the white plate; dark inverts to a graphite tile with a light border / “d” and a light “t” block (bevel inverts to `#F2F2F2` with the theme). keycaps / tip tiles / secondary chrome follow graphite invert; **Start** stays high-contrast (black in light, light fill in dark) with the red bevel. folder tabs are square 2pt accent outlines (no bevel). regenerate AppIcon (always the light plate) with `scripts/render_dt_icon.py`.
 
 <p align="center">
   <img src="assets/brand/screenshots/settings-home-light.png" alt="da transcribuh settings — home" width="920">

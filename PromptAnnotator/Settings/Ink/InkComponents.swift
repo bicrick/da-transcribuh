@@ -43,7 +43,7 @@ struct DTWordmark: View {
 
 /// Hard offset “double pane” — shared by island + selected chrome:
 /// `Ink.label` face border (`Ink.stroke`), `Ink.bevel` solid offset at `Ink.bevelOffset`,
-/// gutter reserved so the offset never clips. Dark bevel floors at #1A1A1C.
+/// gutter reserved so the offset never clips. Bevel is theme-inverted (black ↔ `#F2F2F2`).
 struct InkDoublePaneModifier: ViewModifier {
     var cornerRadius: CGFloat = Ink.sidebarRowRadius
     var borderWidth: CGFloat = Ink.stroke

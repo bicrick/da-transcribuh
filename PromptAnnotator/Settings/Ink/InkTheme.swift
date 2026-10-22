@@ -9,7 +9,7 @@ enum Ink {
     // MARK: - Dynamic surfaces (light / dark)
     //
     // Dark graphite (Patrick): window #2C2C2E · raised/cards #353538 · front #3A3A3D
-    // hairline #4A4A4E · secondary #A8A8AD · label #F2F2F2 · bevel #1A1A1C (floor).
+    // hairline #4A4A4E · secondary #A8A8AD · label #F2F2F2 · bevel #F2F2F2 (theme-inverted).
 
     /// Outer chrome / title / status / page gutter.
     static let window = color(light: "#FFFFFF", dark: "#2C2C2E")
@@ -54,8 +54,9 @@ enum Ink {
     static let markInvertFace = color(light: "#000000", dark: "#F2F2F2")
     /// Letter inside the inverted “t” block.
     static let markInvertInk = color(light: "#FFFFFF", dark: "#3A3A3D")
-    /// Double-pane hard offset — darkest UI paint; nothing darker except this bevel.
-    static let bevel = color(light: "#000000", dark: "#1A1A1C")
+    /// Double-pane hard offset — theme-inverted like the dt mark: black in light,
+    /// near-white (`#F2F2F2`) in dark. Folder tabs have no bevel. Start’s red bevel stays `Ink.paintRed`.
+    static let bevel = color(light: "#000000", dark: "#F2F2F2")
 
     // MARK: - Classic MS Paint flat swatches (Win95/98 era)
 
@@ -141,8 +142,10 @@ enum Ink {
 
     /// Folder-tab shelf height (selected face).
     static let folderTabHeight: CGFloat = 30
-    /// Subtle gap between Session / Speech / App tab clusters (~6–8pt).
-    static let tabGroupGap: CGFloat = 8
+    /// Uniform gap between every folder tab (outlines never touch).
+    static let tabGap: CGFloat = 6
+    /// Alias — same as `tabGap` (clusters no longer use a wider break).
+    static let tabGroupGap: CGFloat = tabGap
     /// Tip row: monochrome glyph square.
     static let tipIconSize: CGFloat = 48
     static let tipSymbolPointSize: CGFloat = 22

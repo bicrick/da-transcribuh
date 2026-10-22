@@ -208,6 +208,7 @@ struct HighlightedSnippet: View {
 }
 
 /// Quiet discoverability chip — tab row trailing.
+/// Square + 2pt outline, no bevel (matches folder tabs).
 struct SettingsSearchAffordance: View {
     var action: () -> Void
 

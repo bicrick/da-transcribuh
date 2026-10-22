@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Regenerate Settings Home README screenshots / paint mocks (light + graphite dark).
 
-Matches the real app: Chrome FolderTabShape — selected has concave cove feet
-(fillet into shelf) + continuous Ink.stroke (2pt) accent shelf; unselected have
-plain rounded tops, open-bottom muted outlines (no bottom edge), fixed layout
-width (selection never shifts frames). Ink.bevelOffset (3pt) on cells/mark.
-Departure Mono chrome; DejaVu for ⌃⌥⌘ glyphs.
+Matches the real app: Paint FolderTabShape — square faces, Ink.stroke (2pt)
+accent outlines, NO bevels on tabs. Continuous accent shelf joins selected
+sides at right angles; unselected tabs rest on that shelf (open bottom).
+Selection-invariant layout. ⌘K chip matches (square, 2pt outline, no bevel).
+Cards / keycaps / mark / Start keep Ink.bevelOffset hard offsets
+(Ink.bevel: black in light, #F2F2F2 in dark). Departure Mono; DejaVu for ⌃⌥⌘.
 """
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -29,14 +29,12 @@ CELL_GAP = 12 * S
 # Ink.bevelOffset = 3pt → 6px at 2×
 BEVEL = 3 * S
 
-# Chrome FolderTabShape constants (Swift points → mock pixels via S)
-CORNER_R = 6 * S
-FOOT = 8 * S  # cove fillet sized for 2pt stroke
+# Paint FolderTabShape constants (Swift points → mock pixels via S)
 TAB_H = 30 * S
 SHELF_TOP_PAD = 8 * S
 PAGE_SIDE = 36 * S
-TAB_GROUP_GAP = 8 * S
-TAB_INNER_GAP = 2 * S
+# Ink.tabGap = 6pt → uniform spacing between every tab
+TAB_GAP = 6 * S
 # Ink.stroke = 2pt → 4px at 2× (chrome outlines + shelf)
 STROKE = int(2 * S)
 # Internal separators only (Recent rows, wordmark rule)
@@ -87,7 +85,7 @@ DARK = {
     "label": "#F2F2F2",
     "secondary": "#A8A8AD",
     "hairline": "#4A4A4E",
-    "bevel": "#1A1A1C",
+    "bevel": "#F2F2F2",
     "primary": "#F2F2F2",
     "on_primary": "#2C2C2E",
     "mark_face": "#3A3A3D",
@@ -122,10 +120,6 @@ TABS_DARK_ACCENT = {
     "#008080": "#2AA8A8",
     "#FFAEC9": "#FFC0D6",
 }
-# Group breaks before Models (index 3) and General (index 4) — matches tabGroups.
-GROUP_BEFORE = {3, 4}
-
-
 def c(pal: dict, key: str) -> tuple[int, int, int]:
     return hex_rgb(pal[key])
 
@@ -135,104 +129,40 @@ def text_size(draw: ImageDraw.ImageDraw, text: str, f: ImageFont.ImageFont) -> t
     return bb[2] - bb[0], bb[3] - bb[1]
 
 
-KAPPA = 0.5522847498  # cubic quarter-circle
-
-
-def measure_tab_width(draw: ImageDraw.ImageDraw, title: str, selected: bool = False) -> float:
-    """Selection-invariant width (label in regular weight + pad). Feet are paint-only."""
-    del selected  # kept for call-site compatibility
+def measure_tab_face_width(draw: ImageDraw.ImageDraw, title: str) -> float:
+    """Selection-invariant tab width (label + pad). No bevel gutter."""
     f = font_departure(11 * S)
     tw, _ = text_size(draw, title, f)
-    # icon + gap + label + pad (matches FolderTabShape.layoutSize)
     return 10 * S + 5 * S + tw + 12 * S * 2
 
 
-def _bezier(
-    p0: tuple[float, float],
-    p1: tuple[float, float],
-    p2: tuple[float, float],
-    p3: tuple[float, float],
-    n: int = 16,
-) -> list[tuple[float, float]]:
-    pts = []
-    for i in range(n + 1):
-        t = i / n
-        u = 1 - t
-        x = u**3 * p0[0] + 3 * u**2 * t * p1[0] + 3 * u * t**2 * p2[0] + t**3 * p3[0]
-        y = u**3 * p0[1] + 3 * u**2 * t * p1[1] + 3 * u * t**2 * p2[1] + t**3 * p3[1]
-        pts.append((x, y))
-    return pts
+def measure_tab_width(draw: ImageDraw.ImageDraw, title: str, selected: bool = False) -> float:
+    """Selection-invariant tab width (no bevel)."""
+    del selected
+    return measure_tab_face_width(draw, title)
 
 
-def _quad(
-    p0: tuple[float, float],
-    control: tuple[float, float],
-    p1: tuple[float, float],
-    n: int = 16,
-) -> list[tuple[float, float]]:
-    """Quadratic Bézier — matches Swift Path.addQuadCurve (concave cove feet)."""
-    pts = []
-    for i in range(n + 1):
-        t = i / n
-        u = 1 - t
-        x = u**2 * p0[0] + 2 * u * t * control[0] + t**2 * p1[0]
-        y = u**2 * p0[1] + 2 * u * t * control[1] + t**2 * p1[1]
-        pts.append((x, y))
-    return pts
-
-
-def flared_tab_outline(x: float, y: float, w: float, h: float) -> list[tuple[float, float]]:
-    """Selected open outline — concave cove feet (matches Swift appendFlaredOutline).
-
-    Left foot: tip (sideX - r, shelfY) → wall (sideX, shelfY - r) with quad control
-    (sideX, shelfY). Arc center sits outside the tab above the baseline; curve bows
-    into the tab-bottom corner (shaded fill is convex at the base). No ledge.
-    """
-    f, r = FOOT, CORNER_R
-    side_l, side_r = x + f, x + w - f
-    top, shelf = y, y + h
-    safe_r = min(r, max(0.0, (side_r - side_l) / 2), max(0.0, h / 2))
-    kr = KAPPA * safe_r
-    pts: list[tuple[float, float]] = [(x, shelf)]
-    # Left concave fillet (cove): control at (side_l, shelf)
-    pts += _quad((x, shelf), (side_l, shelf), (side_l, shelf - f))[1:]
-    pts.append((side_l, top + safe_r))
-    pts += _bezier(
-        (side_l, top + safe_r),
-        (side_l, top + safe_r - kr),
-        (side_l + safe_r - kr, top),
-        (side_l + safe_r, top),
-    )[1:]
-    pts.append((side_r - safe_r, top))
-    pts += _bezier(
-        (side_r - safe_r, top),
-        (side_r - safe_r + kr, top),
-        (side_r, top + safe_r - kr),
-        (side_r, top + safe_r),
-    )[1:]
-    pts.append((side_r, shelf - f))
-    # Right concave fillet (mirrored)
-    pts += _quad((side_r, shelf - f), (side_r, shelf), (x + w, shelf))[1:]
-    return pts
-
-
-def plain_tab_outline(x: float, y: float, w: float, h: float) -> list[tuple[float, float]]:
-    """Unselected — rounded top, straight sides to baseline (no feet)."""
-    r = min(CORNER_R, w / 2, h / 2)
-    kr = KAPPA * r
-    top, shelf = y, y + h
-    pts: list[tuple[float, float]] = [(x, shelf), (x, top + r)]
-    pts += _bezier((x, top + r), (x, top + r - kr), (x + r - kr, top), (x + r, top))[1:]
-    pts.append((x + w - r, top))
-    pts += _bezier((x + w - r, top), (x + w - r + kr, top), (x + w, top + r - kr), (x + w, top + r))[1:]
-    pts.append((x + w, shelf))
-    return pts
+def square_tab_outline(x: float, y: float, w: float, h: float) -> list[tuple[float, float]]:
+    """Open-bottom square: bottom-left → top-left → top-right → bottom-right."""
+    return [
+        (x, y + h),
+        (x, y),
+        (x + w, y),
+        (x + w, y + h),
+    ]
 
 
 def stroke_polyline(draw: ImageDraw.ImageDraw, pts: list[tuple[float, float]], fill, width: int) -> None:
     if len(pts) < 2:
         return
-    draw.line(pts, fill=fill, width=width, joint="curve")
+    draw.line(pts, fill=fill, width=width, joint="miter")
+
+
+def tab_accent_rgb(accent: str, pal: dict) -> tuple[int, int, int]:
+    """Full-strength accent (same 2pt weight selected or unselected)."""
+    if pal is DARK:
+        accent = TABS_DARK_ACCENT.get(accent, accent)
+    return hex_rgb(accent)
 
 
 def draw_folder_tab(
@@ -245,22 +175,24 @@ def draw_folder_tab(
     accent: str,
     selected: bool,
     pal: dict,
+    stroke_outline: bool = True,
 ) -> None:
-    """Fill + label in the layout box. Unselected open-bottom outline; selected outline is the shelf."""
+    """Square face + open-bottom 2pt accent outline. No bevel.
+
+    Selected outline is normally drawn by the continuous shelf path (once, on top)
+    so pass stroke_outline=False for the selected tab to avoid double weight.
+    """
     face = c(pal, "front") if selected else c(pal, "fill")
-    outline = plain_tab_outline(x, y, w, h)
+    outline = square_tab_outline(x, y, w, h)
     draw.polygon(outline + [outline[0]], fill=face)
-    if not selected:
-        # Open bottom — sides terminate on the shelf; continuous accent shows underneath.
-        muted = tuple(int(a * 0.55 + f * 0.45) for a, f in zip(hex_rgb(accent), c(pal, "fill")))
-        stroke_polyline(draw, outline, muted, STROKE)
-    label_left, label_right = x, x + w
+    if stroke_outline:
+        stroke_polyline(draw, outline, tab_accent_rgb(accent, pal), STROKE)
 
     fnt = font_departure(11 * S)
     tw, th = text_size(draw, title, fnt)
     ty = y + (h - th) / 2
     draw.text(
-        (label_left + (label_right - label_left - tw) / 2, ty),
+        (x + (w - tw) / 2, ty),
         title,
         font=fnt,
         fill=c(pal, "label" if selected else "secondary"),
@@ -276,11 +208,21 @@ def draw_continuous_shelf_stroke(
     tab_h: float,
     accent: tuple[int, int, int],
 ) -> None:
-    """Full-width rule joined to selected flared outline (feet outside layout frame)."""
-    outline = flared_tab_outline(tab_x - FOOT, tab_y, tab_w + 2 * FOOT, tab_h)
-    left = [(0, shelf_bottom), outline[0]]
-    right = [outline[-1], (W, shelf_bottom)]
-    stroke_polyline(draw, left + outline + right, accent, STROKE)
+    """Full-width rule + selected U at crisp right angles (drawn once, on top)."""
+    del tab_h
+    # Pixel-center the stroke on the shelf / face edges (matches Swift SelectedTabShelfStroke).
+    y = shelf_bottom
+    top = tab_y + STROKE / 2
+    left, right = tab_x, tab_x + tab_w
+    outline = [
+        (0, y),
+        (left, y),
+        (left, top),
+        (right, top),
+        (right, y),
+        (W, y),
+    ]
+    stroke_polyline(draw, outline, accent, STROKE)
 
 
 def draw_mark(draw: ImageDraw.ImageDraw, x: float, y: float, side: float, pal: dict) -> None:
@@ -393,61 +335,53 @@ def render(pal: dict) -> Image.Image:
     d.text(((W - tw) / 2, (strip_h - th) / 2 - 2), "da transcribuh", font=wf, fill=c(pal, "label"))
     d.rectangle([(W + tw) / 2 + 4, strip_h / 2 - 6, (W + tw) / 2 + 4 + 6 * S, strip_h / 2 + 6], fill=c(pal, "label"))
 
-    # Folder shelf
+    # Folder shelf — fill only ABOVE the shelf stroke; page color from the stroke down
+    # (avoids a fill→front band under the red line in graphite).
     shelf_y = strip_h
     shelf_h = SHELF_TOP_PAD + TAB_H
-    d.rectangle([0, shelf_y, W, shelf_y + shelf_h], fill=c(pal, "fill"))
-
-    # Measure + place tabs (same height / baseline / width whether selected or not)
-    tx = PAGE_SIDE
-    tab_rects: list[tuple[float, float, float, float, bool, str, str]] = []
     tab_bottom = shelf_y + shelf_h
-    for i, (name, accent) in enumerate(TABS):
-        if i in GROUP_BEFORE:
-            tx += TAB_GROUP_GAP
-        selected = i == 0
-        twid = measure_tab_width(d, name, selected=selected)
-        ty = tab_bottom - TAB_H
-        tab_rects.append((tx, ty, twid, TAB_H, selected, name, accent))
-        tx += twid + TAB_INNER_GAP
-
-    # Content under shelf (selected fill merges into page)
-    content_top = shelf_y + shelf_h
+    shelf_stroke_y = tab_bottom - STROKE / 2
+    d.rectangle([0, shelf_y, W, shelf_stroke_y], fill=c(pal, "fill"))
     status_h = 32 * S
-    d.rectangle([0, content_top, W, H - status_h], fill=c(pal, "front"))
+    d.rectangle([0, shelf_stroke_y, W, H - status_h], fill=c(pal, "front"))
+    content_top = tab_bottom
 
-    # Unselected tabs first
+    # Measure + place tabs — uniform Ink.tabGap between every tab
+    tx = PAGE_SIDE
+    # (x, y, face_w, h, selected, name, accent)
+    tab_rects: list[tuple[float, float, float, float, bool, str, str]] = []
+    for i, (name, accent) in enumerate(TABS):
+        selected = i == 0
+        face_w = measure_tab_face_width(d, name)
+        ty = tab_bottom - TAB_H
+        tab_rects.append((tx, ty, face_w, TAB_H, selected, name, accent))
+        tx += face_w + TAB_GAP
+
+    # Unselected tabs first (full-weight 2pt accent outlines)
     for rect in tab_rects:
         x, y, w, h, selected, name, accent = rect
         if not selected:
             draw_folder_tab(d, x, y, w, h, name, accent, False, pal)
 
-    # Selected fill + continuous accent shelf stroke
+    # Selected fill (outline deferred to shelf path) + continuous accent shelf on top
     sx, sy, sw, sh, _, sname, saccent = tab_rects[0]
-    draw_folder_tab(d, sx, sy, sw, sh, sname, saccent, True, pal)
-    # Bleed fill 1pt into the page under the selected body
-    d.rectangle(
-        [sx, tab_bottom - 1, sx + sw, tab_bottom + STROKE],
-        fill=c(pal, "front"),
-    )
-    accent_hex = saccent
-    if pal is DARK:
-        accent_hex = TABS_DARK_ACCENT.get(saccent, saccent)
+    draw_folder_tab(d, sx, sy, sw, sh, sname, saccent, True, pal, stroke_outline=False)
     draw_continuous_shelf_stroke(
-        d, tab_bottom - STROKE / 2, sx, sy, sw, sh, hex_rgb(accent_hex)
+        d, shelf_stroke_y, sx, sy, sw, sh, tab_accent_rgb(saccent, pal)
     )
-    # Label again on top of stroke
-    draw_folder_tab(d, sx, sy, sw, sh, sname, saccent, True, pal)
 
-    # ⌘K chip
+    # ⌘K chip — square, 2pt outline, no bevel (matches tabs)
     cf2 = font_symbol(10 * S)
+    chip_x = W - PAGE_SIDE - 70 * S
+    chip_y = shelf_y + 14 * S
+    chip_w, chip_h = 70 * S, 14 * S
     d.rectangle(
-        [W - PAGE_SIDE - 70 * S, shelf_y + 14 * S, W - PAGE_SIDE, shelf_y + 28 * S],
+        [chip_x, chip_y, chip_x + chip_w, chip_y + chip_h],
         fill=c(pal, "fill"),
         outline=c(pal, "control"),
         width=STROKE,
     )
-    d.text((W - PAGE_SIDE - 64 * S, shelf_y + 16 * S), "⌘K", font=cf2, fill=c(pal, "secondary"))
+    d.text((chip_x + 6 * S, chip_y + 2 * S), "⌘K", font=cf2, fill=c(pal, "secondary"))
 
     # Hero
     mx, my = PAGE_SIDE, content_top + 28 * S

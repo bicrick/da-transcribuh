@@ -16,12 +16,12 @@ final class InkThemeTests: XCTestCase {
 
 
     func testDarkGraphitePalette() {
-        // Soft graphite — nothing in chrome darker than bevel #1A1A1C.
+        // Soft graphite surfaces; bevel inverts to near-white in dark.
         XCTAssertEqual(Ink.nsColor(hex: "#2C2C2E").redComponent * 255, 44, accuracy: 0.6)
         XCTAssertEqual(Ink.nsColor(hex: "#353538").redComponent * 255, 53, accuracy: 0.6)
         XCTAssertEqual(Ink.nsColor(hex: "#3A3A3D").redComponent * 255, 58, accuracy: 0.6)
         XCTAssertEqual(Ink.nsColor(hex: "#4A4A4E").redComponent * 255, 74, accuracy: 0.6)
-        XCTAssertEqual(Ink.nsColor(hex: "#1A1A1C").redComponent * 255, 26, accuracy: 0.6)
+        XCTAssertEqual(Ink.nsColor(hex: "#F2F2F2").redComponent * 255, 242, accuracy: 0.6)
         // Dynamic tokens resolve (light side checked via layout; dark via NSColor provider).
         _ = Ink.window
         _ = Ink.front
@@ -40,7 +40,8 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.fieldRadius, 2)
         XCTAssertEqual(Ink.sidebarRowRadius, 2)
         XCTAssertEqual(Ink.folderTabHeight, 30)
-        XCTAssertEqual(Ink.tabGroupGap, 8)
+        XCTAssertEqual(Ink.tabGap, 6)
+        XCTAssertEqual(Ink.tabGroupGap, Ink.tabGap)
         XCTAssertEqual(Ink.tipIconSize, 48)
         XCTAssertEqual(Ink.tipSymbolPointSize, 22)
         XCTAssertEqual(Ink.pageTop, 28)
@@ -233,8 +234,8 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(SettingsPage.history.tabAccent, Ink.tabStrokeBlue)
         XCTAssertEqual(SettingsPage.model.tabAccent, Ink.tabStrokeOrange)
         XCTAssertEqual(SettingsPage.performance.tabAccent, Ink.tabStrokePink)
-        XCTAssertEqual(FolderTabShape.corner, 6)
-        XCTAssertEqual(FolderTabShape.foot, 8)
+        XCTAssertEqual(FolderTabShape.corner, 0, "Tabs are square Paint chrome")
+        XCTAssertEqual(FolderTabShape.foot, 0, "No cove feet — tabs have no bevel")
         XCTAssertEqual(Ink.stroke, 2)
         XCTAssertEqual(Ink.bevelOffset, 3)
         XCTAssertEqual(Ink.hairlineWidth, 1)
@@ -246,16 +247,18 @@ final class InkThemeTests: XCTestCase {
     }
 
     func testFolderTabLayoutSizeIgnoresSelection() {
-        // Feet are paint-only overlays — layout width is label-based and identical
-        // whether the tab is selected or not (Chrome-stable frames).
+        // Face width is label-based and identical whether selected or not
+        // (tabs have no bevel gutter).
         let home = FolderTabShape.layoutSize(titleWidth: 40)
         let appearance = FolderTabShape.layoutSize(titleWidth: 90)
         XCTAssertEqual(home.height, Ink.folderTabHeight)
         XCTAssertEqual(appearance.height, Ink.folderTabHeight)
         XCTAssertGreaterThan(appearance.width, home.width)
-        // Foot overhang is not part of layoutSize.
         XCTAssertEqual(home.width, 10 + (Ink.space1 + 1) + 40 + Ink.space3 * 2)
-        XCTAssertEqual(FolderTabMetrics.intraGroupGap, 2)
+        XCTAssertEqual(FolderTabMetrics.intraGroupGap, Ink.tabGap)
+        // Square open-bottom path: four corners, no curves.
+        let outline = FolderTabShape(closeBottom: false).path(in: CGRect(x: 0, y: 0, width: 80, height: 30))
+        XCTAssertFalse(outline.isEmpty)
     }
 
     func testWordmarkUsesSeparateBlockCursorNotInvertedH() {

@@ -1,36 +1,25 @@
 import SwiftUI
 
-/// Chrome-style folder tabs across the top of Settings.
+/// Paint-style folder tabs across the top of Settings.
 ///
-/// Layout is **selection-invariant** (Chrome): every tab keeps the same frame
-/// whether selected or not. Feet are paint-only overlays that extend outside the
-/// layout box. The selected-accent shelf + selected outline are one continuous
-/// `Ink.stroke` path, edge to edge, drawn above unselected bottoms.
+/// Square faces, `Ink.stroke` (2pt) accent outlines, **no bevels**. Layout is
+/// **selection-invariant**. Selected outline + continuous shelf are one path
+/// drawn on top (full accent, open bottom merging into the page). Unselected
+/// tabs get the same 2pt accent weight on the face and rest on the shelf.
 struct SettingsFolderTabs: View {
     @Binding var selection: SettingsPage
     var onSearch: (() -> Void)? = nil
 
     private var tabHeight: CGFloat { Ink.folderTabHeight }
     private var shelfHeight: CGFloat { Ink.space2 + tabHeight }
-    /// Seal selected fill into the page under the 2pt shelf stroke.
     private var selectedBleed: CGFloat { Ink.stroke }
 
     @State private var selectedFrame: CGRect = .null
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 0) {
-            ForEach(Array(SettingsPage.tabGroups.enumerated()), id: \.offset) { groupIndex, group in
-                if groupIndex > 0 {
-                    Color.clear
-                        .frame(width: Ink.tabGroupGap, height: 1)
-                }
-                ForEach(Array(group.enumerated()), id: \.element.id) { tabIndex, page in
-                    if tabIndex > 0 {
-                        Color.clear
-                            .frame(width: FolderTabMetrics.intraGroupGap, height: 1)
-                    }
-                    tab(page)
-                }
+        HStack(alignment: .bottom, spacing: Ink.tabGap) {
+            ForEach(SettingsPage.tabOrder) { page in
+                tab(page)
             }
             Spacer(minLength: Ink.space2)
             if let onSearch {
@@ -46,14 +35,19 @@ struct SettingsFolderTabs: View {
         .coordinateSpace(name: ShelfSpace.name)
         .background {
             ZStack(alignment: .bottom) {
+                // Tab row well; page color under the shelf stroke (no fill→front band).
                 Ink.fill
-                // Full-width continuous accent path — drawn last so it sits on top of
-                // unselected tab bottoms across the entire window width.
-                SelectedTabShelfStroke(gap: selectedFrame)
-                    .stroke(selection.tabAccent, lineWidth: Ink.stroke)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .allowsHitTesting(false)
+                Ink.front
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Ink.stroke)
             }
+        }
+        // Continuous shelf + selected U on TOP so stroke weight matches unselected faces
+        // (never double-drawn, never hidden behind fill).
+        .overlay(alignment: .bottom) {
+            SelectedTabShelfStroke(gap: selectedFrame)
+                .stroke(selection.tabAccent, lineWidth: Ink.stroke)
+                .allowsHitTesting(false)
         }
         .onPreferenceChange(SelectedTabFrameKey.self) { frame in
             selectedFrame = frame ?? .null
@@ -67,7 +61,6 @@ struct SettingsFolderTabs: View {
         return Button {
             selection = page
         } label: {
-            // Fixed label metrics — same padding / font whether selected or not.
             HStack(spacing: Ink.space1 + 1) {
                 Image(systemName: page.symbol)
                     .font(.system(size: 10, weight: .bold))
@@ -80,20 +73,17 @@ struct SettingsFolderTabs: View {
             .padding(.horizontal, Ink.space3)
             .frame(height: tabHeight)
             .background {
-                // Fill stays inside the layout box for both states (no foot padding).
-                FolderTabShape(flared: false)
+                FolderTabShape(closeBottom: true)
                     .fill(selected ? Ink.front : Ink.fill)
             }
             .overlay {
-                // Unselected: open-bottom outline (sides terminate on the shelf).
-                // Selected outline is the continuous shelf stroke.
+                // Unselected only — selected outline is the overlay shelf path (same 2pt).
                 if !selected {
-                    FolderTabShape(flared: false, closeBottom: false)
-                        .stroke(page.tabAccent.opacity(0.55), lineWidth: Ink.stroke)
+                    FolderTabShape(closeBottom: false)
+                        .stroke(page.tabAccent, lineWidth: Ink.stroke)
                 }
             }
             .background(alignment: .bottom) {
-                // Selected fill bleed under the shelf stroke — does not change layout height.
                 if selected {
                     Ink.front
                         .frame(height: selectedBleed)
@@ -101,7 +91,6 @@ struct SettingsFolderTabs: View {
                 }
             }
             .background {
-                // Report the layout frame; shelf stroke expands feet outside this box.
                 if selected {
                     GeometryReader { geo in
                         Color.clear.preference(
@@ -113,7 +102,6 @@ struct SettingsFolderTabs: View {
             }
         }
         .buttonStyle(.plain)
-        // Feet / shelf paint above neighbors; layout frames stay put.
         .zIndex(selected ? 1 : 0)
         .accessibilityLabel(page.pageTitle)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
@@ -121,15 +109,15 @@ struct SettingsFolderTabs: View {
     }
 }
 
-// MARK: - Shelf space + selected frame
+// MARK: - Preference plumbing
 
 private enum ShelfSpace {
-    static let name = "settings.folderTabShelf"
+    static let name = "SettingsFolderShelf"
 }
 
 enum FolderTabMetrics {
-    /// Gap between tabs inside a group (selection-invariant).
-    static let intraGroupGap: CGFloat = 2
+    /// Uniform gap between every tab — same as `Ink.tabGap`.
+    static let intraGroupGap: CGFloat = Ink.tabGap
 }
 
 private struct SelectedTabFrameKey: PreferenceKey {
@@ -142,9 +130,9 @@ private struct SelectedTabFrameKey: PreferenceKey {
     }
 }
 
-/// Full-width rule joined to the selected tab’s open outline (concave feet).
-/// Feet extend `FolderTabShape.foot` outside the reported layout frame so
-/// selection never changes tab width. Pixel-centered for `Ink.stroke` at 1× / 2×.
+/// Full-width accent rule joined to the selected tab’s square open outline.
+/// Pixel-centered for `Ink.stroke` at 1× / 2× so sides meet the shelf at whole-pixel corners.
+/// Drawn once on top of the tab row — never doubles the selected edge.
 private struct SelectedTabShelfStroke: Shape {
     var gap: CGRect
 
@@ -153,139 +141,56 @@ private struct SelectedTabShelfStroke: Shape {
         let y = rect.maxY - stroke / 2
         var path = Path()
 
-        let foot = FolderTabShape.foot
         if gap.isNull || gap.isEmpty || gap.width <= 1 {
             path.move(to: CGPoint(x: rect.minX, y: y))
             path.addLine(to: CGPoint(x: rect.maxX, y: y))
             return path
         }
 
-        // Layout frame is the label box; flared outline lives in an expanded rect.
-        let tab = CGRect(
-            x: gap.minX - foot,
-            y: gap.minY,
-            width: gap.width + 2 * foot,
-            height: max(0, y + stroke / 2 - gap.minY)
-        )
+        let left = gap.minX
+        let right = gap.maxX
+        let top = gap.minY + stroke / 2
+
         path.move(to: CGPoint(x: rect.minX, y: y))
-        path.addLine(to: CGPoint(x: tab.minX, y: y))
-        FolderTabShape.appendFlaredOutline(to: &path, in: tab, shelfY: y, moveToStart: false)
+        path.addLine(to: CGPoint(x: left, y: y))
+        path.addLine(to: CGPoint(x: left, y: top))
+        path.addLine(to: CGPoint(x: right, y: top))
+        path.addLine(to: CGPoint(x: right, y: y))
         path.addLine(to: CGPoint(x: rect.maxX, y: y))
         return path
     }
 }
 
-// MARK: - Chrome-style tab silhouette
+// MARK: - Square tab silhouette
 
-/// Chrome tab geometry.
-/// - `flared`: selected shelf path — concave cove feet outside the layout box.
-/// - not flared: rounded top; `closeBottom` false for unselected outlines (no bottom edge).
+/// Square folder-tab face (no rounded tops, no cove feet, no bevel).
 struct FolderTabShape: Shape {
-    static let corner: CGFloat = 6
-    /// Cove fillet radius; sized for `Ink.stroke` (2pt) so joints stay clean.
-    static let foot: CGFloat = 8
-    /// Cubic kappa for a quarter-circle Bézier (top corners only).
-    private static let k: CGFloat = 0.5522847498
+    static let corner: CGFloat = 0
+    static let foot: CGFloat = 0
 
-    var flared: Bool
     var closeBottom: Bool = true
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        if flared {
-            Self.appendFlaredOutline(to: &path, in: rect, shelfY: rect.maxY, moveToStart: true)
-        } else {
-            Self.appendPlainOutline(to: &path, in: rect, closeBottom: closeBottom)
-        }
-        return path
-    }
-
-    /// Unselected / fill: rounded top, vertical sides. Open bottom when used as an
-    /// outline so the continuous accent shelf shows through underneath.
-    static func appendPlainOutline(to path: inout Path, in rect: CGRect, closeBottom: Bool) {
-        let r = min(corner, rect.width / 2, rect.height / 2)
-        let kappa = k * r
         path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
-        path.addCurve(
-            to: CGPoint(x: rect.minX + r, y: rect.minY),
-            control1: CGPoint(x: rect.minX, y: rect.minY + r - kappa),
-            control2: CGPoint(x: rect.minX + r - kappa, y: rect.minY)
-        )
-        path.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
-        path.addCurve(
-            to: CGPoint(x: rect.maxX, y: rect.minY + r),
-            control1: CGPoint(x: rect.maxX - r + kappa, y: rect.minY),
-            control2: CGPoint(x: rect.maxX, y: rect.minY + r - kappa)
-        )
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
         if closeBottom {
             path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
             path.closeSubpath()
         }
+        return path
     }
 
-    /// Selected open outline with Chrome **concave** feet (cove / fillet, not bullnose).
-    ///
-    /// `rect` is the flared paint box (layout frame expanded by `foot` on each side).
-    /// Left foot: baseline tip `(sideX - r, shelfY)` → vertical `(sideX, shelfY - r)`.
-    /// Quad control `(sideX, shelfY)` — arc center outside the tab above the baseline.
-    static func appendFlaredOutline(
-        to path: inout Path,
-        in rect: CGRect,
-        shelfY: CGFloat,
-        moveToStart: Bool
-    ) {
-        let f = foot
-        let r = min(corner, max(0, (rect.width - 2 * f) / 2), max(0, (shelfY - rect.minY) / 2))
-        let sideLeft = rect.minX + f
-        let sideRight = rect.maxX - f
-        let top = rect.minY
-        let kappaR = k * r
-
-        if moveToStart {
-            path.move(to: CGPoint(x: rect.minX, y: shelfY))
-        }
-
-        path.addQuadCurve(
-            to: CGPoint(x: sideLeft, y: shelfY - f),
-            control: CGPoint(x: sideLeft, y: shelfY)
-        )
-
-        path.addLine(to: CGPoint(x: sideLeft, y: top + r))
-
-        path.addCurve(
-            to: CGPoint(x: sideLeft + r, y: top),
-            control1: CGPoint(x: sideLeft, y: top + r - kappaR),
-            control2: CGPoint(x: sideLeft + r - kappaR, y: top)
-        )
-
-        path.addLine(to: CGPoint(x: sideRight - r, y: top))
-
-        path.addCurve(
-            to: CGPoint(x: sideRight, y: top + r),
-            control1: CGPoint(x: sideRight - r + kappaR, y: top),
-            control2: CGPoint(x: sideRight, y: top + r - kappaR)
-        )
-
-        path.addLine(to: CGPoint(x: sideRight, y: shelfY - f))
-
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: shelfY),
-            control: CGPoint(x: sideRight, y: shelfY)
-        )
-    }
-
-    /// Ideal layout size for a tab label (selection-invariant).
+    /// Ideal layout size for a tab (selection-invariant).
     static func layoutSize(titleWidth: CGFloat, height: CGFloat = Ink.folderTabHeight) -> CGSize {
-        // icon (~10) + gap (5) + title + horizontal pad × 2
         let width = 10 + (Ink.space1 + 1) + titleWidth + Ink.space3 * 2
         return CGSize(width: width, height: height)
     }
 }
 
 extension SettingsPage {
-    /// Groups: primary (Home / Appearance / History), speech (Models), app plumbing.
     static var tabGroups: [[SettingsPage]] {
         [
             [.home, .appearance, .history],
@@ -308,7 +213,6 @@ extension SettingsPage {
         }
     }
 
-    /// Accent for selected shelf stroke / unselected outline (muted via opacity at the call site).
     var tabAccent: Color {
         switch self {
         case .home: return Ink.tabStrokeRed
