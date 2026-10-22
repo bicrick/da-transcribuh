@@ -26,7 +26,7 @@ ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset s
 
 appearance is system / light / dark from **general**, or mash `theme: …` in the menu bar to cycle. light stays white; dark is soft graphite (window `#2C2C2E`, raised `#353538`, front `#3A3A3D`, hairline `#4A4A4E`, text `#F2F2F2` / `#A8A8AD`, bevel `#F2F2F2` theme-inverted) — never midnight black. paint accents stay vivid.
 
-the start/stop chord lives in **general** as paint keycaps — click, press a combo (modifier required, or a function key), it rebinds live. reset drops you back on ⌃⌥Space. home, the status bar, the menu panel, and onboarding all read the same stored shortcut.
+the start/stop chord lives in **general** as paint keycaps — click, press a combo (modifier required, or a function key), it rebinds live. reset drops you back on ⌥Space. home, the status bar, the menu panel, and onboarding all read the same stored shortcut.
 
 the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform, screenshot-count chip on the right when you’ve grabbed a tile (the chip slot fully collapses when there are none). default size is the everyday footprint; compact is the same layout, tighter. same double-pane hard offset as selected chrome (`Ink.bevel` block down-right) — no palette strip, no extra chrome.
 
@@ -68,7 +68,7 @@ macos 14 or later. the first build fetches whisperkit.
 
 ## what it does
 
-- lives in the menu bar. press the shortcut (yours, not stuck on ⌃⌥Space), talk, press it again. words land on the clipboard (and paste into the front app when that makes sense).
+- lives in the menu bar. press the shortcut (yours, not stuck on ⌥Space), talk, press it again. words land on the clipboard (and paste into the front app when that makes sense).
 - hold **shift** and drag to grab a piece of the screen. release shift to keep the tile. stop the session and you get the picture with the words.
 - sessions save under `~/Documents/PromptAnnotator/Sessions/` (folder name stays put so your history doesn’t vanish).
 - on-device speech via whisperkit. bring your own core ml folder or hugging face variant if you want. optional openai-compatible server for the final transcript only.
@@ -78,7 +78,7 @@ macos 14 or later. the first build fetches whisperkit.
 
 | | |
 | --- | --- |
-| start / stop | ⌃⌥Space by default — click the paint keycaps in **general** to rebind (needs a modifier, or a function key). re-registers live. |
+| start / stop | ⌥Space by default — click the paint keycaps in **general** to rebind (needs a modifier, or a function key). re-registers live. |
 | mark / capture | hold shift, drag, release |
 | paste image + text | control-option-v |
 | cancel take | optional; set one in general (escape clears it while listening) |

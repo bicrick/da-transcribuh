@@ -3,12 +3,20 @@ import Carbon.HIToolbox
 import Foundation
 
 /// The session toggle. Shift is not allowed: while a session is running, Shift draws.
-/// Option-Space, Command-Space, and Option-Command-Space stay with the system.
+/// Command-Space and Option-Command-Space stay with Spotlight / Finder search.
+/// Option-Space is the default Start/Stop chord (Carbon consumes it so it won’t type NBSP).
 struct HotkeyChord: Equatable, Codable {
     var keyCode: UInt32
     var carbonModifiers: UInt32
 
+    /// Default Start/Stop: Option-Space.
     static let `default` = HotkeyChord(
+        keyCode: UInt32(kVK_Space),
+        carbonModifiers: UInt32(optionKey)
+    )
+
+    /// Pre-⌥Space default — used once to migrate users who never customized.
+    static let legacyDefault = HotkeyChord(
         keyCode: UInt32(kVK_Space),
         carbonModifiers: UInt32(controlKey | optionKey)
     )
@@ -21,11 +29,11 @@ struct HotkeyChord: Equatable, Codable {
         normalizedModifiers & UInt32(shiftKey) != 0
     }
 
-    /// True when this chord would take Option-Space, Command-Space, or Option-Command-Space.
+    /// True when this chord would take Command-Space or Option-Command-Space.
     var takesOverSystemShortcut: Bool {
         guard keyCode == UInt32(kVK_Space) else { return false }
         switch normalizedModifiers {
-        case UInt32(optionKey), UInt32(cmdKey), UInt32(cmdKey | optionKey):
+        case UInt32(cmdKey), UInt32(cmdKey | optionKey):
             return true
         default:
             return false
@@ -49,7 +57,7 @@ struct HotkeyChord: Equatable, Codable {
             return "Shift is held to draw, so the shortcut cannot include Shift."
         }
         if takesOverSystemShortcut {
-            return "Option-Space, Command-Space, and Option-Command-Space stay with the system."
+            return "Command-Space and Option-Command-Space stay with the system."
         }
         return nil
     }
@@ -64,7 +72,7 @@ struct HotkeyChord: Equatable, Codable {
         return symbols + keyTitle
     }
 
-    /// Separate keycaps, modifiers first, then the key. Control-Option-Space is ⌃, ⌥, Space.
+    /// Separate keycaps, modifiers first, then the key. Option-Space is ⌥, Space.
     var keycaps: [String] {
         var caps: [String] = []
         let mods = normalizedModifiers
@@ -149,7 +157,7 @@ enum RecordingChordCapture {
         case saved(success: Bool)
     }
 
-    /// Esc cancels; Delete / Forward Delete restores ⌃⌥Space; otherwise validate + `setChord`.
+    /// Esc cancels; Delete / Forward Delete restores ⌥Space; otherwise validate + `setChord`.
     @MainActor
     static func applyToggleEvent(_ event: NSEvent, settings: AppSettings) -> Outcome {
         let bare = event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty

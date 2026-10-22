@@ -243,8 +243,9 @@ struct InkKeycapRow: View {
 }
 
 /// Home Start-row chord editor — same `ShortcutCapture` + `AppSettings.setChord` as General.
-/// Hover: label border + pointing hand. Click: dashed “press keys…”; Esc cancels;
-/// Delete restores ⌃⌥Space. Conflicts show as a brief red caption under the caps.
+/// Muted “click to rebind” hint sits left of the keycaps (does not shift Start).
+/// Hover: label border + pointing hand. Click to capture; Esc cancels;
+/// Delete restores ⌥Space. Conflicts show as a brief red caption under the caps.
 struct HomeChordEditor: View {
     @ObservedObject var settings: AppSettings
     @State private var listening = false
@@ -254,38 +255,40 @@ struct HomeChordEditor: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: Ink.space1) {
-            Button {
-                beginListening()
-            } label: {
-                Group {
-                    if listening {
-                        Text("press keys…")
-                            .font(Ink.mono(11))
-                            .foregroundStyle(Ink.secondary)
-                            .padding(.horizontal, Ink.space3)
-                            .padding(.vertical, Ink.space2)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
-                                    .strokeBorder(Ink.label, style: StrokeStyle(lineWidth: Ink.stroke, dash: [4, 3]))
-                            )
-                    } else {
-                        InkKeycapRow(keys: settings.chord.keycaps)
-                            .padding(3)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
-                                    .strokeBorder(hovering ? Ink.label : Color.clear, lineWidth: Ink.stroke)
-                            )
-                    }
+            HStack(alignment: .center, spacing: Ink.space2) {
+                Text(listening ? "press keys… esc to cancel" : "click to rebind")
+                    .font(Ink.mono(10))
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize()
+                    .accessibilityHidden(true)
+
+                Button {
+                    beginListening()
+                } label: {
+                    InkKeycapRow(keys: settings.chord.keycaps)
+                        .padding(3)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
+                                .strokeBorder(
+                                    listening
+                                        ? Ink.label
+                                        : (hovering ? Ink.label : Color.clear),
+                                    style: StrokeStyle(
+                                        lineWidth: Ink.stroke,
+                                        dash: listening ? [4, 3] : []
+                                    )
+                                )
+                        )
+                        .contentShape(Rectangle())
                 }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(listening ? "Press a shortcut — Esc cancels, Delete restores ⌃⌥Space" : "Edit recording shortcut")
-            .accessibilityLabel(listening ? "Listening for shortcut" : "Recording shortcut \(settings.chord.display)")
-            .accessibilityHint("Click to change the Start and stop shortcut")
-            .onHover { over in
-                hovering = over && !listening
-                syncCursor(wantHand: over && !listening)
+                .buttonStyle(.plain)
+                .help(listening ? "Press a shortcut — Esc cancels, Delete restores ⌥Space" : "Edit recording shortcut")
+                .accessibilityLabel(listening ? "Listening for shortcut" : "Recording shortcut \(settings.chord.display)")
+                .accessibilityHint("Click to change the Start and stop shortcut")
+                .onHover { over in
+                    hovering = over && !listening
+                    syncCursor(wantHand: over && !listening)
+                }
             }
 
             if let message {
@@ -294,7 +297,7 @@ struct HomeChordEditor: View {
                     .foregroundStyle(Ink.error)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 220, alignment: .trailing)
+                    .frame(maxWidth: 280, alignment: .trailing)
                     .transition(.opacity)
             }
         }

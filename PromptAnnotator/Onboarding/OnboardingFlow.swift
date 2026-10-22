@@ -315,7 +315,7 @@ struct OnboardingFlow: View {
                         }
                         .buttonStyle(InkSecondaryButtonStyle())
                         .disabled(listening)
-                        Button("Use ⌃⌥Space") {
+                        Button("Use ⌥Space") {
                             listening = false
                             shortcutNote = settings.setChord(.default) ? nil : "macOS would not register that shortcut."
                         }

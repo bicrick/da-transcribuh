@@ -397,11 +397,26 @@ def render(pal: dict) -> Image.Image:
     d.rectangle([PAGE_SIDE, row_y + 4 * S, PAGE_SIDE + 10 * S, row_y + 14 * S], fill=hex_rgb("#ED1C24"), outline=c(pal, "label"), width=STROKE)
     d.text((PAGE_SIDE + 16 * S, row_y + 2 * S), "Start a session", font=font_departure(13 * S), fill=c(pal, "label"))
 
+    # Muted rebind hint left of keycaps (HomeChordEditor); default chord is ⌥Space.
+    hint_f = font_departure(10 * S)
+    hint = "click to rebind"
+    hw, hh = text_size(d, hint, hint_f)
     kx = W - PAGE_SIDE - 280 * S
-    for label, ww in (("⌃", 26 * S), ("⌥", 26 * S), ("Space", 56 * S)):
+    # Start button (~72) + gap + Space + ⌥ + gaps + hint
+    start_w = 72 * S
+    key_row_w = 26 * S + 6 * S + 56 * S
+    hint_x = W - PAGE_SIDE - start_w - 8 * S - key_row_w - 8 * S - hw
+    d.text(
+        (hint_x, row_y + (26 * S - hh) / 2),
+        hint,
+        font=hint_f,
+        fill=c(pal, "secondary"),
+    )
+    kx = hint_x + hw + 8 * S
+    for label, ww in (("⌥", 26 * S), ("Space", 56 * S)):
         draw_keycap(d, kx, row_y, ww, 26 * S, label, pal)
         kx += ww + 6 * S
-    bx, by, bw, bh = kx + 8 * S, row_y - 2 * S, 72 * S, 30 * S
+    bx, by, bw, bh = kx + 8 * S, row_y - 2 * S, start_w, 30 * S
     d.rectangle([bx + BEVEL, by + BEVEL, bx + bw + BEVEL, by + bh + BEVEL], fill=hex_rgb("#ED1C24"))
     d.rectangle([bx, by, bx + bw, by + bh], fill=c(pal, "primary"), outline=c(pal, "control"), width=STROKE)
     d.rectangle([bx + 10 * S, by + 11 * S, bx + 18 * S, by + 19 * S], fill=hex_rgb("#ED1C24"), outline=c(pal, "on_primary"), width=STROKE)
@@ -600,7 +615,7 @@ def render(pal: dict) -> Image.Image:
     d.text((18 * S, H - 22 * S), "■ idle", font=sf, fill=c(pal, "status_fg"))
     d.text((90 * S, H - 22 * S), "small.en_217MB", font=sf, fill=c(pal, "status_fg"))
     d.text((260 * S, H - 22 * S), "172 sessions", font=sf, fill=c(pal, "status_fg"))
-    d.text((400 * S, H - 22 * S), "⌃⌥Space", font=sym, fill=c(pal, "status_fg"))
+    d.text((400 * S, H - 22 * S), "⌥Space", font=sym, fill=c(pal, "status_fg"))
     ver = "0.9.0 beta (2)"
     vw, _ = text_size(d, ver, sf)
     d.text((W - 18 * S - vw, H - 22 * S), ver, font=sf, fill=c(pal, "status_fg"))

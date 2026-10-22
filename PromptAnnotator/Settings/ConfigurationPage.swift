@@ -102,7 +102,7 @@ struct ConfigurationPage: View {
                         .padding(.horizontal, Ink.rowHPad)
                         .padding(.bottom, Ink.space2)
                 }
-                Text("Click the keycaps, press a new combo (needs a modifier, or a function key). It re-registers live — no relaunch. Shift stays free for drawing. Option-Space, Command-Space, and Option-Command-Space stay with the system. Escape while capturing Cancel clears it.")
+                Text("Click the keycaps, press a new combo (needs a modifier, or a function key). It re-registers live — no relaunch. Shift stays free for drawing. Command-Space and Option-Command-Space stay with the system. Escape while capturing Cancel clears it.")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -110,7 +110,7 @@ struct ConfigurationPage: View {
                     .padding(.bottom, Ink.space3)
                 HStack {
                     Spacer()
-                    Button("Reset to ⌃⌥Space") {
+                    Button("Reset to ⌥Space") {
                         capture = nil
                         message = settings.setChord(.default) ? nil : "macOS would not register the default shortcut."
                     }
