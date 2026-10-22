@@ -6,7 +6,13 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–29)
+## Final summary (Runs 1–30)
+
+### Run 30 — Scroller thumb + island default/compact + chip collapse
+
+- **Scroller:** root cause — thumb offset came from a SwiftUI GeometryReader preference; AppKit scrolls via `NSClipView` bounds without a SwiftUI layout pass, so the preference never moved. Fix: observe `boundsDidChange` / document `frameDidChange`, drive the rail from real clip metrics; drag surface owns hits.
+- **Island sizes:** Default (classic) = former compact footprint (~48pt); Compact = tighter (~36pt, ≥24pt hits). Same symmetric layout. Saved `classic` users pick up the new default metrics automatically.
+- **Chip collapse:** 0 captures → trailing slot width 0 (no reserved space). First capture animates slot open (~0.22s); Reduce Motion snaps. `islandPanelSize()` follows live slots.
 
 ### Run 29 — Symmetric island + spacing audit
 
