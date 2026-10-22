@@ -456,10 +456,11 @@ def render(pal: dict) -> Image.Image:
     rx, ry = draw_bento_cell(
         d, content_left, r2y, recent_w, row2_h, "RECENT", pal, trailing="All in History →"
     )
+    # Empty / "No speech" takes are discarded — Recent only shows kept sessions.
     recent = [
         ("11:42", "Ship the folder tabs and keep Start inverted.", "86", True),
         ("Tue", "Dictate standup notes while capturing the board.", "42", True),
-        ("Mon", "No speech", "0", False),
+        ("Mon", "Paste the sheet under the notes.", "28", False),
         ("Oct 12", "Quick reply about the notarized build.", "19", False),
     ]
     iy = ry
