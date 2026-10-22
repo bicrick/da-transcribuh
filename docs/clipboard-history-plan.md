@@ -1,6 +1,8 @@
 # Clipboard history — design plan
 
-**Status:** design only — **direction A locked** (compact Maccy-like list at the cursor + delayed preview popover). No app code until remaining open questions are answered.
+**Status:** design only — **direction A locked** with **Maccy structural parity** (restyled in Paint ink). No app code until remaining open questions are answered.
+
+**Parity source:** [p0deje/Maccy](https://github.com/p0deje/Maccy) SwiftUI (`ContentView`, `ListHeaderView`, `SearchFieldView`, `ListItemView`, `HistoryListView`, `FooterView`, `PreviewItemView`, `Popup` metrics).
 
 **Defaults:** recording **⌥Space**; clipboard panel **⌘⇧C** (both customizable). Reserved system chords: **⌘Space**, **⌥⌘Space** only.
 
@@ -58,20 +60,22 @@ Combined image+text staging → **two rows** (screenshot + transcript) so source
 
 Narrow floating non-activating panel (~360pt) near the pointer. Double-pane bevel on the chrome. Square rows, 2pt selected outline, Departure Mono throughout.
 
-### Layout (top → bottom)
+### Layout (top → bottom) — match Maccy
 
-1. **Header** — muted `clipboard` (or `da transcribuh`) label on the left + a proper **search field** (magnifier, placeholder `type to search…`, visible caret). Focused on open; typing goes straight here. Not a separate “Filter…” bar.
-2. **List** — pinned first, then recents. Calm Maccy-like rows (no boxed type icons).
-3. **One-line key-hint footer** — short muted chords (DejaVu fallback for ⌘⌥⇧↩⌫↑↓).
+Metrics from `Popup` / list views (pre-macOS 26): window ~**450**pt wide, **itemHeight 22**, **horizontal/verticalPadding 5**, search field height **23**, `imageMaxHeight` default **40**.
 
-### Row anatomy
+1. **Header** — muted app name **`da transcribuh`** (Maccy shows `Maccy`) left + square search field (Maccy’s rounded field → our square 2pt stroke): magnifier, placeholder **`type to search…`**, focused caret on open.
+2. **List** — borderless, **no dividers between rows**. Pinned block on top with a single separator under pins (as Maccy’s PinsView + Divider). Then unpinned history.
+3. **Footer** (Maccy `showFooter`) — quiet menu rows, not key-hint chrome: **Clear** (`⌥⌘⌫`), **Preferences…** (`⌘,`), **Quit** (`⌘Q`). (Clear all is the alternate Clear with modifiers — same as Maccy.)
 
-- Text / code / URL: single line, **middle-truncated**, left-aligned to one padding edge
-- Image: ~**48pt**-tall thumbnail (natural aspect) + short caption
-- `⌘1`…`⌘9` **right-aligned**, muted (first nine visible / filtered rows)
-- Optional tiny muted source tag **only for transcripts**
-- Pinned: small pin mark (not a red dot)
-- Selected: **solid invert** (light: black fill / white text; dark: light fill / dark text) — not an outline
+### Row anatomy — match Maccy
+
+- Text: single line, **middle-truncated**; no type glyphs / boxes
+- Image: thumbnail only (natural aspect, max height ~40pt) — **no caption text** beside it
+- `⌘1`…`⌘9` right, muted opacity ~0.7 — **only first nine**; rows 10+ have no shortcut
+- Optional app icons: off by default (Maccy `showApplicationIcons`)
+- Selected: full-width highlight with the same inset rhythm as Maccy; **ours = solid ink invert** (not accent blue)
+- No per-row pin dots; pinning is section + ⌥P behavior
 
 ### Sample content (mocks)
 
@@ -102,13 +106,9 @@ Panel opens from **⌘⇧C** (customizable). Focus is on search immediately. Cha
 | `Esc` | If search non-empty → clear search; if search empty → close panel |
 | `⌘,` | Open Settings → General (Clipboard card); close panel |
 
-### Footer (one line)
+### Footer (Maccy menu, not hint strip)
 
-Always visible, tertiary/muted, short:
-
-`↑↓  ↩ paste  ⌥↩ copy  ⌘1–9  ⌥P pin  Esc`
-
-(Modifier glyphs via DejaVu in mocks; Departure for ASCII.)
+Divider, then selectable rows: Clear / Preferences… / Quit with trailing shortcuts. No always-on key-hint bar.
 
 ### Focus / activation notes
 
@@ -134,15 +134,16 @@ A second floating plate appears **beside the list** when a row is **hovered or k
 | Code-like text | Wrapped **monospaced** block (Departure Mono) |
 | URL | Full URL string, wrapped; no truncated single-line |
 
-**Metadata block** (below the preview, separated by a 1pt hairline):
+**Metadata block** (match Maccy `PreviewItemView` copy):
 
-| Field | Examples |
+| Field | Maccy label |
 | --- | --- |
-| Source | Frontmost app name at copy time (`Safari`, `Cursor`), or **`da transcribuh · transcript`** / **`da transcribuh · screenshot`** for session ingest |
-| First copied | Absolute or relative timestamp |
-| Last copied | Absolute or relative timestamp (same as first until re-copied / dedupe bump) |
-| Copies | Integer count of times this fingerprint was seen |
-| Key hints | `⌥P pin/unpin` · `⌥⌫ delete` (and optionally `↩ paste` · `⌥↩ copy`) |
+| Application | `Application:` (+ app name; session ingest may show `da transcribuh`) |
+| First copy | `First copy time:` |
+| Last copy | `Last copy time:` |
+| Copies | `Number of copies:` |
+| (images) | `Dimensions:` / `Size:` when applicable |
+| Hints | `Press ⌥P to pin.` / `Press ⌥P to unpin.` · `Press ⌥⌫ to delete.` |
 
 **Behavior notes:**
 
