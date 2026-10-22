@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Clipboard preferences — partial Maccy parity in Paint ink sections.
+/// Clipboard preferences in Paint ink sections. Every control is a Paint
+/// component (no stock Stepper / Slider / radio Picker).
 struct ClipboardPage: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject private var store = ClipboardHistoryStore.shared
@@ -9,11 +10,14 @@ struct ClipboardPage: View {
     @State private var confirmClear = false
     @State private var message: String?
     @State private var captureChord = false
+    /// Folder size, measured off the main thread. Was a synchronous directory
+    /// scan inside `body` that re-ran on every store publish.
+    @State private var diskBytes: Int64?
 
     var body: some View {
         SettingsPageStack(
             title: "Clipboard",
-            subtitle: "History panel, capture, and paste — Maccy-shaped, Paint chrome."
+            subtitle: "What gets saved, how the panel looks, and how it pastes."
         ) {
             if let message {
                 Text(message)
@@ -27,6 +31,23 @@ struct ClipboardPage: View {
             SettingsSection(title: "Ignore") { ignoreCard }
             SettingsSection(title: "Advanced") { advancedCard }
         }
+        .task(id: diskSignature) {
+            let folder = store.storageFolder
+            let bytes = await Task.detached(priority: .utility) {
+                ClipboardHistoryStore.diskUsageBytes(at: folder)
+            }.value
+            diskBytes = bytes
+        }
+    }
+
+    /// Re-measure disk use only when the history actually changes.
+    private var diskSignature: String {
+        "\(store.items.count)-\(store.items.first?.id.uuidString ?? "")"
+    }
+
+    private var diskUsageText: String {
+        guard let diskBytes else { return "On disk: measuring…" }
+        return "On disk: \(ByteCountFormatter.string(fromByteCount: diskBytes, countStyle: .file))"
     }
 
     private var generalCard: some View {
@@ -43,7 +64,7 @@ struct ClipboardPage: View {
                 InkDivider(leading: 0)
                 InkSettingRow(
                     title: "Open shortcut",
-                    detail: "Default ⌘⇧C. Shift is allowed for clipboard."
+                    detail: "Default ⇧⌘C. Shift is allowed for clipboard."
                 ) {
                     InkShortcutRecorder(
                         keys: settings.clipboardChord.keycaps,
@@ -61,7 +82,7 @@ struct ClipboardPage: View {
                             ? nil
                             : "macOS would not register the shortcut."
                     } label: {
-                        InkGlyphString(text: "Reset to ⌘⇧C", size: 11)
+                        InkGlyphString(text: "Reset to ⇧⌘C", size: 11)
                     }
                     .buttonStyle(InkSecondaryButtonStyle())
                 }
@@ -145,39 +166,32 @@ struct ClipboardPage: View {
                 InkDivider(leading: 0)
                 InkSettingRow(
                     title: "History size",
-                    detail: "On disk: \(ByteCountFormatter.string(fromByteCount: store.diskUsageBytes(), countStyle: .file))"
+                    detail: "\(diskUsageText). Pinned items are kept."
                 ) {
-                    Stepper(
+                    InkStepper(
+                        title: "History size",
                         value: Binding(
                             get: { settings.clipboardHistoryLimit },
                             set: { settings.setClipboardHistoryLimit($0) }
                         ),
-                        in: 20...500,
-                        step: 10
-                    ) {
-                        Text("\(settings.clipboardHistoryLimit)")
-                            .font(Ink.mono(12))
-                    }
+                        range: 20...500,
+                        step: 10,
+                        format: { "\($0) items" },
+                        valueWidth: 84
+                    )
                 }
                 InkDivider(leading: 0)
-                VStack(alignment: .leading, spacing: Ink.space2) {
-                    Text("Sort by")
-                        .font(Ink.labelFont)
-                        .foregroundStyle(Ink.label)
-                    Picker("", selection: Binding(
-                        get: { settings.clipboardSortMode },
-                        set: { settings.setClipboardSortMode($0) }
-                    )) {
-                        ForEach(ClipboardSortMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.radioGroup)
-                    .fixedSize(horizontal: false, vertical: true)
+                InkSettingRow(title: "Sort by", detail: "Order of unpinned items in the panel.") {
+                    InkRadioGroup(
+                        title: "Sort by",
+                        selection: Binding(
+                            get: { settings.clipboardSortMode },
+                            set: { settings.setClipboardSortMode($0) }
+                        ),
+                        options: ClipboardSortMode.allCases.map { ($0, $0.title) }
+                    )
+                    .frame(width: 200, alignment: .leading)
                 }
-                .padding(Ink.rowHPad)
-                .padding(.vertical, Ink.rowVPad)
             }
         }
     }
@@ -185,70 +199,55 @@ struct ClipboardPage: View {
     private var appearanceCard: some View {
         InkCard {
             VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: Ink.space2) {
-                    Text("Popup position")
-                        .font(Ink.labelFont)
-                    Picker("", selection: Binding(
-                        get: { settings.clipboardPopupPosition },
-                        set: { settings.setClipboardPopupPosition($0) }
-                    )) {
-                        ForEach(ClipboardPopupPosition.allCases) { pos in
-                            Text(pos.title).tag(pos)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.radioGroup)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(Ink.rowHPad)
-                .padding(.vertical, Ink.rowVPad)
-                InkDivider(leading: 0)
-                VStack(alignment: .leading, spacing: Ink.space2) {
-                    Text("Pinned section")
-                        .font(Ink.labelFont)
-                    Picker("", selection: Binding(
-                        get: { settings.clipboardPinEdge },
-                        set: { settings.setClipboardPinEdge($0) }
-                    )) {
-                        ForEach(ClipboardPinEdge.allCases) { edge in
-                            Text(edge.title).tag(edge)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.radioGroup)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(Ink.rowHPad)
-                .padding(.vertical, Ink.rowVPad)
-                InkDivider(leading: 0)
-                InkSettingRow(title: "Image height", detail: "List thumbnail max height.") {
-                    HStack {
-                        Slider(
-                            value: Binding(
-                                get: { settings.clipboardImageHeight },
-                                set: { settings.setClipboardImageHeight($0) }
-                            ),
-                            in: 24...120,
-                            step: 1
-                        )
-                        .frame(width: 120)
-                        Text("\(Int(settings.clipboardImageHeight))pt")
-                            .font(Ink.mono(11))
-                    }
+                InkSettingRow(title: "Popup position", detail: "Where the panel opens.") {
+                    InkRadioGroup(
+                        title: "Popup position",
+                        selection: Binding(
+                            get: { settings.clipboardPopupPosition },
+                            set: { settings.setClipboardPopupPosition($0) }
+                        ),
+                        options: ClipboardPopupPosition.allCases.map { ($0, $0.title) }
+                    )
+                    .frame(width: 200, alignment: .leading)
                 }
                 InkDivider(leading: 0)
-                InkSettingRow(title: "Preview delay", detail: "Hover / selection preview wait.") {
-                    Stepper(
+                InkSettingRow(title: "Pinned section", detail: "Pins sit above or below history.") {
+                    InkRadioGroup(
+                        title: "Pinned section",
+                        selection: Binding(
+                            get: { settings.clipboardPinEdge },
+                            set: { settings.setClipboardPinEdge($0) }
+                        ),
+                        options: ClipboardPinEdge.allCases.map { ($0, $0.title) }
+                    )
+                    .frame(width: 200, alignment: .leading)
+                }
+                InkDivider(leading: 0)
+                InkSettingRow(title: "Image height", detail: "Max height of image thumbnails.") {
+                    InkValueSlider(
+                        title: "Image height",
+                        value: Binding(
+                            get: { settings.clipboardImageHeight },
+                            set: { settings.setClipboardImageHeight($0) }
+                        ),
+                        range: 24...120,
+                        step: 1,
+                        format: { "\(Int($0)) pt" }
+                    )
+                }
+                InkDivider(leading: 0)
+                InkSettingRow(title: "Preview delay", detail: "Wait before the hover preview shows.") {
+                    InkStepper(
+                        title: "Preview delay",
                         value: Binding(
                             get: { settings.clipboardPreviewDelayMs },
                             set: { settings.setClipboardPreviewDelayMs($0) }
                         ),
-                        in: 0...2000,
-                        step: 50
-                    ) {
-                        Text("\(settings.clipboardPreviewDelayMs) ms")
-                            .font(Ink.mono(11))
-                    }
+                        range: 0...2000,
+                        step: 50,
+                        format: { "\($0) ms" },
+                        valueWidth: 84
+                    )
                 }
                 InkDivider(leading: 0)
                 InkToggleRow(
@@ -308,34 +307,47 @@ struct ClipboardPage: View {
                 )
                 InkDivider(leading: 0)
                 VStack(alignment: .leading, spacing: Ink.space2) {
-                    Text("Ignored apps (bundle IDs)")
-                        .font(Ink.labelFont)
+                    Text("Ignored apps")
+                        .font(Ink.rowTitleFont)
+                        .foregroundStyle(Ink.label)
+                    Text("Copies from these bundle IDs are never saved.")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
                     ForEach(settings.clipboardIgnoredApps, id: \.self) { id in
                         HStack {
                             Text(id)
-                                .font(Ink.mono(11))
+                                .font(Ink.optionFont)
+                                .foregroundStyle(Ink.label)
+                                .lineLimit(1)
                             Spacer()
-                            Button("−") { settings.removeClipboardIgnoredApp(id) }
-                                .buttonStyle(.plain)
+                            Button("Remove") { settings.removeClipboardIgnoredApp(id) }
+                                .buttonStyle(InkSecondaryButtonStyle())
+                                .accessibilityLabel("Remove \(id)")
                         }
                     }
-                    HStack {
+                    HStack(spacing: Ink.space2) {
                         TextField("com.example.app", text: $ignoreDraft)
                             .textFieldStyle(.plain)
-                            .font(Ink.mono(12))
-                            .padding(6)
-                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
-                        Button("+") {
-                            settings.addClipboardIgnoredApp(ignoreDraft)
-                            ignoreDraft = ""
-                        }
-                        .buttonStyle(InkSecondaryButtonStyle())
+                            .font(Ink.optionFont)
+                            .foregroundStyle(Ink.label)
+                            .inkFieldStyle()
+                            .onSubmit(addIgnoredApp)
+                        Button("Add", action: addIgnoredApp)
+                            .buttonStyle(InkSecondaryButtonStyle())
+                            .disabled(ignoreDraft.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
                 .padding(Ink.rowHPad)
                 .padding(.vertical, Ink.rowVPad)
             }
         }
+    }
+
+    private func addIgnoredApp() {
+        let trimmed = ignoreDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        settings.addClipboardIgnoredApp(trimmed)
+        ignoreDraft = ""
     }
 
     private var advancedCard: some View {
@@ -369,7 +381,7 @@ struct ClipboardPage: View {
                 )
                 InkDivider(leading: 0)
                 HStack {
-                    Button(confirmClear ? "Click again to confirm" : "Clear history…") {
+                    Button(confirmClear ? "Click again to confirm" : "Clear history") {
                         if confirmClear {
                             store.clearHistoryFully(clearSystem: settings.clipboardClearSystemClipboard)
                             confirmClear = false
@@ -397,24 +409,26 @@ private struct PinEditorRow: View {
     var body: some View {
         HStack(spacing: Ink.space2) {
             Text(item.previewLine)
-                .font(Ink.mono(11))
+                .font(Ink.optionFont)
+                .foregroundStyle(Ink.label)
                 .lineLimit(1)
-                .frame(maxWidth: 140, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
             TextField("Title", text: $title)
                 .textFieldStyle(.plain)
-                .font(Ink.mono(11))
-                .frame(width: 120)
-                .padding(4)
-                .overlay(Rectangle().strokeBorder(Ink.hairline, lineWidth: 1))
+                .font(Ink.optionFont)
+                .foregroundStyle(Ink.label)
+                .frame(width: 140)
+                .inkFieldStyle()
             TextField("Key", text: $key)
                 .textFieldStyle(.plain)
-                .font(Ink.mono(11))
-                .frame(width: 36)
-                .padding(4)
-                .overlay(Rectangle().strokeBorder(Ink.hairline, lineWidth: 1))
+                .font(Ink.optionFont)
+                .foregroundStyle(Ink.label)
+                .multilineTextAlignment(.center)
+                .frame(width: 28)
+                .inkFieldStyle()
+                .accessibilityLabel("Pin key")
             Button("Save") { onSave(title, key) }
-                .buttonStyle(.plain)
-                .font(Ink.captionFont)
+                .buttonStyle(InkSecondaryButtonStyle())
         }
         .onAppear {
             title = item.pinTitle ?? ""

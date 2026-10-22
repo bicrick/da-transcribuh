@@ -1388,8 +1388,14 @@ final class SessionController: ObservableObject {
 
     private func tick() {
         guard phase == .recording else { return }
-        elapsed = Date().timeIntervalSince(startedAt)
-        let span = IslandMetrics.clockSpan(elapsed)
+        let now = Date().timeIntervalSince(startedAt)
+        // The clock shows whole seconds. Publishing every 0.1 s tick
+        // re-rendered every SessionController observer (island, menu bar,
+        // the whole Settings window) ten times a second while recording.
+        if Int(now) != Int(elapsed) || now < elapsed {
+            elapsed = now
+        }
+        let span = IslandMetrics.clockSpan(now)
         if span != clockSpan {
             clockSpan = span
             placeIsland(animated: false)
@@ -1401,7 +1407,7 @@ final class SessionController: ObservableObject {
             limit: settings.silenceStopSeconds,
             delta: 0.1
         )
-        if !stopQueued, quietLongEnough || SessionLimits.reachedMax(elapsed: elapsed, minutes: settings.maxSessionMinutes) {
+        if !stopQueued, quietLongEnough || SessionLimits.reachedMax(elapsed: now, minutes: settings.maxSessionMinutes) {
             stopQueued = true
             Task { await self.finish() }
         }

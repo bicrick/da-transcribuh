@@ -42,12 +42,16 @@ struct DTMenuBarPanel: View {
                 settings.cycleAppearance()
             }
 
+            hairline
             if settings.clipboardHistoryEnabled {
-                hairline
                 row("Clipboard history (\(settings.clipboardChord.display))") {
                     ClipboardHistoryController.shared.togglePanel()
                     dismiss()
                 }
+            }
+            // Always listed so a disabled clipboard can still be found and turned on.
+            row("Clipboard settings…") {
+                SettingsPresenter.shared.show(page: .clipboard)
             }
 
             hairline

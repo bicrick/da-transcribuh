@@ -39,10 +39,10 @@ struct HistoryPage: View {
             }
         }
         .inkPageChrome()
-        .onAppear {
-            reload()
-            syncSelection()
-        }
+        // No reload here: SettingsRoot already loads on appear / show /
+        // sessionsChanged, and a second decode of every session.json on each
+        // tab switch was pure repeat work.
+        .onAppear { syncSelection() }
         .onChange(of: query) { _, _ in syncSelection() }
         .onChange(of: sessions.count) { _, _ in syncSelection() }
         .onChange(of: focusSearch) { _, wants in
@@ -287,10 +287,15 @@ struct HistoryPage: View {
 
     private func whenText(for session: SessionSummary) -> String {
         guard let started = session.started else { return session.id }
+        return Self.whenFormatter.string(from: started)
+    }
+
+    /// One formatter for every row (creating one per row showed in traces).
+    private static let whenFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d HH:mm"
-        return formatter.string(from: started)
-    }
+        return formatter
+    }()
 
     private func longTitle(for session: SessionSummary) -> String {
         guard let started = session.started else { return session.id }

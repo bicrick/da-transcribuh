@@ -115,7 +115,7 @@ final class ClipboardHistoryTests: XCTestCase {
 
     func testClipboardDefaultChordAllowsShift() {
         let chord = HotkeyChord.clipboardDefault
-        XCTAssertEqual(chord.display, "⌘⇧C")
+        XCTAssertEqual(chord.display, "⇧⌘C")
         XCTAssertTrue(chord.canRegister(allowingShift: true))
         XCTAssertFalse(chord.canRegister(allowingShift: false))
         XCTAssertNil(chord.rejection(allowingShift: true))

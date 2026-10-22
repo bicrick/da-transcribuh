@@ -33,6 +33,8 @@ final class ClipboardHistoryPanelController {
     }
 
     func show() {
+        PerfProbe.begin("panel", "open")
+        defer { PerfProbe.endAfterDisplay("panel") }
         resignHideWork?.cancel()
         resignHideWork = nil
         showGeneration &+= 1

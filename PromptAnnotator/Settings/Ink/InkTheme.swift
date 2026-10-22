@@ -204,6 +204,8 @@ enum Ink {
     static let wordmarkFont = mono(12)
     static let buttonFont = labelFont
     static let buttonSmallFont = mono(11)
+    /// Radio / stepper / slider value text.
+    static let optionFont = mono(12)
     static let keycapFont = labelFont
     static let keycapCompactFont = mono(11)
     static let badgeFont = mono(11)
@@ -218,7 +220,7 @@ enum Ink {
     /// Always wraps the upright `NSFont` so SwiftUI cannot re-apply a synthetic oblique face.
     static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         _ = weight
-        return Font(InkFontRegistrar.resolveNSFont(size: size))
+        return InkMonoCache.font(size: size)
     }
 
     static var monoIsRegistered: Bool {
@@ -259,5 +261,30 @@ enum Ink {
             let match = appearance.bestMatch(from: [.darkAqua, .aqua])
             return match == .darkAqua ? nsColor(hex: "#2C2C2E") : nsColor(hex: "#FFFFFF")
         })
+    }
+}
+
+/// `Ink.mono` is called from many view bodies. Resolving the descriptor +
+/// cascade list each time was redundant work, so cache per point size once
+/// Departure Mono is registered (fallbacks are not cached, so a late
+/// registration still wins).
+private enum InkMonoCache {
+    private static let lock = NSLock()
+    private static var fonts: [CGFloat: Font] = [:]
+
+    static func font(size: CGFloat) -> Font {
+        lock.lock()
+        if let hit = fonts[size] {
+            lock.unlock()
+            return hit
+        }
+        lock.unlock()
+        let font = Font(InkFontRegistrar.resolveNSFont(size: size))
+        if InkFontRegistrar.isDepartureAvailable {
+            lock.lock()
+            fonts[size] = font
+            lock.unlock()
+        }
+        return font
     }
 }

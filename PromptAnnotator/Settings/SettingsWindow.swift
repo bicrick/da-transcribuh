@@ -24,7 +24,7 @@ struct SettingsRoot: View {
             VStack(spacing: 0) {
                 DTTitleStrip()
 
-                SettingsFolderTabs(selection: $page) {
+                SettingsFolderTabs(selection: timedPage) {
                     showPalette = true
                 }
 
@@ -63,6 +63,11 @@ struct SettingsRoot: View {
             settings.appearance.applyToApp()
             SettingsPresenter.shared.applyChrome()
             reload()
+            if let pending = SettingsPresenter.shared.takePendingPage() {
+                page = pending
+            }
+            PerfHarness.runTabCycle { next in timedPage.wrappedValue = next }
+            SnapshotHarness.run { next in timedPage.wrappedValue = next }
         }
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSettingsShown)) { _ in
             reload()
@@ -70,6 +75,7 @@ struct SettingsRoot: View {
             SettingsPresenter.shared.applyChrome()
         }
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSettingsSelectPage)) { note in
+            _ = SettingsPresenter.shared.takePendingPage()
             if let raw = note.object as? String, let next = SettingsPage(rawValue: raw) {
                 page = next
             }
@@ -105,8 +111,27 @@ struct SettingsRoot: View {
         .accessibilityHidden(true)
     }
 
+    /// Tab selection that times each switch (PerfProbe "tab").
+    private var timedPage: Binding<SettingsPage> {
+        Binding(
+            get: { page },
+            set: { next in
+                guard next != page else { return }
+                PerfProbe.begin("tab", next.rawValue)
+                page = next
+            }
+        )
+    }
+
     @ViewBuilder
     private var detail: some View {
+        pageView
+            .onAppear { PerfProbe.endAfterCommit("tab") }
+            .id(page)
+    }
+
+    @ViewBuilder
+    private var pageView: some View {
         switch page {
         case .home:
             HomePage(
@@ -248,9 +273,20 @@ final class SettingsPresenter {
         NotificationCenter.default.post(name: .promptAnnotatorSettingsShown, object: nil)
     }
 
+    /// Page requested before SettingsRoot exists. On a cold open the root
+    /// is not subscribed yet when the notification below posts, so it reads
+    /// this on appear instead (root cause of "Preferences… lands on Home").
+    private var pendingPage: SettingsPage?
+
     func show(page: SettingsPage) {
+        pendingPage = page
         show()
         NotificationCenter.default.post(name: .promptAnnotatorSettingsSelectPage, object: page.rawValue)
+    }
+
+    func takePendingPage() -> SettingsPage? {
+        defer { pendingPage = nil }
+        return pendingPage
     }
 
     private func ensure() -> NSWindow {
@@ -274,7 +310,7 @@ final class SettingsPresenter {
         window.backgroundColor = Ink.windowNSColor
         window.contentView = host
         window.setContentSize(NSSize(width: 1040, height: 700))
-        // Wide enough for all seven folder tabs without truncation.
+        // Wide enough for all eight folder tabs without truncation.
         window.minSize = NSSize(width: 980, height: 600)
         window.center()
         self.window = window

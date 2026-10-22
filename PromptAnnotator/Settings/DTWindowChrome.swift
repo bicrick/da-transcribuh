@@ -168,21 +168,23 @@ private struct DTTrafficLight: View {
 
 struct DTDitherGrip: View {
     var body: some View {
+        // One path, one fill. The per-cell `context.fill` loop resolved the
+        // dynamic ink color and issued a draw call for every 2×2 cell.
         Canvas { context, size in
             let step: CGFloat = 2
+            var path = Path()
+            var row = 0
             var y: CGFloat = 0
             while y < size.height {
-                var x: CGFloat = 0
+                var x: CGFloat = row % 2 == 0 ? 0 : step
                 while x < size.width {
-                    let on = (Int(x / step) + Int(y / step)) % 2 == 0
-                    if on {
-                        let rect = CGRect(x: x, y: y, width: step, height: step)
-                        context.fill(Path(rect), with: .color(Ink.label.opacity(0.55)))
-                    }
-                    x += step
+                    path.addRect(CGRect(x: x, y: y, width: step, height: step))
+                    x += step * 2
                 }
                 y += step
+                row += 1
             }
+            context.fill(path, with: .color(Ink.label.opacity(0.55)))
         }
         .accessibilityHidden(true)
     }

@@ -468,7 +468,7 @@ struct HomePage: View {
     private func recentThumb(_ summary: SessionSummary) -> some View {
         let side: CGFloat = 28
         if let url = SessionLibrary.thumbnailURL(for: summary),
-           let image = NSImage(contentsOf: url) {
+           let image = HomeThumbCache.image(at: url) {
             Image(nsImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
@@ -788,5 +788,23 @@ final class PermissionModel: ObservableObject {
 
     func refresh() {
         status = Permissions.current()
+    }
+}
+
+/// Recent-row thumbnails were decoded from disk in `body` on every render.
+/// Thumbnails are written once per session, so cache by path.
+@MainActor
+enum HomeThumbCache {
+    private static let cache: NSCache<NSURL, NSImage> = {
+        let cache = NSCache<NSURL, NSImage>()
+        cache.countLimit = 64
+        return cache
+    }()
+
+    static func image(at url: URL) -> NSImage? {
+        if let hit = cache.object(forKey: url as NSURL) { return hit }
+        guard let image = NSImage(contentsOf: url) else { return nil }
+        cache.setObject(image, forKey: url as NSURL)
+        return image
     }
 }

@@ -38,9 +38,9 @@ enum OnboardingStep: Int, CaseIterable {
         case .permissions:
             return "Microphone, Screen Recording, and Accessibility. Flip them, then Reopen so da transcribuh picks them up."
         case .shortcut:
-            return "Recording defaults to ⌥Space; clipboard history to ⌘⇧C. Both are rebindable. ⌘Space / ⌥⌘Space stay with the system."
+            return "Recording defaults to ⌥Space; clipboard history to ⇧⌘C. Both are rebindable. ⌘Space / ⌥⌘Space stay with the system."
         case .clipboard:
-            return "Maccy-style history of text, images, and files. Default shortcut ⌘⇧C. Tune capture and paste on the Clipboard settings tab."
+            return "Maccy-style history of text, images, and files. Default shortcut ⇧⌘C. Tune capture and paste on the Clipboard settings tab."
         case .appearance:
             return "Light, dark graphite, or follow the system. Same control as the Appearance tab."
         case .model:
@@ -430,7 +430,7 @@ struct OnboardingFlow: View {
                                     ? nil
                                     : "macOS would not register that shortcut."
                             } label: {
-                                InkGlyphString(text: "Use ⌘⇧C", size: 11)
+                                InkGlyphString(text: "Use ⇧⌘C", size: 11)
                             }
                             .buttonStyle(InkSecondaryButtonStyle())
                         }

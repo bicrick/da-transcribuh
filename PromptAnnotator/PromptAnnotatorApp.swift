@@ -44,6 +44,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let settings = AppSettings.shared
         HotkeyCenter.shared.install(settings.chord)
+        PerfHarness.runPanelCycle()
+        VerifyNavHarness.run()
         HotkeyCenter.shared.applyCancel(settings.cancelChord)
         settings.onAppChange = {
             SettingsPresenter.shared.applyChrome()

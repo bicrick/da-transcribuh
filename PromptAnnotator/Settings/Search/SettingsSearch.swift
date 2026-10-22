@@ -77,7 +77,7 @@ enum SettingsSearch {
         hit("gen.start", .configuration, "Start and stop", "Session shortcut"),
         hit("gen.cancel", .configuration, "Cancel recording", "Discard shortcut"),
         hit("clip.enable", .clipboard, "Clipboard history", "Enable pasteboard history panel"),
-        hit("clip.chord", .clipboard, "Clipboard shortcut", "Open history near the pointer (⌘⇧C)"),
+        hit("clip.chord", .clipboard, "Clipboard shortcut", "Open history near the pointer (⇧⌘C)"),
         hit("clip.limit", .clipboard, "Clipboard history limit", "Max items; pinned survive Clear"),
         hit("clip.storage", .clipboard, "Clipboard storage", "Save files, images, text"),
         hit("clip.ignore", .clipboard, "Clipboard ignore", "Ignored apps and concealed types"),

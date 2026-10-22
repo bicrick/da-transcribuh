@@ -165,20 +165,19 @@ struct ConfigurationPage: View {
                 InkDivider(leading: 0)
                 InkSettingRow(
                     title: "History size",
-                    detail: "Keep up to \(settings.clipboardHistoryLimit) items (pinned survive Clear)."
+                    detail: "Pinned items survive Clear. More in the Clipboard tab."
                 ) {
-                    Stepper(
+                    InkStepper(
+                        title: "History size",
                         value: Binding(
                             get: { settings.clipboardHistoryLimit },
                             set: { settings.setClipboardHistoryLimit($0) }
                         ),
-                        in: 20...500,
-                        step: 20
-                    ) {
-                        Text("\(settings.clipboardHistoryLimit)")
-                            .font(Ink.mono(12))
-                            .monospacedDigit()
-                    }
+                        range: 20...500,
+                        step: 10,
+                        format: { "\($0) items" },
+                        valueWidth: 84
+                    )
                 }
                 HStack {
                     Spacer()
@@ -188,7 +187,7 @@ struct ConfigurationPage: View {
                             ? nil
                             : "macOS would not register the default shortcut."
                     } label: {
-                        InkGlyphString(text: "Reset to ⌘⇧C", size: 11)
+                        InkGlyphString(text: "Reset to ⇧⌘C", size: 11)
                     }
                     .buttonStyle(InkSecondaryButtonStyle())
                     Button("Clear history") {

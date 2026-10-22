@@ -191,12 +191,21 @@ final class ClipboardHistoryStore: ObservableObject {
         return NSImage(contentsOf: imagesURL.appendingPathComponent(name))
     }
 
+    /// History folder (index + images). Read-only for off-main measurement.
+    var storageFolder: URL { folderURL }
+
     /// Approximate on-disk size of the history folder (index + images).
     func diskUsageBytes() -> Int64 {
+        Self.diskUsageBytes(at: folderURL)
+    }
+
+    /// Directory walk; safe off the main actor (touches only the file system).
+    nonisolated static func diskUsageBytes(at folder: URL) -> Int64 {
+        let fileManager = FileManager.default
         var total: Int64 = 0
         let urls = (try? fileManager.contentsOfDirectory(
-            at: folderURL,
-            includingPropertiesForKeys: [.fileSizeKey],
+            at: folder,
+            includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey],
             options: [.skipsHiddenFiles]
         )) ?? []
         for url in urls {
