@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/wordmark-g-dt-block-dark.png">
-    <img src="assets/brand/wordmark-g-dt-block.png" alt="da transcribuh" height="40">
-  </picture>
+  <img src="assets/brand/wordmark-g-dt-block.png" alt="da transcribuh" height="40">
 </p>
 
 <p align="center">
@@ -34,19 +31,13 @@ the start/stop chord lives in **general** as paint keycaps — click, press a co
 the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform centered, screenshot-count chip on the right — equal side slots, equal gaps, equal outer padding. flat fill, thin hairline, no label text, no palette, no hard shadow. a touch taller so hit targets stay comfortable.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/screenshots/settings-home-dark.png">
-    <img src="assets/brand/screenshots/settings-home-light.png" alt="da transcribuh settings — home" width="920">
-  </picture>
+  <img src="assets/brand/screenshots/settings-home-light.png" alt="da transcribuh settings — home" width="920">
 </p>
 
-<p align="center"><em>settings home · light / dark follow your github theme</em></p>
+<p align="center"><em>settings home · light mode (readme always shows the white look). charcoal dark lives in the app — see <a href="assets/brand/screenshots/settings-home-dark.png">settings-home-dark</a> if you want a peek.</em></p>
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/mocks/recording-paint-dark.png">
-    <img src="assets/brand/mocks/recording-paint-light.png" alt="da transcribuh recording island" width="640">
-  </picture>
+  <img src="assets/brand/mocks/recording-paint-light.png" alt="da transcribuh recording island" width="640">
 </p>
 
 <p align="center"><em>recording island · minimal · symmetric</em></p>
@@ -126,13 +117,13 @@ cancel drops the take. nothing gets staged.
 
 final **dt block** art lives in [`assets/brand/`](assets/brand/):
 
-- `wordmark-g-dt-block.png` / `wordmark-g-dt-block-dark.png` — lowercase “da transcribuh” plus a separate block cursor after the h (light / dark)
+- `wordmark-g-dt-block.png` — lowercase “da transcribuh” plus a separate block cursor after the h (readme embeds this light mark; `wordmark-g-dt-block-dark.png` is available for dark surfaces)
 - `icon-g-dt-block-1024.png` — app mark
 - `readme-banner.png` — hero (paint traffic lights on the session window mock)
 - `social-preview.png` (1280×640) — repo social preview; also mirrored as `social-preview-1280x640.png` / `@2x`
-- `screenshots/settings-home-light.png` / `settings-home-dark.png` — settings home mocks for the readme
-- `mocks/home-paint-light.png` / `home-paint-dark.png` — Paint-direction lock mocks
-- `mocks/recording-paint-light.png` / `recording-paint-dark.png` — recording island (minimal)
+- `screenshots/settings-home-light.png` — settings home mock embedded in the readme (dark twin: `settings-home-dark.png`)
+- `mocks/home-paint-light.png` — Paint-direction lock mock (dark twin: `home-paint-dark.png`)
+- `mocks/recording-paint-light.png` — recording island, minimal/symmetric (dark twin: `recording-paint-dark.png`)
 - `mocks/icon-concepts.png` — app icon explorations (AppIcon not replaced); recommend #1 dt-block square + red shadow
 - `menubar-g-dt-block-16.png` / `menubar-g-dt-block-32.png` — template menu-bar glyph
 
