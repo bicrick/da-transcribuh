@@ -10,7 +10,7 @@ The whole app is an **MS Paint** theme: manila **folder tabs** (not a toolbox si
 
 **Functional colors on the island:** record square stays `Ink.record` (Paint red). Live waveform bars use `Ink.label` (black in light, `#F2F2F2` in graphite) — not cyan — so they follow the island’s own appearance tokens.
 
-Home Start-row keycaps are an inline chord editor (`HomeChordEditor` + shared `RecordingChordCapture` / `ShortcutCapture` / `AppSettings.setChord`) — same binding as General. Esc cancels; Delete restores ⌃⌥Space.
+Home Start-row keycaps are an inline chord editor (`HomeChordEditor` + shared `RecordingChordCapture` / `ShortcutCapture` / `AppSettings.setChord`) — same binding as General. Esc cancels; Delete restores ⌥Space.
 
 ### Brand mark
 

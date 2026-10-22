@@ -261,10 +261,11 @@ final class InkThemeTests: XCTestCase {
         XCTAssertFalse(outline.isEmpty)
     }
 
-    func testWordmarkUsesSeparateBlockCursorNotInvertedH() {
+    func testWordmarkIsPlainLowercaseName() {
         let name = "da transcribuh"
         XCTAssertFalse(name.hasSuffix(" "))
         XCTAssertEqual(name.last, "h")
+        XCTAssertFalse(name.contains("█"))
         XCTAssertEqual(Ink.monoName, "DepartureMono-Regular")
     }
 

@@ -1,8 +1,10 @@
 import Carbon.HIToolbox
 import Foundation
 
-/// Control-Option-Space, as a tap. Option-Space, Command-Space, and
-/// Option-Command-Space are left alone because this chord requires both modifiers.
+/// Global Start/Stop hotkey via Carbon `RegisterEventHotKey`.
+/// Default is Option-Space; returning `noErr` from the handler consumes the event
+/// so ⌥Space does not insert a non-breaking space into text fields.
+/// Command-Space / Option-Command-Space stay reserved for the system.
 final class HotkeyCenter {
     static let shared = HotkeyCenter()
 

@@ -119,13 +119,7 @@ final class AppSettings: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         isLoading = true
-        let keyCode = defaults.object(forKey: Keys.chordKey) as? Int
-        let modifiers = defaults.object(forKey: Keys.chordMods) as? Int
-        if let keyCode, let modifiers {
-            chord = HotkeyChord(keyCode: UInt32(keyCode), carbonModifiers: UInt32(modifiers))
-        } else {
-            chord = .default
-        }
+        chord = Self.loadChord(defaults: defaults)
         cancelChord = Self.chord(key: Keys.cancelKey, mods: Keys.cancelMods, defaults: defaults)
         pushToTalk = defaults.bool(forKey: Keys.pushToTalk)
         islandStyle = IslandStyle.stored(defaults.string(forKey: Keys.island) ?? "")
@@ -177,6 +171,27 @@ final class AppSettings: ObservableObject {
 
     func cycleAppearance() {
         setAppearance(appearance.next)
+    }
+
+    /// Load Start/Stop chord. One-shot migration: users still on the old default
+    /// ⌃⌥Space (never customized) move to ⌥Space; custom chords are left alone.
+    private static func loadChord(defaults: UserDefaults) -> HotkeyChord {
+        let keyCode = defaults.object(forKey: Keys.chordKey) as? Int
+        let modifiers = defaults.object(forKey: Keys.chordMods) as? Int
+        let stored: HotkeyChord? = {
+            guard let keyCode, let modifiers else { return nil }
+            return HotkeyChord(keyCode: UInt32(keyCode), carbonModifiers: UInt32(modifiers))
+        }()
+
+        if defaults.object(forKey: Keys.chordMigratedOptionSpace) == nil {
+            defaults.set(true, forKey: Keys.chordMigratedOptionSpace)
+            if let stored, stored == .legacyDefault {
+                defaults.set(Int(HotkeyChord.default.keyCode), forKey: Keys.chordKey)
+                defaults.set(Int(HotkeyChord.default.carbonModifiers), forKey: Keys.chordMods)
+                return .default
+            }
+        }
+        return stored ?? .default
     }
 
     private static func chord(key: String, mods: String, defaults: UserDefaults) -> HotkeyChord? {
@@ -415,6 +430,8 @@ final class AppSettings: ObservableObject {
     private enum Keys {
         static let chordKey = "hotkey.keyCode"
         static let chordMods = "hotkey.modifiers"
+        /// One-shot flag: legacy ⌃⌥Space → ⌥Space migration has run.
+        static let chordMigratedOptionSpace = "hotkey.migratedToOptionSpace"
         static let cancelKey = "hotkey.cancel.keyCode"
         static let cancelMods = "hotkey.cancel.modifiers"
         static let pushToTalk = "hotkey.pushToTalk"
