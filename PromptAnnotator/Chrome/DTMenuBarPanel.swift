@@ -9,7 +9,7 @@ struct DTMenuBarPanel: View {
     @Environment(\.dismiss) private var dismiss
 
     private let panelWidth: CGFloat = 260
-    private var shadow: CGFloat { Ink.menuBarShadow }
+    private var shadow: CGFloat { Ink.bevelOffset }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -59,7 +59,7 @@ struct DTMenuBarPanel: View {
         .background(Ink.window)
         .overlay(
             Rectangle()
-                .strokeBorder(Ink.label, lineWidth: 1)
+                .strokeBorder(Ink.label, lineWidth: Ink.stroke)
         )
         .background(alignment: .topLeading) {
             Rectangle()

@@ -2,9 +2,10 @@
 """Regenerate Settings Home README screenshots / paint mocks (light + graphite dark).
 
 Matches the real app: Chrome FolderTabShape — selected has concave cove feet
-(fillet into shelf) + continuous accent shelf stroke; unselected have plain
-rounded tops, muted accent outlines, no inner stripes. Departure Mono chrome;
-DejaVu for ⌃⌥⌘ glyphs.
+(fillet into shelf) + continuous Ink.stroke (2pt) accent shelf; unselected have
+plain rounded tops, open-bottom muted outlines (no bottom edge), fixed layout
+width (selection never shifts frames). Ink.bevelOffset (3pt) on cells/mark.
+Departure Mono chrome; DejaVu for ⌃⌥⌘ glyphs.
 """
 
 from __future__ import annotations
@@ -25,17 +26,21 @@ W, H = 2040, 1560
 # Logical ~1020×780 at 2× (bento Home needs a bit more height)
 S = 2.0
 CELL_GAP = 12 * S
-BEVEL = 2 * S
+# Ink.bevelOffset = 3pt → 6px at 2×
+BEVEL = 3 * S
 
 # Chrome FolderTabShape constants (Swift points → mock pixels via S)
 CORNER_R = 6 * S
-FOOT = 6 * S
+FOOT = 8 * S  # cove fillet sized for 2pt stroke
 TAB_H = 30 * S
 SHELF_TOP_PAD = 8 * S
 PAGE_SIDE = 36 * S
 TAB_GROUP_GAP = 8 * S
 TAB_INNER_GAP = 2 * S
-STROKE = max(2, int(S))  # 1pt at logical → 2px at 2×
+# Ink.stroke = 2pt → 4px at 2× (chrome outlines + shelf)
+STROKE = int(2 * S)
+# Internal separators only (Recent rows, wordmark rule)
+HAIRLINE = max(1, int(S))
 
 
 def font_departure(size: float) -> ImageFont.FreeTypeFont:
@@ -134,11 +139,12 @@ KAPPA = 0.5522847498  # cubic quarter-circle
 
 
 def measure_tab_width(draw: ImageDraw.ImageDraw, title: str, selected: bool = False) -> float:
+    """Selection-invariant width (label in regular weight + pad). Feet are paint-only."""
+    del selected  # kept for call-site compatibility
     f = font_departure(11 * S)
     tw, _ = text_size(draw, title, f)
-    # icon + gap + label + pad; selected adds foot overhang on each side
-    base = 10 * S + 5 * S + tw + 12 * S * 2
-    return base + (FOOT * 2 if selected else 0)
+    # icon + gap + label + pad (matches FolderTabShape.layoutSize)
+    return 10 * S + 5 * S + tw + 12 * S * 2
 
 
 def _bezier(
@@ -240,19 +246,15 @@ def draw_folder_tab(
     selected: bool,
     pal: dict,
 ) -> None:
+    """Fill + label in the layout box. Unselected open-bottom outline; selected outline is the shelf."""
     face = c(pal, "front") if selected else c(pal, "fill")
-    if selected:
-        outline = flared_tab_outline(x, y, w, h)
-        draw.polygon(outline + [(outline[0][0], y + h)], fill=face)
-        # Outline via continuous shelf stroke (caller).
-        label_left, label_right = x + FOOT, x + w - FOOT
-    else:
-        outline = plain_tab_outline(x, y, w, h)
-        draw.polygon(outline + [outline[0]], fill=face)
-        # Muted accent outline — no inner stripe.
+    outline = plain_tab_outline(x, y, w, h)
+    draw.polygon(outline + [outline[0]], fill=face)
+    if not selected:
+        # Open bottom — sides terminate on the shelf; continuous accent shows underneath.
         muted = tuple(int(a * 0.55 + f * 0.45) for a, f in zip(hex_rgb(accent), c(pal, "fill")))
-        stroke_polyline(draw, outline + [outline[0]], muted, STROKE)
-        label_left, label_right = x, x + w
+        stroke_polyline(draw, outline, muted, STROKE)
+    label_left, label_right = x, x + w
 
     fnt = font_departure(11 * S)
     tw, th = text_size(draw, title, fnt)
@@ -274,17 +276,17 @@ def draw_continuous_shelf_stroke(
     tab_h: float,
     accent: tuple[int, int, int],
 ) -> None:
-    """Full-width rule (window edge → edge) joined to selected flared outline."""
-    outline = flared_tab_outline(tab_x, tab_y, tab_w, tab_h)
+    """Full-width rule joined to selected flared outline (feet outside layout frame)."""
+    outline = flared_tab_outline(tab_x - FOOT, tab_y, tab_w + 2 * FOOT, tab_h)
     left = [(0, shelf_bottom), outline[0]]
     right = [outline[-1], (W, shelf_bottom)]
     stroke_polyline(draw, left + outline + right, accent, STROKE)
 
 
 def draw_mark(draw: ImageDraw.ImageDraw, x: float, y: float, side: float, pal: dict) -> None:
-    bevel = max(2, side * 0.07)
+    bevel = BEVEL
     draw.rectangle([x + bevel, y + bevel, x + side + bevel, y + side + bevel], fill=c(pal, "bevel"))
-    draw.rectangle([x, y, x + side, y + side], fill=c(pal, "mark_face"), outline=c(pal, "mark_ink"), width=max(2, int(S)))
+    draw.rectangle([x, y, x + side, y + side], fill=c(pal, "mark_face"), outline=c(pal, "mark_ink"), width=STROKE)
     f = font_departure(side * 0.42)
     cx, cy = x + side / 2, y + side / 2
     db = draw.textbbox((0, 0), "d", font=f)
@@ -310,8 +312,8 @@ def draw_mark(draw: ImageDraw.ImageDraw, x: float, y: float, side: float, pal: d
 
 
 def draw_keycap(draw: ImageDraw.ImageDraw, x: float, y: float, w: float, h: float, label: str, pal: dict) -> None:
-    draw.rectangle([x + 2, y + 2, x + w + 2, y + h + 2], fill=c(pal, "bevel"))
-    draw.rectangle([x, y, x + w, y + h], fill=c(pal, "front"), outline=c(pal, "control"), width=max(2, int(S)))
+    draw.rectangle([x + BEVEL, y + BEVEL, x + w + BEVEL, y + h + BEVEL], fill=c(pal, "bevel"))
+    draw.rectangle([x, y, x + w, y + h], fill=c(pal, "front"), outline=c(pal, "control"), width=STROKE)
     # Use symbol font for ⌃⌥⌘; Departure for ASCII like "Space"
     use_sym = any(ord(ch) > 127 for ch in label)
     f = font_symbol(h * 0.42) if use_sym else font_departure(h * 0.42)
@@ -347,7 +349,7 @@ def draw_bento_cell(
     trailing: str | None = None,
     compact: bool = False,
 ) -> tuple[float, float]:
-    """Paint/Ink cell: face + 1pt border + bevel offset. Returns content origin (cx, cy)."""
+    """Paint/Ink cell: face + Ink.stroke border + Ink.bevelOffset. Returns content origin (cx, cy)."""
     pad = (12 if compact else 16) * S
     # Bevel behind
     draw.rectangle(
@@ -358,7 +360,7 @@ def draw_bento_cell(
         [x, y, x + w, y + h],
         fill=c(pal, "front"),
         outline=c(pal, "label"),
-        width=max(2, int(S)),
+        width=STROKE,
     )
     hf = font_departure(11 * S)
     draw.text((x + pad, y + pad), title, font=hf, fill=c(pal, "label"))
@@ -379,13 +381,13 @@ def render(pal: dict) -> Image.Image:
     img = Image.new("RGB", (W, H), c(pal, "window"))
     d = ImageDraw.Draw(img)
 
-    # Title strip — full-bleed 1pt rule (not 2pt)
+    # Title strip — hairline rule under chrome (separator, not border)
     strip_h = 40 * S
     d.rectangle([0, 0, W, strip_h], fill=c(pal, "window"))
-    d.rectangle([0, strip_h - STROKE, W, strip_h], fill=c(pal, "label"))
+    d.rectangle([0, strip_h - HAIRLINE, W, strip_h], fill=c(pal, "label"))
     for i, col in enumerate(["#ED1C24", "#FFF200", "#22B14C"]):
         x = 12 * S + i * 18 * S
-        d.rectangle([x, 12 * S, x + 11 * S, 23 * S], fill=hex_rgb(col), outline=c(pal, "label"), width=max(1, int(S)))
+        d.rectangle([x, 12 * S, x + 11 * S, 23 * S], fill=hex_rgb(col), outline=c(pal, "label"), width=STROKE)
     wf = font_departure(13 * S)
     tw, th = text_size(d, "da transcribuh", wf)
     d.text(((W - tw) / 2, (strip_h - th) / 2 - 2), "da transcribuh", font=wf, fill=c(pal, "label"))
@@ -396,7 +398,7 @@ def render(pal: dict) -> Image.Image:
     shelf_h = SHELF_TOP_PAD + TAB_H
     d.rectangle([0, shelf_y, W, shelf_y + shelf_h], fill=c(pal, "fill"))
 
-    # Measure + place tabs (same height / baseline; selected wider by foot pad)
+    # Measure + place tabs (same height / baseline / width whether selected or not)
     tx = PAGE_SIDE
     tab_rects: list[tuple[float, float, float, float, bool, str, str]] = []
     tab_bottom = shelf_y + shelf_h
@@ -425,7 +427,7 @@ def render(pal: dict) -> Image.Image:
     draw_folder_tab(d, sx, sy, sw, sh, sname, saccent, True, pal)
     # Bleed fill 1pt into the page under the selected body
     d.rectangle(
-        [sx + FOOT, tab_bottom - 1, sx + sw - FOOT, tab_bottom + S],
+        [sx, tab_bottom - 1, sx + sw, tab_bottom + STROKE],
         fill=c(pal, "front"),
     )
     accent_hex = saccent
@@ -442,8 +444,8 @@ def render(pal: dict) -> Image.Image:
     d.rectangle(
         [W - PAGE_SIDE - 70 * S, shelf_y + 14 * S, W - PAGE_SIDE, shelf_y + 28 * S],
         fill=c(pal, "fill"),
-        outline=c(pal, "hairline"),
-        width=max(1, int(S)),
+        outline=c(pal, "control"),
+        width=STROKE,
     )
     d.text((W - PAGE_SIDE - 64 * S, shelf_y + 16 * S), "⌘K", font=cf2, fill=c(pal, "secondary"))
 
@@ -455,8 +457,8 @@ def render(pal: dict) -> Image.Image:
 
     # Start row
     row_y = my + mark_side + 24 * S
-    d.rectangle([PAGE_SIDE, row_y - 16 * S, W - PAGE_SIDE, row_y - 16 * S + 1], fill=c(pal, "hairline"))
-    d.rectangle([PAGE_SIDE, row_y + 4 * S, PAGE_SIDE + 10 * S, row_y + 14 * S], fill=hex_rgb("#ED1C24"), outline=c(pal, "label"), width=1)
+    d.rectangle([PAGE_SIDE, row_y - 16 * S, W - PAGE_SIDE, row_y - 16 * S + HAIRLINE], fill=c(pal, "hairline"))
+    d.rectangle([PAGE_SIDE, row_y + 4 * S, PAGE_SIDE + 10 * S, row_y + 14 * S], fill=hex_rgb("#ED1C24"), outline=c(pal, "label"), width=STROKE)
     d.text((PAGE_SIDE + 16 * S, row_y + 2 * S), "Start a session", font=font_departure(13 * S), fill=c(pal, "label"))
 
     kx = W - PAGE_SIDE - 280 * S
@@ -464,9 +466,9 @@ def render(pal: dict) -> Image.Image:
         draw_keycap(d, kx, row_y, ww, 26 * S, label, pal)
         kx += ww + 6 * S
     bx, by, bw, bh = kx + 8 * S, row_y - 2 * S, 72 * S, 30 * S
-    d.rectangle([bx + 3 * S, by + 3 * S, bx + bw + 3 * S, by + bh + 3 * S], fill=hex_rgb("#ED1C24"))
-    d.rectangle([bx, by, bx + bw, by + bh], fill=c(pal, "primary"), outline=c(pal, "control"), width=max(1, int(S)))
-    d.rectangle([bx + 10 * S, by + 11 * S, bx + 18 * S, by + 19 * S], fill=hex_rgb("#ED1C24"), outline=c(pal, "on_primary"), width=1)
+    d.rectangle([bx + BEVEL, by + BEVEL, bx + bw + BEVEL, by + bh + BEVEL], fill=hex_rgb("#ED1C24"))
+    d.rectangle([bx, by, bx + bw, by + bh], fill=c(pal, "primary"), outline=c(pal, "control"), width=STROKE)
+    d.rectangle([bx + 10 * S, by + 11 * S, bx + 18 * S, by + 19 * S], fill=hex_rgb("#ED1C24"), outline=c(pal, "on_primary"), width=STROKE)
     d.text((bx + 24 * S, by + 6 * S), "Start", font=font_departure(13 * S), fill=c(pal, "on_primary"))
 
     # —— Bento grid (completed Home; example data, clearly fake) ——
@@ -522,12 +524,12 @@ def render(pal: dict) -> Image.Image:
                 [thumb_x, iy, thumb_x + 28 * S, iy + 28 * S],
                 fill=c(pal, "fill"),
                 outline=c(pal, "label"),
-                width=max(1, int(S)),
+                width=STROKE,
             )
             d.rectangle(
                 [thumb_x + 6 * S, iy + 8 * S, thumb_x + 22 * S, iy + 20 * S],
                 outline=c(pal, "secondary"),
-                width=max(1, int(S)),
+                width=STROKE,
             )
         d.rectangle([rx, iy + 34 * S, inner_right, iy + 34 * S + 1], fill=c(pal, "hairline"))
         iy += 40 * S
@@ -593,13 +595,13 @@ def render(pal: dict) -> Image.Image:
         [cx0, cy0, cx0 + icon, cy0 + icon],
         fill=c(pal, "tile"),
         outline=c(pal, "control"),
-        width=max(2, int(S)),
+        width=STROKE,
     )
     m = 10 * S
     d.rectangle(
         [cx0 + m, cy0 + m, cx0 + icon - m, cy0 + icon - m],
         outline=c(pal, "on_tile"),
-        width=max(2, int(S)),
+        width=STROKE,
     )
     d.text((cx0, cy0 + icon + 8 * S), "Talk, or drag to capture", font=font_departure(13 * S), fill=c(pal, "label"))
     cap_detail = (
@@ -626,17 +628,17 @@ def render(pal: dict) -> Image.Image:
         [fx0, fy0, fx0 + icon, fy0 + icon],
         fill=c(pal, "tile"),
         outline=c(pal, "control"),
-        width=max(2, int(S)),
+        width=STROKE,
     )
     d.rectangle(
         [fx0 + 12 * S, fy0 + 16 * S, fx0 + icon - 12 * S, fy0 + icon - 10 * S],
         outline=c(pal, "on_tile"),
-        width=max(2, int(S)),
+        width=STROKE,
     )
     d.rectangle(
         [fx0 + 15 * S, fy0 + 10 * S, fx0 + icon - 15 * S, fy0 + 18 * S],
         outline=c(pal, "on_tile"),
-        width=max(2, int(S)),
+        width=STROKE,
     )
     d.text((fx0, fy0 + icon + 8 * S), "Sessions folder", font=font_departure(13 * S), fill=c(pal, "label"))
     d.text(
@@ -651,7 +653,7 @@ def render(pal: dict) -> Image.Image:
         [fx0, by, fx0 + 48 * S, by + 22 * S],
         fill=c(pal, "front"),
         outline=c(pal, "control"),
-        width=max(1, int(S)),
+        width=STROKE,
     )
     d.text((fx0 + 10 * S, by + 4 * S), "Show", font=font_departure(11 * S), fill=c(pal, "label"))
 

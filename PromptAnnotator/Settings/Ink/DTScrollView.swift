@@ -113,7 +113,7 @@ private struct DTScrollerRail: View {
                     .fill(Ink.window)
                     .overlay(
                         RoundedRectangle(cornerRadius: Ink.scrollerRadius, style: .continuous)
-                            .strokeBorder(Ink.label, lineWidth: 1)
+                            .strokeBorder(Ink.label, lineWidth: Ink.stroke)
                     )
                     .overlay {
                         DTDitherGrip()

@@ -48,11 +48,13 @@ Nothing in chrome should paint darker than `#1A1A1C` except the bevel itself. Ro
 
 Home keeps the pre-declutter structure (stats grid, Get Started checklist, tip tiles). Nits only: no yellow version badge (status bar has it), no hero tagline, no “^⌥Space starts…” caption under Start. Stat underlines are neutral (`Ink.statRule`). Start / primary stays high-contrast invert (`primaryFill` / `onPrimary`: black↔`#F2F2F2`), not a flat graphite plate.
 
-Folder tabs are Chrome-style (`FolderTabShape`): selected has convex ~6pt top corners and **concave cove feet** (fillet into the shelf — quad control at `(sideX, baselineY)`, not a convex bullnose ledge); unselected have rounded tops and straight sides (no feet). The shelf rule and selected outline are **one continuous 1pt path** in the selected accent (`SettingsPage.tabAccent` / `Ink.tabStroke*`, lifted in dark; Appearance = purple), edge to edge. Unselected outlines use a muted accent (no inner stripes). Selected fill is `Ink.front` and merges into the page. README mocks: `scripts/render_home_mocks.py`.
+Chrome borders use **`Ink.stroke` (2pt)** and hard offsets use **`Ink.bevelOffset` (3pt)** everywhere (tabs, shelf, cells, keycaps, mark, island, menu). Internal separators stay **`Ink.hairlineWidth` (1pt)**.
+
+Folder tabs are Chrome-style (`FolderTabShape`): **selection-invariant layout** (same x/width/height/label whether selected or not — feet are paint outside the frame). Selected: convex ~6pt top corners + **concave cove feet** (fillet into the shelf; foot = 8pt for the 2pt stroke). Unselected: rounded tops, open-bottom muted accent outlines (sides terminate on the shelf; no bottom edge). The shelf + selected outline are **one continuous `Ink.stroke` path** in the selected accent (`SettingsPage.tabAccent` / `Ink.tabStroke*`, lifted in dark; Appearance = purple), edge to edge on top of unselected bottoms. Selected fill is `Ink.front` and merges into the page. README mocks: `scripts/render_home_mocks.py`.
 
 ### Home after Get Started
 
-`HomeGetStartedStore` (`home.getStarted.complete`) dismisses the checklist permanently once all three steps are done. Mark + Start stay; the body below is a **bento grid** of `HomeBentoCell`s (`Ink.front` face, 1pt `Ink.label` border, `Ink.bevel` offset, Departure Mono caption headers, `Ink.space3` gutters):
+`HomeGetStartedStore` (`home.getStarted.complete`) dismisses the checklist permanently once all three steps are done. Mark + Start stay; the body below is a **bento grid** of `HomeBentoCell`s (`Ink.front` face, `Ink.stroke` `Ink.label` border, `Ink.bevelOffset` hard offset, Departure Mono caption headers, `Ink.space3` gutters):
 
 1. **Stats** — four equal cells (Sessions / Tiles / Words / Minutes); short tick under the number. Narrow → 2×2.
 2. **RECENT (~2/3) + THIS WEEK (~1/3)** — last 4 session rows (hover Copy; click → History) beside a compact week chart (bars ~12pt, 6pt gaps; today `Ink.paintRed`; week total + best-day caption in the cell). Narrow → stack. While Get Started is incomplete it occupies this row as one full-width cell (checklist look unchanged).

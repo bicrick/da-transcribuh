@@ -121,7 +121,7 @@ struct HistoryPage: View {
         }
         .overlay(
             Rectangle()
-                .strokeBorder(Ink.label, lineWidth: 1)
+                .strokeBorder(Ink.label, lineWidth: Ink.stroke)
         )
     }
 
@@ -266,7 +266,7 @@ struct HistoryPage: View {
                 }
                 .overlay(
                     Rectangle()
-                        .strokeBorder(Ink.label, lineWidth: 1)
+                        .strokeBorder(Ink.label, lineWidth: Ink.stroke)
                 )
             } else {
                 InkDashedEmpty(

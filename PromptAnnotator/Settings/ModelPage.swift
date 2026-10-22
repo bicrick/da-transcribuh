@@ -196,7 +196,7 @@ struct ModelPage: View {
                     .frame(height: 24)
                     .overlay(
                         RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                            .strokeBorder(Ink.label, lineWidth: 1)
+                            .strokeBorder(Ink.label, lineWidth: Ink.stroke)
                     )
             }
             .buttonStyle(.plain)

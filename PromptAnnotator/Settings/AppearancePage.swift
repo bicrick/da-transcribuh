@@ -170,7 +170,7 @@ struct AppearancePage: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                        .strokeBorder(Ink.controlBorder, lineWidth: 1)
+                        .strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke)
                 )
         }
         .buttonStyle(.plain)
@@ -189,7 +189,7 @@ struct AppearancePage: View {
                     .fill(Color(red: color.swiftUIRed, green: color.swiftUIGreen, blue: color.swiftUIBlue))
                     .frame(width: 16, height: 16)
                 Circle()
-                    .strokeBorder(Ink.label, lineWidth: selected ? 2 : 1)
+                    .strokeBorder(Ink.label, lineWidth: Ink.stroke)
                     .frame(width: selected ? 22 : 18, height: selected ? 22 : 18)
             }
             .frame(width: 28, height: 28)

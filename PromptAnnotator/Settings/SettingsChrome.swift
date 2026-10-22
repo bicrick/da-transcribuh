@@ -161,7 +161,7 @@ struct ShortcutBadge: View {
             .padding(.vertical, Ink.space1)
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                    .strokeBorder(Ink.label, lineWidth: 1)
+                    .strokeBorder(Ink.label, lineWidth: Ink.stroke)
             )
     }
 }
@@ -197,7 +197,7 @@ struct InkAppearanceSegment: View {
         }
         .overlay(
             Rectangle()
-                .strokeBorder(Ink.controlBorder, lineWidth: 1)
+                .strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke)
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Appearance")

@@ -25,7 +25,7 @@ struct CaptureCountChip: View {
         .background(Ink.front, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                .strokeBorder(Ink.hairline, lineWidth: 1)
+                .strokeBorder(Ink.label, lineWidth: Ink.stroke)
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(count) \(count == 1 ? "capture" : "captures")")

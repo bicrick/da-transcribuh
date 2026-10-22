@@ -38,7 +38,7 @@ struct MarkupToolbarView: View {
                 .fill(Ink.front)
                 .overlay(
                     RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                        .strokeBorder(Ink.hairline, lineWidth: 1)
+                        .strokeBorder(Ink.label, lineWidth: Ink.stroke)
                 )
         }
     }
@@ -98,11 +98,11 @@ struct MarkupToolbarView: View {
                 .frame(width: 14, height: 14)
                 .overlay(
                     Circle()
-                        .strokeBorder(Ink.label.opacity(color.isNearWhite ? 0.55 : 0.35), lineWidth: 1)
+                        .strokeBorder(Ink.label.opacity(color.isNearWhite ? 0.55 : 0.35), lineWidth: Ink.stroke)
                 )
                 .overlay(
                     Circle()
-                        .strokeBorder(Ink.label, lineWidth: selected ? 2 : 0)
+                        .strokeBorder(Ink.label, lineWidth: selected ? Ink.stroke : 0)
                         .padding(-3)
                 )
                 .frame(width: 28, height: 32)
