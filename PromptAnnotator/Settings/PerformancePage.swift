@@ -88,7 +88,7 @@ struct PerformancePage: View {
                     .monospacedDigit()
                     .foregroundStyle(Ink.label)
                 Text(detail)
-                    .font(.system(size: 11))
+                    .font(Ink.headingFont)
                     .foregroundStyle(Ink.secondary)
                 InkSegmentMeter(label: "Load", fraction: max(0.05, min(1, fraction)), emphasized: true)
             }

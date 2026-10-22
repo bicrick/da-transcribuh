@@ -6,7 +6,15 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–18)
+## Final summary (Runs 1–19)
+
+### Run 19 — Typography, appearance, spacing, scrollers, layout
+
+- **Fonts:** Departure Mono for chrome (title/heading/label/number/buttons/keycaps/badges/sidebar/status); SF Mono (`.system(design: .monospaced)`) for body/caption. Central tokens in `InkTheme`.
+- **Appearance:** No prior switcher existed. Added System/Light/Dark in General (B&W segment) + menu `theme: …` cycle. Persisted `app.appearance`; applies via `NSApp.appearance` + `preferredColorScheme`. Island untouched.
+- **Spacing:** 4/8/12/16/24/32 scale. Sidebar tiles padded (8pt), renamed Configuration→**General** / Performance→**Perf**, footer-clearing scroll inset, wider sidebar (128).
+- **Scrollers:** `DTScrollView` hides native indicators; B/W track + dither + draggable thumb.
+- **Layout:** Content column centers up to 880pt; Home denser terminal-style checklist/stats; pages/onboarding/menu use the same chrome language.
 
 ### Run 18 — Custom traffic lights + styled menu-bar panel
 

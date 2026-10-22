@@ -20,18 +20,27 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.buttonRadius, 3)
         XCTAssertEqual(Ink.fieldRadius, 2)
         XCTAssertEqual(Ink.sidebarRowRadius, 3)
-        XCTAssertEqual(Ink.sidebarWidth, 108)
-        XCTAssertEqual(Ink.sidebarTileSize, 72)
-        XCTAssertEqual(Ink.pageTop, 22)
-        XCTAssertEqual(Ink.pageSide, 28)
-        XCTAssertEqual(Ink.maxContentWidth, 660)
+        XCTAssertEqual(Ink.sidebarWidth, 128)
+        XCTAssertEqual(Ink.sidebarTileSize, 84)
+        XCTAssertEqual(Ink.sidebarTilePad, 8)
+        XCTAssertEqual(Ink.sidebarFooterHeight, 72)
+        XCTAssertEqual(Ink.pageTop, 16)
+        XCTAssertEqual(Ink.pageSide, 24)
+        XCTAssertEqual(Ink.maxContentWidth, 880)
         XCTAssertEqual(Ink.sectionGap, 24)
-        XCTAssertEqual(Ink.gridGap, 10)
+        XCTAssertEqual(Ink.gridGap, 12)
+        XCTAssertEqual(Ink.space1, 4)
+        XCTAssertEqual(Ink.space2, 8)
+        XCTAssertEqual(Ink.space3, 12)
+        XCTAssertEqual(Ink.space4, 16)
+        XCTAssertEqual(Ink.space5, 24)
+        XCTAssertEqual(Ink.space6, 32)
         XCTAssertEqual(Ink.statusBarHeight, 24)
         XCTAssertEqual(Ink.titleStripHeight, 38)
         XCTAssertEqual(Ink.menuBarShadow, 4)
         XCTAssertEqual(Ink.hardShadow, 3)
         XCTAssertEqual(Ink.selectedBorder, 2)
+        XCTAssertEqual(Ink.scrollerWidth, 8)
     }
 
     func testSettingsMetricsAliasInkTokens() {
@@ -40,6 +49,33 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(SettingsMetrics.maxContentWidth, Ink.maxContentWidth)
         XCTAssertEqual(SettingsMetrics.cardCorner, Ink.cardRadius)
         XCTAssertEqual(SettingsMetrics.sidebarWidth, Ink.sidebarWidth)
+    }
+
+    func testTypographyUsesDepartureAndSystemMono() {
+        XCTAssertEqual(Ink.monoName, "DepartureMono-Regular")
+        // Aliases stay wired to primary tokens.
+        XCTAssertEqual(Ink.pageTitleFont, Ink.titleFont)
+        XCTAssertEqual(Ink.sectionTitleFont, Ink.headingFont)
+        XCTAssertEqual(Ink.rowTitleFont, Ink.labelFont)
+        XCTAssertEqual(Ink.statValueFont, Ink.numberFont)
+    }
+
+    func testSidebarTileTitlesAreCompact() {
+        XCTAssertEqual(SettingsPage.configuration.title, "General")
+        XCTAssertEqual(SettingsPage.performance.title, "Perf")
+        XCTAssertEqual(SettingsPage.configuration.pageTitle, "General")
+        XCTAssertEqual(SettingsPage.performance.pageTitle, "Performance")
+    }
+
+    func testAppAppearanceCyclesAndStores() {
+        XCTAssertEqual(AppAppearance.system.next, .light)
+        XCTAssertEqual(AppAppearance.light.next, .dark)
+        XCTAssertEqual(AppAppearance.dark.next, .system)
+        XCTAssertEqual(AppAppearance.stored(nil), .system)
+        XCTAssertEqual(AppAppearance.stored("dark"), .dark)
+        XCTAssertEqual(AppAppearance.dark.menuLabel, "theme: dark")
+        XCTAssertEqual(AppAppearance.light.preferredColorScheme, .light)
+        XCTAssertNil(AppAppearance.system.preferredColorScheme)
     }
 
     func testOnboardingStepCountAndEyebrows() {
@@ -72,8 +108,6 @@ final class InkThemeTests: XCTestCase {
     }
 
     func testWordmarkUsesSeparateBlockCursorNotInvertedH() {
-        // Pure logic: the displayed name string must be the full lowercase word;
-        // the cursor is a separate view, not an inverted trailing letter.
         let name = "da transcribuh"
         XCTAssertFalse(name.hasSuffix(" "))
         XCTAssertEqual(name.last, "h")

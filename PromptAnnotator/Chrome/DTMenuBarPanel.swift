@@ -8,7 +8,7 @@ struct DTMenuBarPanel: View {
     @ObservedObject var settings: AppSettings
     @Environment(\.dismiss) private var dismiss
 
-    private let panelWidth: CGFloat = 252
+    private let panelWidth: CGFloat = 260
     private var shadow: CGFloat { Ink.menuBarShadow }
 
     var body: some View {
@@ -28,11 +28,17 @@ struct DTMenuBarPanel: View {
 
             hairline
 
+            row(settings.appearance.menuLabel) {
+                settings.cycleAppearance()
+            }
+
+            hairline
+
             Text(AppVersion.label)
-                .font(.system(size: 11))
+                .font(Ink.menuBarMetaFont)
                 .foregroundStyle(Ink.secondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, Ink.space3)
+                .padding(.vertical, Ink.space2)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             row("quit da transcribuh") {
@@ -57,7 +63,7 @@ struct DTMenuBarPanel: View {
                 polishMenuBarWindow(window)
             }
         }
-        .preferredColorScheme(nil)
+        .preferredColorScheme(settings.appearance.preferredColorScheme)
     }
 
     // MARK: - Sections
@@ -69,28 +75,29 @@ struct DTMenuBarPanel: View {
             }
 
             Text(shortcutHint)
-                .font(.system(size: 11))
+                .font(Ink.menuBarMetaFont)
                 .foregroundStyle(Ink.secondary)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 6)
+                .padding(.horizontal, Ink.space3)
+                .padding(.bottom, Ink.space2)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityLabel(shortcutHint)
 
             if let cancel = settings.cancelChord {
                 Text("Cancel: \(cancel.display)")
-                    .font(.system(size: 11))
+                    .font(Ink.menuBarMetaFont)
                     .foregroundStyle(Ink.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 6)
+                    .padding(.horizontal, Ink.space3)
+                    .padding(.bottom, Ink.space2)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if let status = session.menuStatusLine, !status.isEmpty {
                 Text(status)
-                    .font(.system(size: 11))
+                    .font(Ink.menuBarMetaFont)
                     .foregroundStyle(Ink.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
+                    .padding(.horizontal, Ink.space3)
+                    .padding(.bottom, Ink.space2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -141,11 +148,13 @@ struct DTMenuBarPanel: View {
         DTMenuRow(title: title, disabled: disabled) {
             guard !disabled else { return }
             action()
-            dismiss()
+            // Theme cycle stays open so the user can click again; other actions dismiss.
+            if !title.hasPrefix("theme:") {
+                dismiss()
+            }
         }
     }
 
-    /// Clear the system panel chrome so our 1px border + hard shadow read cleanly.
     private func polishMenuBarWindow(_ window: NSWindow) {
         window.backgroundColor = .clear
         window.isOpaque = false
@@ -172,11 +181,11 @@ private struct DTMenuRow: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 13))
+                .font(Ink.menuBarItemFont)
                 .foregroundStyle(rowForeground)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, Ink.space3)
+                .padding(.vertical, Ink.space2)
                 .contentShape(Rectangle())
                 .background(rowBackground)
         }

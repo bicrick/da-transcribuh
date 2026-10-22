@@ -84,7 +84,7 @@ struct InkTile<Content: View>: View {
                             .fill(Ink.label)
                             .frame(width: 18, height: 18)
                         Image(systemName: "checkmark")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(Ink.microFont)
                             .foregroundStyle(Ink.onAccent)
                     }
                     .offset(x: 1, y: -1)
@@ -100,8 +100,8 @@ struct InkSectionHeader: View {
     var caption: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+            HStack(spacing: Ink.space2) {
                 Text(title.uppercased())
                     .font(Ink.sectionTitleFont)
                     .tracking(0.6)
@@ -137,7 +137,7 @@ struct InkBadge: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 11, weight: .medium))
+            .font(Ink.badgeFont)
             .foregroundStyle(accented ? Ink.onAccent : Ink.label)
             .padding(.horizontal, 5)
             .frame(height: 17)
@@ -169,7 +169,7 @@ struct InkIconChip: View {
 
     var body: some View {
         Image(systemName: systemName)
-            .font(.system(size: 14, weight: .medium))
+            .font(Ink.labelFont)
             .foregroundStyle(tint)
             .frame(width: 28, height: 28)
             .overlay(
@@ -187,7 +187,7 @@ struct InkKeycap: View {
 
     var body: some View {
         Text(label)
-            .font(.system(size: compact ? 12 : 13, weight: .semibold))
+            .font(compact ? Ink.keycapCompactFont : Ink.keycapFont)
             .foregroundStyle(Ink.label)
             .padding(.horizontal, compact ? 6 : 7)
             .frame(minWidth: compact ? 22 : 26, minHeight: compact ? 22 : 26)
@@ -227,9 +227,9 @@ struct InkSegmentMeter: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(label)
-                .font(.system(size: 11))
+                .font(Ink.headingFont)
                 .foregroundStyle(Ink.secondary)
-                .frame(width: 46, alignment: .leading)
+                .frame(width: 52, alignment: .leading)
             HStack(spacing: 2) {
                 ForEach(0..<segments, id: \.self) { index in
                     Rectangle()
@@ -302,7 +302,7 @@ struct InkCheck: View {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .fill(Ink.label)
                 Image(systemName: "checkmark")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(Ink.microFont)
                     .foregroundStyle(Ink.onAccent)
             }
         }
@@ -334,7 +334,7 @@ struct InkPrimaryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: large ? 13 : 12, weight: .semibold))
+            .font(large ? Ink.buttonFont : Ink.buttonSmallFont)
             .foregroundStyle(enabled ? Ink.onAccent : Ink.tertiary)
             .padding(.horizontal, large ? 15 : 11)
             .frame(height: large ? 30 : 24)
@@ -353,7 +353,7 @@ struct InkPrimaryButtonStyle: ButtonStyle {
 struct InkSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .medium))
+            .font(Ink.buttonSmallFont)
             .foregroundStyle(Ink.label)
             .padding(.horizontal, 11)
             .frame(height: 24)
@@ -428,7 +428,7 @@ struct InkWavePenMotif: View {
             .frame(width: 120, height: 48)
 
             Text("→")
-                .font(.system(size: 22, weight: .bold))
+                .font(Ink.titleFont)
                 .foregroundStyle(Ink.label)
 
             RoundedRectangle(cornerRadius: 3, style: .continuous)
@@ -457,7 +457,7 @@ struct InkErrorBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Text("!")
-                .font(.system(size: 11, weight: .bold))
+                .font(Ink.headingFont)
                 .foregroundStyle(Ink.onAccent)
                 .frame(width: 16, height: 16)
                 .background(Ink.label, in: RoundedRectangle(cornerRadius: 2, style: .continuous))

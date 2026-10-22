@@ -17,7 +17,10 @@ struct ConfigurationPage: View {
     }
 
     var body: some View {
-        SettingsPageStack(title: "Configuration") {
+        SettingsPageStack(title: "General") {
+            SettingsSection(title: "Appearance") {
+                appearanceCard
+            }
             SettingsSection(title: "Keyboard shortcuts") {
                 shortcutCard
             }
@@ -46,6 +49,30 @@ struct ConfigurationPage: View {
         )) { event in
             apply(event)
         })
+    }
+
+    private var appearanceCard: some View {
+        SettingsCard {
+            VStack(alignment: .leading, spacing: Ink.space3) {
+                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                    Text("Theme")
+                        .font(Ink.rowTitleFont)
+                        .foregroundStyle(Ink.label)
+                    Text("System follows macOS. Light and Dark lock the Settings window and menu panel. The recording island keeps its own look.")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                InkAppearanceSegment(
+                    selection: Binding(
+                        get: { settings.appearance },
+                        set: { settings.setAppearance($0) }
+                    ),
+                    onChange: { settings.setAppearance($0) }
+                )
+            }
+            .padding(Ink.cardPad)
+        }
     }
 
     private var shortcutCard: some View {
@@ -123,19 +150,21 @@ struct ConfigurationPage: View {
                 }
                 if let note = settings.loginItemNote {
                     Text(note)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 8)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.error)
+                        .padding(.horizontal, Ink.rowHPad)
+                        .padding(.bottom, Ink.space2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 SettingsDivider()
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: Ink.space3) {
+                    VStack(alignment: .leading, spacing: Ink.titleDescGap) {
                         Text("Updates")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(Ink.rowTitleFont)
+                            .foregroundStyle(Ink.label)
                         Text(updateMessage)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
@@ -218,17 +247,20 @@ struct ConfigurationPage: View {
                     settingCopy("Normalize quiet speech", "Raises a quiet take before transcription. Silence is left alone.")
                 }
                 .toggleStyle(.switch)
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: Ink.space2) {
                     Text("Sessions folder")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(Ink.rowTitleFont)
+                        .foregroundStyle(Ink.label)
                     Text(folderPath)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
                         .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let folderNote {
                         Text(folderNote)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.red)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.error)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     HStack {
                         Button("Change") { chooseFolder() }

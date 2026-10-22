@@ -45,21 +45,22 @@ struct OnboardingFlow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .center, spacing: 18) {
+            DTScrollView {
+                VStack(alignment: .center, spacing: Ink.space4) {
                     InkEyebrow(text: step.eyebrow)
                     stepBody
                 }
-                .padding(.top, 36)
-                .padding(.horizontal, 36)
-                .padding(.bottom, 20)
+                .padding(.top, Ink.space6)
+                .padding(.horizontal, Ink.space6)
+                .padding(.bottom, Ink.space4)
                 .frame(maxWidth: .infinity)
             }
             footer
         }
         .frame(width: OnboardingMetrics.width, height: OnboardingMetrics.height)
         .background(Ink.window)
-        .tint(Ink.accent)
+        .tint(Ink.label)
+        .preferredColorScheme(settings.appearance.preferredColorScheme)
         .background(ShortcutCapture(active: $listening) { event in
             applyShortcut(event)
         })
@@ -234,7 +235,7 @@ struct OnboardingFlow: View {
             }
             if permissions.status.isReady {
                 Text("All three are on. Continue.")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(Ink.buttonSmallFont)
                     .foregroundStyle(Ink.success)
             }
         }
@@ -329,7 +330,7 @@ struct OnboardingFlow: View {
                 }
             } else if modelIsReady {
                 Label("Selected model is on this Mac. Continue when you are ready.", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(Ink.buttonSmallFont)
                     .foregroundStyle(Ink.success)
             } else {
                 Text("Press Download to fetch the selected model, then Continue.")
@@ -436,7 +437,7 @@ struct OnboardingFlow: View {
     private func guideRow(_ number: String, _ text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(number)
-                .font(.system(size: 12, weight: .bold))
+                .font(Ink.headingFont)
                 .foregroundStyle(Ink.accent)
                 .frame(width: 16, alignment: .leading)
             Text(text)

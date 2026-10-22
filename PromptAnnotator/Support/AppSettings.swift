@@ -88,6 +88,7 @@ final class AppSettings: ObservableObject {
     @Published var keepWindowOnTop: Bool
     @Published var errorLogging: Bool
     @Published var showInDock: Bool
+    @Published var appearance: AppAppearance
     @Published var silenceStopSeconds: Double
     @Published var maxSessionMinutes: Double
     @Published var normalizeSpeech: Bool
@@ -139,6 +140,7 @@ final class AppSettings: ObservableObject {
         keepWindowOnTop = defaults.bool(forKey: Keys.onTop)
         errorLogging = defaults.bool(forKey: Keys.errorLog)
         showInDock = defaults.object(forKey: Keys.dock) as? Bool ?? true
+        appearance = AppAppearance.stored(defaults.string(forKey: Keys.appearance))
         silenceStopSeconds = defaults.object(forKey: Keys.silence) as? Double ?? 0
         maxSessionMinutes = defaults.object(forKey: Keys.maxMinutes) as? Double ?? 0
         normalizeSpeech = defaults.bool(forKey: Keys.normalize)
@@ -156,6 +158,22 @@ final class AppSettings: ObservableObject {
         openAIModel = OpenAICompatibleTranscriber.storedModel(defaults: defaults)
         loginItemNote = nil
         isLoading = false
+        appearance.applyToApp()
+    }
+
+    func setAppearance(_ mode: AppAppearance) {
+        guard appearance != mode else {
+            mode.applyToApp()
+            return
+        }
+        appearance = mode
+        persist(Keys.appearance, mode.rawValue)
+        mode.applyToApp()
+        onAppChange?()
+    }
+
+    func cycleAppearance() {
+        setAppearance(appearance.next)
     }
 
     private static func chord(key: String, mods: String, defaults: UserDefaults) -> HotkeyChord? {
@@ -409,6 +427,7 @@ final class AppSettings: ObservableObject {
         static let onTop = "app.windowOnTop"
         static let errorLog = "app.errorLog"
         static let dock = "app.showInDock"
+        static let appearance = "app.appearance"
         static let silence = "session.silenceStop"
         static let maxMinutes = "session.maxMinutes"
         static let normalize = "session.normalize"

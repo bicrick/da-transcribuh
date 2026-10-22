@@ -88,10 +88,10 @@ struct RecordingPage: View {
                 Circle().fill(Ink.accent).frame(width: 6, height: 6)
                 WaveformBars(levels: preview, slotWidth: 64, slotHeight: 16)
                 Text("1")
-                    .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                    .font(Ink.badgeFont)
                     .foregroundStyle(Ink.label)
                 Image(systemName: "photo")
-                    .font(.system(size: 8, weight: .medium))
+                    .font(Ink.microFont)
                     .foregroundStyle(Ink.secondary)
             }
         case .compact:
@@ -99,14 +99,14 @@ struct RecordingPage: View {
                 Circle().fill(Ink.accent).frame(width: 6, height: 6)
                 WaveformBars(levels: preview, slotWidth: 72, slotHeight: 16)
                 Text("0:12")
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
             }
         case .minimal:
             WaveformBars(levels: preview, slotWidth: 96, slotHeight: 16)
         case .hidden:
             Image(systemName: "eye.slash")
-                .font(.system(size: 16, weight: .medium))
+                .font(Ink.labelFont)
                 .foregroundStyle(Ink.secondary)
         }
     }
@@ -117,7 +117,7 @@ struct RecordingPage: View {
             session.select(tool: tool)
         } label: {
             Image(systemName: tool.symbolName)
-                .font(.system(size: 14, weight: .medium))
+                .font(Ink.labelFont)
                 .frame(width: 32, height: 28)
                 .foregroundStyle(selected ? Ink.accent : Ink.secondary)
                 .background(

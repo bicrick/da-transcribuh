@@ -41,50 +41,96 @@ enum Ink {
     static let selectedBorder: CGFloat = 2
     static let hardShadow: CGFloat = 3
     static let buttonShadow: CGFloat = 1
+    static let scrollerRadius: CGFloat = 2
+
+    // MARK: - Spacing scale (4 / 8 / 12 / 16 / 24 / 32)
+
+    static let space1: CGFloat = 4
+    static let space2: CGFloat = 8
+    static let space3: CGFloat = 12
+    static let space4: CGFloat = 16
+    static let space5: CGFloat = 24
+    static let space6: CGFloat = 32
 
     // MARK: - Layout
 
-    /// Narrow enough for one centered tile column (~72pt tiles + padding).
-    static let sidebarWidth: CGFloat = 108
-    /// Breathing room below title-bar safe area.
-    static let pageTop: CGFloat = 22
-    static let pageSide: CGFloat = 28
-    static let pageBottom: CGFloat = 28
-    static let maxContentWidth: CGFloat = 660
-    static let sectionGap: CGFloat = 24
-    static let sectionInnerGap: CGFloat = 8
-    static let rowHPad: CGFloat = 14
-    static let rowVPad: CGFloat = 12
-    static let gridGap: CGFloat = 10
+    /// Wide enough for square tiles with padded labels (“General”, “Recording”).
+    static let sidebarWidth: CGFloat = 128
+    static let sidebarTileSize: CGFloat = 84
+    /// Inner padding inside each sidebar tile (label must not touch the border).
+    static let sidebarTilePad: CGFloat = 8
+    static let sidebarIconLabelGap: CGFloat = 6
+    static let sidebarTileGap: CGFloat = 8
+    static let sidebarSectionGap: CGFloat = 12
+    /// Footer (mark + version) height — used as ScrollView bottom inset.
+    static let sidebarFooterHeight: CGFloat = 72
+
+    static let pageTop: CGFloat = 16
+    static let pageSide: CGFloat = 24
+    static let pageBottom: CGFloat = 24
+    /// Content column grows with the window; caps so lines stay readable.
+    static let maxContentWidth: CGFloat = 880
+    static let sectionGap: CGFloat = space5
+    static let sectionInnerGap: CGFloat = space2
+    static let titleDescGap: CGFloat = space1
+    static let rowHPad: CGFloat = space4
+    static let rowVPad: CGFloat = space3
+    static let cardPad: CGFloat = space4
+    static let gridGap: CGFloat = space3
     static let statusBarHeight: CGFloat = 24
-    static let sidebarTileSize: CGFloat = 72
-    /// Custom Settings title strip (traffic lights + wordmark + dither grip).
     static let titleStripHeight: CGFloat = 38
-    /// Hard offset shadow for the menu-bar panel mockup.
     static let menuBarShadow: CGFloat = 4
+    static let scrollerWidth: CGFloat = 8
+    static let scrollerThumbMin: CGFloat = 28
 
     // MARK: - Type
+    //
+    // Chrome (Departure Mono, PostScript `DepartureMono-Regular` via ATSApplicationFontsPath):
+    //   title / heading / label / number / buttons / keycaps / badges / sidebar / status
+    // Long copy (SF Mono): body / caption
+    // Prefer crisp pixel sizes: 11, 13, 16, 22.
 
-    /// Departure Mono PostScript name (bundled OFL).
+    /// Departure Mono PostScript name (bundled OFL under `PromptAnnotator/Fonts/`).
     static let monoName = "DepartureMono-Regular"
 
-    static let pageTitleFont = Font.system(size: 22, weight: .bold)
-    static let onboardingHeroFont = Font.system(size: 28, weight: .bold)
-    static let stepTitleFont = Font.system(size: 22, weight: .bold)
-    static let sectionTitleFont = Font.system(size: 11, weight: .bold)
-    static let tileTitleFont = Font.system(size: 15, weight: .semibold)
-    static let statValueFont = Font.system(size: 26, weight: .bold)
-    static let rowTitleFont = Font.system(size: 13, weight: .semibold)
-    static let bodyFont = Font.system(size: 13, weight: .regular)
-    static let captionFont = Font.system(size: 12, weight: .regular)
-    static let eyebrowFont = Font.system(size: 11, weight: .bold)
-    static let statusFont = Font.custom(monoName, size: 11)
-    static let wordmarkFont = Font.custom(monoName, size: 11)
+    /// Primary tokens — retune here only.
+    static let titleFont = mono(22)
+    static let headingFont = mono(11)
+    static let labelFont = mono(13)
+    static let numberFont = mono(22)
+    static let bodyFont = Font.system(size: 13, weight: .regular, design: .monospaced)
+    static let captionFont = Font.system(size: 11, weight: .regular, design: .monospaced)
+
+    /// Role aliases (kept so existing call sites stay compile-safe).
+    static let pageTitleFont = titleFont
+    static let onboardingHeroFont = mono(22)
+    static let stepTitleFont = titleFont
+    static let sectionTitleFont = headingFont
+    static let tileTitleFont = labelFont
+    static let statValueFont = numberFont
+    static let rowTitleFont = labelFont
+    static let eyebrowFont = headingFont
+    static let statusFont = mono(11)
+    static let wordmarkFont = mono(11)
+    static let buttonFont = labelFont
+    static let buttonSmallFont = mono(11)
+    static let keycapFont = labelFont
+    static let keycapCompactFont = mono(11)
+    static let badgeFont = mono(11)
+    static let sidebarTileLabelFont = mono(11)
+    static let sidebarSectionFont = headingFont
+    static let menuBarItemFont = labelFont
+    static let menuBarMetaFont = captionFont
+    static let microFont = mono(11)
 
     static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         // Weight variants are not shipped; size is what matters for motifs.
         _ = weight
         return Font.custom(monoName, size: size)
+    }
+
+    static func systemMono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        Font.system(size: size, weight: weight, design: .monospaced)
     }
 
     // MARK: - Helpers

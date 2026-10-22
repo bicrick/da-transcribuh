@@ -72,7 +72,7 @@ struct SpeechModelPicker: View {
                 }
             }
             Text("Weights from argmaxinc/whisperkit-coreml. Size is the download. Speed and quality compare these three.")
-                .font(.system(size: 11))
+                .font(Ink.headingFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let message = transfer.message {
@@ -121,14 +121,14 @@ struct SpeechModelPicker: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .top) {
                         Image(systemName: iconName(for: choice))
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(Ink.labelFont)
                             .foregroundStyle(Ink.label)
                         Spacer(minLength: 4)
                         if selected {
                             ZStack {
                                 Rectangle().fill(Ink.label).frame(width: 18, height: 18)
                                 Image(systemName: "checkmark")
-                                    .font(.system(size: 9, weight: .bold))
+                                    .font(Ink.microFont)
                                     .foregroundStyle(Ink.onAccent)
                             }
                         }
@@ -143,7 +143,7 @@ struct SpeechModelPicker: View {
                             }
                         }
                         Text(choice.variant)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
                     }
                     Text(choice.detail)
@@ -159,11 +159,11 @@ struct SpeechModelPicker: View {
                         InkProgressBar(fraction: fraction)
                     } else if onDisk {
                         Label("On disk", systemImage: "checkmark.circle.fill")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(Ink.buttonSmallFont)
                             .foregroundStyle(Ink.success)
                     } else {
                         Label("\(choice.megabytes) MB", systemImage: "arrow.down.circle")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(Ink.buttonSmallFont)
                             .foregroundStyle(Ink.secondary)
                     }
                 }

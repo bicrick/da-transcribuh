@@ -33,6 +33,7 @@ struct PromptAnnotatorApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Runtime.isUnitTest else { return }
+        AppSettings.shared.appearance.applyToApp()
         HotkeyCenter.shared.handler = {
             SessionController.shared.handleHotkey()
         }

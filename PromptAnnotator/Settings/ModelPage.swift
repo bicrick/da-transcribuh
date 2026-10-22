@@ -159,7 +159,7 @@ struct ModelPage: View {
                             InkBadge(text: model.source == .folder ? "Local folder" : "Hugging Face")
                         }
                         Text(model.subtitle)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
                             .lineLimit(2)
                     }
@@ -252,7 +252,7 @@ struct ModelPage: View {
                     }
                     if OpenAICompatibleTranscriber.isConfigured() {
                         Text("API key saved in Keychain.")
-                            .font(.system(size: 11))
+                            .font(Ink.headingFont)
                             .foregroundStyle(Ink.secondary)
                     } else {
                         InkErrorBanner(message: "Add an API key before recording with this engine.")
@@ -275,7 +275,7 @@ struct ModelPage: View {
                             .foregroundStyle(Ink.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Text(WhisperKitTranscriber.modelsFolder().path)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
                             .lineLimit(2)
                             .textSelection(.enabled)

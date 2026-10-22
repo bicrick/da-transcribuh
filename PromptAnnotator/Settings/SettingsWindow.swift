@@ -41,9 +41,11 @@ struct SettingsRoot: View {
         }
         .tint(Ink.label)
         .background(Ink.window)
+        .preferredColorScheme(settings.appearance.preferredColorScheme)
         // Draw under the (hidden) system titlebar so our strip owns the top edge.
         .ignoresSafeArea(.container, edges: .top)
         .onAppear {
+            settings.appearance.applyToApp()
             SettingsPresenter.shared.applyChrome()
             reload()
         }
@@ -93,7 +95,7 @@ struct SettingsRoot: View {
     }
 
     private var sidebarFooter: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: Ink.space1) {
             Image("AppMark")
                 .resizable()
                 .interpolation(.high)
@@ -103,17 +105,17 @@ struct SettingsRoot: View {
                         .strokeBorder(Ink.label, lineWidth: 1)
                 )
             Text(AppVersion.label)
-                .font(.system(size: 9))
+                .font(Ink.captionFont)
                 .foregroundStyle(Ink.secondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 10)
+        .frame(height: Ink.sidebarFooterHeight)
+        .padding(.horizontal, Ink.space2)
         .overlay(alignment: .top) {
-            Rectangle().fill(Ink.hairline).frame(height: 1)
+            Rectangle().fill(Ink.label).frame(height: 1)
         }
     }
 
@@ -127,28 +129,28 @@ struct SettingsSidebar: View {
     @Binding var selection: SettingsPage
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .center, spacing: 2) {
+        DTScrollView(bottomInset: Ink.space2) {
+            VStack(alignment: .center, spacing: Ink.sidebarSectionGap) {
                 ForEach(SettingsPage.sidebarSections, id: \.title) { section in
-                    Text(section.title.uppercased())
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Ink.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 2)
-                        .padding(.top, 12)
-                        .padding(.bottom, 6)
+                    VStack(alignment: .center, spacing: Ink.space2) {
+                        Text(section.title.uppercased())
+                            .font(Ink.sidebarSectionFont)
+                            .foregroundStyle(Ink.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, Ink.space2)
 
-                    VStack(spacing: 6) {
-                        ForEach(section.pages) { item in
-                            toolTile(item)
+                        VStack(spacing: Ink.sidebarTileGap) {
+                            ForEach(section.pages) { item in
+                                toolTile(item)
+                            }
                         }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
+            .padding(.horizontal, Ink.space3)
+            .padding(.top, Ink.space2)
+            .padding(.bottom, Ink.space2)
             .frame(maxWidth: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -161,15 +163,17 @@ struct SettingsSidebar: View {
         return Button {
             selection = item
         } label: {
-            VStack(spacing: 6) {
+            VStack(spacing: Ink.sidebarIconLabelGap) {
                 Image(systemName: item.symbol)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(Ink.labelFont)
                     .foregroundStyle(selected ? Ink.onAccent : Ink.label)
                 Text(item.title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(Ink.sidebarTileLabelFont)
                     .foregroundStyle(selected ? Ink.onAccent : Ink.label)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .minimumScaleFactor(0.7)
+                    .padding(.horizontal, Ink.sidebarTilePad)
+                    .frame(maxWidth: .infinity)
             }
             .frame(width: Ink.sidebarTileSize, height: Ink.sidebarTileSize)
             .background(
@@ -233,8 +237,8 @@ final class SettingsPresenter {
         window.isReleasedWhenClosed = false
         window.backgroundColor = Ink.windowNSColor
         window.contentView = host
-        window.setContentSize(NSSize(width: 880, height: 640))
-        window.minSize = NSSize(width: 760, height: 560)
+        window.setContentSize(NSSize(width: 960, height: 660))
+        window.minSize = NSSize(width: 820, height: 560)
         window.center()
         self.window = window
         applyChrome()

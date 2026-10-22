@@ -67,14 +67,14 @@ struct HistoryPage: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(12)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
+                DTScrollView {
+                    LazyVStack(spacing: Ink.space2) {
                         ForEach(matches) { session in
                             historyRow(session)
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 12)
+                    .padding(.horizontal, Ink.space3)
+                    .padding(.bottom, Ink.space3)
                 }
             }
         }
@@ -99,7 +99,7 @@ struct HistoryPage: View {
                             .foregroundStyle(Ink.label)
                         Spacer(minLength: 4)
                         Text(TimeFormat.clock(session.duration))
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
                     }
                     Text(session.preview.isEmpty ? "No speech" : session.preview)
@@ -135,7 +135,7 @@ struct HistoryPage: View {
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(longTitle(for: selected))
-                                    .font(.system(size: 16, weight: .semibold))
+                                    .font(Ink.labelFont)
                                     .foregroundStyle(Ink.label)
                                 Text(detail(for: selected))
                                     .font(Ink.captionFont)
@@ -152,11 +152,12 @@ struct HistoryPage: View {
                             }
                         }
                         InkDivider(leading: 0)
-                        ScrollView {
+                        DTScrollView {
                             Text(selected.transcript.isEmpty ? "No speech in this session." : selected.transcript)
-                                .font(.system(size: 14))
+                                .font(Ink.bodyFont)
                                 .foregroundStyle(selected.transcript.isEmpty ? Ink.secondary : Ink.label)
                                 .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .frame(minHeight: 200)
