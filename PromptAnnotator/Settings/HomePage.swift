@@ -208,7 +208,7 @@ struct HomePage: View {
                     recentCell
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     thisWeekCell
-                        .frame(width: 220, maxHeight: .infinity, alignment: .topLeading)
+                        .frame(minWidth: 220, maxWidth: 220, maxHeight: .infinity, alignment: .topLeading)
                 }
                 // Stretch both cells to the taller sibling (RECENT).
                 .fixedSize(horizontal: false, vertical: true)
