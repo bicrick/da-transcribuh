@@ -85,4 +85,63 @@ final class ClipboardSettingsTests: XCTestCase {
         XCTAssertTrue(SettingsPage.tabOrder.contains(.clipboard))
         XCTAssertEqual(SettingsPage.clipboard.title, "Clipboard")
     }
+
+    func testClipboardHistoryEnabledDefaultsTrueAndPersists() {
+        let name = "clipboard-enabled-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertTrue(settings.clipboardHistoryEnabled)
+
+        settings.setClipboardHistoryEnabled(false)
+        XCTAssertFalse(settings.clipboardHistoryEnabled)
+        let again = AppSettings(defaults: defaults)
+        XCTAssertFalse(again.clipboardHistoryEnabled)
+
+        defaults.removePersistentDomain(forName: name)
+    }
+
+    func testClipboardHistoryLimitClampsAndPersists() {
+        let name = "clipboard-limit-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        let settings = AppSettings(defaults: defaults)
+
+        settings.setClipboardHistoryLimit(10)
+        XCTAssertEqual(settings.clipboardHistoryLimit, 20)
+        settings.setClipboardHistoryLimit(999)
+        XCTAssertEqual(settings.clipboardHistoryLimit, 500)
+        settings.setClipboardHistoryLimit(120)
+        XCTAssertEqual(settings.clipboardHistoryLimit, 120)
+
+        let again = AppSettings(defaults: defaults)
+        XCTAssertEqual(again.clipboardHistoryLimit, 120)
+        defaults.removePersistentDomain(forName: name)
+    }
+
+    func testClipboardChordRejectsRecordingAndCancelChords() {
+        let name = "clipboard-chord-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        let settings = AppSettings(defaults: defaults)
+
+        XCTAssertTrue(settings.setClipboardChord(.clipboardDefault))
+        XCTAssertFalse(settings.setClipboardChord(settings.chord))
+        if let cancel = settings.cancelChord {
+            XCTAssertFalse(settings.setClipboardChord(cancel))
+        }
+        // Invalid stored mods fall back to default on load.
+        defaults.set(0, forKey: "clipboard.hotkey.keyCode")
+        defaults.set(0, forKey: "clipboard.hotkey.modifiers")
+        let again = AppSettings(defaults: defaults)
+        XCTAssertEqual(again.clipboardChord, .clipboardDefault)
+
+        defaults.removePersistentDomain(forName: name)
+    }
+
+    func testSettingsSearchHitsRouteToClipboardPage() {
+        let hits = SettingsSearch.catalog.filter { $0.id.hasPrefix("clip.") }
+        XCTAssertFalse(hits.isEmpty)
+        XCTAssertTrue(hits.allSatisfy { $0.page == .clipboard })
+    }
 }
