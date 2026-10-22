@@ -6,12 +6,20 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–19)
+## Final summary (Runs 1–20)
+
+### Run 20 — Recording island / waveform / annotate B&W reskin
+
+- Island + markup toolbar: solid `Ink.window` fill, 1px outline, 3pt radius (no vibrancy/material). Record marker is a pulsing B/W square. Markup selection inverts; color swatches stay chromatic.
+- Waveform: solid `Ink.label` square bars (same Canvas path / no new timers).
+- Overlay selection border tightened to crisp black/white dual stroke.
+- `AGENTS.md` documents that overlay chrome is now in scope for the theme.
+- Risky: ChromePanel still `masksToBounds` so hard offset shadows were skipped on floating chrome; confirm island/toolbar hit targets and waveform FPS on Mac.
 
 ### Run 19 — Typography, appearance, spacing, scrollers, layout
 
 - **Fonts:** Departure Mono for chrome (title/heading/label/number/buttons/keycaps/badges/sidebar/status); SF Mono (`.system(design: .monospaced)`) for body/caption. Central tokens in `InkTheme`.
-- **Appearance:** No prior switcher existed. Added System/Light/Dark in General (B&W segment) + menu `theme: …` cycle. Persisted `app.appearance`; applies via `NSApp.appearance` + `preferredColorScheme`. Island untouched.
+- **Appearance:** No prior switcher existed. Added System/Light/Dark in General (B&W segment) + menu `theme: …` cycle. Persisted `app.appearance`; applies via `NSApp.appearance` + `preferredColorScheme`.
 - **Spacing:** 4/8/12/16/24/32 scale. Sidebar tiles padded (8pt), renamed Configuration→**General** / Performance→**Perf**, footer-clearing scroll inset, wider sidebar (128).
 - **Scrollers:** `DTScrollView` hides native indicators; B/W track + dither + draggable thumb.
 - **Layout:** Content column centers up to 880pt; Home denser terminal-style checklist/stats; pages/onboarding/menu use the same chrome language.
@@ -127,7 +135,8 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 ### P0 — must pass before recording
 
 - [ ] **Build** `overnight-audit` in Xcode (Debug) + run unit tests (`NonSpeechFilter`, `LiveSampleWindow`, `AudioRecorderTrim`, `SpeechGate`, `SettingsBehavior`, `UserFacingError`, `SpeechModelTests` holdback, **`FontMetricsTests`**, **`BYOMTests`**, **`InkThemeTests`**, **`FocusPasteDecisionTests`**).
-- [ ] **B&W Settings**: Home / Models / History / Recording / Configuration / Sound / Performance in light + dark — 1px B/W chrome, no island restyle.
+- [ ] **B&W Settings**: Home / Models / History / Recording / General / Sound / Performance in light + dark — 1px B/W chrome.
+- [ ] **Island / annotate**: record a session — island + waveform + markup toolbar are B/W (not material); annotation ink colors still pickable; no hitch vs prior FPS.
 - [ ] **Ink padding**: ~20–24pt gap below title-bar to first content on every Settings page (not ~90pt).
 - [ ] **Sidebar**: one vertical column of equal square tiles (icon above label, 1px outline; selected inverted); Session / Speech / App labels; scrolls if short; not 2-col, not compact rows.
 - [ ] **Title strip**: custom outlined traffic lights (hover ×/−/+), centered wordmark + block cursor, dither grip; window drags from strip; ⌘W / ⌘M work.
