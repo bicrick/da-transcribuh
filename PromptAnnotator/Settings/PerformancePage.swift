@@ -10,10 +10,7 @@ struct PerformancePage: View {
     @State private var modelBytesAt: Date = .distantPast
 
     var body: some View {
-        SettingsPageStack(
-            title: "Performance",
-            subtitle: "Memory this app is using right now, including the model after it loads."
-        ) {
+        SettingsPageStack(title: "Performance") {
             LazyVGrid(
                 columns: [GridItem(.flexible(), spacing: Ink.gridGap), GridItem(.flexible(), spacing: Ink.gridGap)],
                 spacing: Ink.gridGap

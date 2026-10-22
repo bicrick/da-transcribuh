@@ -6,20 +6,14 @@ struct RecordingPage: View {
     @ObservedObject var session: SessionController
 
     var body: some View {
-        SettingsPageStack(
-            title: "Recording",
-            subtitle: "Island style and Shift-drag defaults. Shortcuts live in General."
-        ) {
-            SettingsSection(
-                title: "Recording window",
-                footer: "The menu bar shows the same shortcut under Start Session."
-            ) {
+        SettingsPageStack(title: "Recording") {
+            SettingsSection(title: "Recording window") {
                 styleGrid
             }
 
             SettingsSection(
                 title: "Defaults",
-                footer: "These tools show while you hold Shift. Drag captures the front window or modal."
+                footer: "Hold Shift to draw; drag captures the front window."
             ) {
                 InkCard {
                     VStack(alignment: .leading, spacing: 0) {
@@ -145,14 +139,14 @@ struct RecordingPage: View {
             Image(systemName: tool.symbolName)
                 .font(Ink.labelFont)
                 .frame(width: 36, height: 28)
-                .foregroundStyle(selected ? Ink.onAccent : Ink.label)
+                .foregroundStyle(selected ? Ink.onPrimary : Ink.label)
                 .background(
                     RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                        .fill(selected ? Ink.label : Ink.window)
+                        .fill(selected ? Ink.primaryFill : Ink.front)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                        .strokeBorder(Ink.label, lineWidth: 1)
+                        .strokeBorder(Ink.controlBorder, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)

@@ -17,10 +17,7 @@ struct ConfigurationPage: View {
     }
 
     var body: some View {
-        SettingsPageStack(
-            title: "General",
-            subtitle: "Appearance, shortcuts, launch behavior, and paste rules."
-        ) {
+        SettingsPageStack(title: "General") {
             SettingsSection(
                 title: "Appearance",
                 footer: "Also cycles from the menu bar as theme: …"
@@ -61,19 +58,12 @@ struct ConfigurationPage: View {
 
     private var appearanceCard: some View {
         InkCard {
-            VStack(alignment: .leading, spacing: Ink.space3) {
-                Text("System follows macOS. Light and Dark lock Settings, the menu panel, and the recording island / annotate chrome.")
-                    .font(Ink.captionFont)
-                    .foregroundStyle(Ink.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                InkAppearanceSegment(
-                    selection: Binding(
-                        get: { settings.appearance },
-                        set: { settings.setAppearance($0) }
-                    ),
-                    onChange: { settings.setAppearance($0) }
+            InkAppearanceSegment(
+                selection: Binding(
+                    get: { settings.appearance },
+                    set: { settings.setAppearance($0) }
                 )
-            }
+            )
             .padding(.horizontal, Ink.rowHPad)
             .padding(.vertical, Ink.rowVPad)
         }

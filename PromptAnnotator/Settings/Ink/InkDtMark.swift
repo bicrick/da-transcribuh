@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Chosen brand mark: Departure Mono lowercase “d” + inverted “t” (white on black block),
-/// inside a white square with a black hard-offset bevel (same double-pane language as tiles / island).
-/// Dark mode keeps the tile white with a black bevel so the mark stays constant across themes.
+/// Chosen brand mark: Departure Mono lowercase “d” + inverted “t” block,
+/// inside a square with a hard-offset bevel (same double-pane language as tiles / island).
+/// Light: white tile, black ink. Dark: graphite tile, light ink (inverts with the theme).
 struct InkDtMark: View {
     var side: CGFloat = 28
 
@@ -15,14 +15,14 @@ struct InkDtMark: View {
         mark
             .padding(pad)
             .frame(width: side, height: side)
-            .background(Color.white)
+            .background(Ink.markFace)
             .overlay(
                 Rectangle()
-                    .strokeBorder(Color.black, lineWidth: max(1, side * 0.04))
+                    .strokeBorder(Ink.markInk, lineWidth: max(1, side * 0.04))
             )
             .background(
                 Rectangle()
-                    .fill(Color.black)
+                    .fill(Ink.bevel)
                     .offset(x: bevel, y: bevel)
             )
             .accessibilityLabel("da transcribuh")
@@ -32,13 +32,13 @@ struct InkDtMark: View {
         HStack(spacing: gap) {
             Text("d")
                 .font(Ink.mono(fontSize))
-                .foregroundStyle(Color.black)
+                .foregroundStyle(Ink.markInk)
             Text("t")
                 .font(Ink.mono(fontSize))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(Ink.markInvertInk)
                 .padding(.horizontal, fontSize * 0.12)
                 .padding(.vertical, fontSize * 0.02)
-                .background(Color.black)
+                .background(Ink.markInvertFace)
         }
         .fixedSize()
     }

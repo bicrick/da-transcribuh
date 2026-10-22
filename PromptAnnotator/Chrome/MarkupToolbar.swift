@@ -49,10 +49,10 @@ struct MarkupToolbarView: View {
             Image(systemName: "viewfinder")
                 .font(Ink.labelFont)
                 .frame(width: 36, height: 32)
-                .foregroundStyle(selected ? Ink.onAccent : Ink.label)
+                .foregroundStyle(selected ? Ink.onPrimary : Ink.label)
                 .background(
                     RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                        .fill(selected ? Ink.label : Color.clear)
+                        .fill(selected ? Ink.primaryFill : Color.clear)
                 )
         }
         .help("Capture a snippet")
@@ -65,10 +65,10 @@ struct MarkupToolbarView: View {
             Image(systemName: tool.symbolName)
                 .font(Ink.labelFont)
                 .frame(width: 36, height: 32)
-                .foregroundStyle(selected ? Ink.onAccent : Ink.label)
+                .foregroundStyle(selected ? Ink.onPrimary : Ink.label)
                 .background(
                     RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                        .fill(selected ? Ink.label : Color.clear)
+                        .fill(selected ? Ink.primaryFill : Color.clear)
                 )
         }
         .help(tool.title)

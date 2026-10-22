@@ -110,8 +110,42 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(AppAppearance.stored(nil), .system)
         XCTAssertEqual(AppAppearance.stored("dark"), .dark)
         XCTAssertEqual(AppAppearance.dark.menuLabel, "theme: dark")
-        XCTAssertEqual(AppAppearance.light.preferredColorScheme, .light)
-        XCTAssertNil(AppAppearance.system.preferredColorScheme)
+        XCTAssertNil(AppAppearance.system.nsAppearance)
+        XCTAssertEqual(AppAppearance.light.nsAppearance?.name, .aqua)
+        XCTAssertEqual(AppAppearance.dark.nsAppearance?.name, .darkAqua)
+    }
+
+    @MainActor
+    func testSetAppearanceIsIdempotentSinglePath() {
+        let name = "PromptAnnotatorTests.appearanceDefaults"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        let settings = AppSettings(defaults: defaults)
+        var appChanges = 0
+        settings.onAppChange = { appChanges += 1 }
+
+        settings.setAppearance(.dark)
+        XCTAssertEqual(settings.appearance, .dark)
+        XCTAssertEqual(appChanges, 1)
+        XCTAssertEqual(NSApp.appearance?.name, .darkAqua)
+
+        // Re-selecting the same mode must not re-apply / flicker.
+        settings.setAppearance(.dark)
+        XCTAssertEqual(appChanges, 1)
+
+        settings.setAppearance(.system)
+        XCTAssertEqual(settings.appearance, .system)
+        XCTAssertEqual(appChanges, 2)
+        XCTAssertNil(NSApp.appearance)
+
+        settings.cycleAppearance()
+        XCTAssertEqual(settings.appearance, .light)
+        XCTAssertEqual(appChanges, 3)
+        XCTAssertEqual(NSApp.appearance?.name, .aqua)
+
+        defaults.removePersistentDomain(forName: name)
+        // Leave the test host on system so later tests aren't pinned dark.
+        AppAppearance.system.applyToApp()
     }
 
     func testOnboardingStepCountAndEyebrows() {
@@ -139,8 +173,44 @@ final class InkThemeTests: XCTestCase {
             darkHex = hexRGB(resolved: Ink.windowNSColor)
         }
         XCTAssertEqual(lightHex.uppercased(), "FFFFFF")
-        XCTAssertEqual(darkHex.uppercased(), "1E1E1E")
+        XCTAssertEqual(darkHex.uppercased(), "2C2C2E")
         XCTAssertNotEqual(lightHex, darkHex)
+    }
+
+    func testChromeInvertTokensResolve() {
+        // Light: primary plate is black; dark: graphite front (not glare white).
+        let aqua = NSAppearance(named: .aqua)!
+        let darkAqua = NSAppearance(named: .darkAqua)!
+        var lightPrimary = ""
+        var darkPrimary = ""
+        var lightMark = ""
+        var darkMark = ""
+        aqua.performAsCurrentDrawingAppearance {
+            lightPrimary = hexRGB(resolved: NSColor(Ink.primaryFill))
+            lightMark = hexRGB(resolved: NSColor(Ink.markFace))
+        }
+        darkAqua.performAsCurrentDrawingAppearance {
+            darkPrimary = hexRGB(resolved: NSColor(Ink.primaryFill))
+            darkMark = hexRGB(resolved: NSColor(Ink.markFace))
+        }
+        XCTAssertEqual(lightPrimary.uppercased(), "000000")
+        XCTAssertEqual(darkPrimary.uppercased(), "3A3A3D")
+        XCTAssertEqual(lightMark.uppercased(), "FFFFFF")
+        XCTAssertEqual(darkMark.uppercased(), "3A3A3D")
+        XCTAssertEqual(Ink.keycap, Ink.front)
+        XCTAssertEqual(Ink.tileFace, Ink.front)
+        XCTAssertEqual(Ink.onTile, Ink.label)
+        // Control border inverts: black in light, light hairline in dark.
+        var lightBorder = ""
+        var darkBorder = ""
+        aqua.performAsCurrentDrawingAppearance {
+            lightBorder = hexRGB(resolved: NSColor(Ink.controlBorder))
+        }
+        darkAqua.performAsCurrentDrawingAppearance {
+            darkBorder = hexRGB(resolved: NSColor(Ink.controlBorder))
+        }
+        XCTAssertEqual(lightBorder.uppercased(), "000000")
+        XCTAssertEqual(darkBorder.uppercased(), "F2F2F2")
     }
 
     func testWordmarkUsesSeparateBlockCursorNotInvertedH() {

@@ -10,7 +10,17 @@ The whole app is an **MS Paint** theme: manila **folder tabs** (not a toolbox si
 
 ### Brand mark
 
-`InkDtMark` / AppIcon: Departure Mono lowercase **d** + inverted **t** (white on black block) inside a **white** square with a **black** hard-offset bevel. Dark mode keeps the tile white; bevel uses `Ink.bevel` (`#1A1A1C`). Regenerate with `scripts/render_dt_icon.py`.
+`InkDtMark` / AppIcon: Departure Mono lowercase **d** + inverted **t** block inside a square with a hard-offset bevel.
+
+| | Light | Dark |
+| --- | --- | --- |
+| Tile (`markFace`) | `#FFFFFF` | `#3A3A3D` |
+| “d” + outer hairline (`markInk`) | `#000000` | `#F2F2F2` |
+| “t” block (`markInvertFace`) | `#000000` | `#F2F2F2` |
+| “t” letter (`markInvertInk`) | `#FFFFFF` | `#3A3A3D` |
+| Bevel | `Ink.bevel` | `Ink.bevel` (`#1A1A1C`) |
+
+AppIcon / README brand PNGs stay the light plate (white square). In-app mark follows the tokens above. Regenerate AppIcon with `scripts/render_dt_icon.py`.
 
 ### Dark graphite tokens
 
@@ -18,13 +28,20 @@ The whole app is an **MS Paint** theme: manila **folder tabs** (not a toolbox si
 | --- | --- | --- |
 | `window` | `#FFFFFF` | `#2C2C2E` |
 | `fill` / `card` (raised) | `#F0F0F0` / `#FFFFFF` | `#353538` |
-| `front` (selected tab + content) | `#FFFFFF` | `#3A3A3D` |
+| `front` / `tileFace` / `keycap` | `#FFFFFF` | `#3A3A3D` |
 | `hairline` | `#C0C0C0` | `#4A4A4E` |
-| `label` | `#000000` | `#F2F2F2` |
+| `label` / `onTile` | `#000000` | `#F2F2F2` |
 | `secondary` | `#666666` | `#A8A8AD` |
+| `primaryFill` (Start / selected chrome) | `#000000` | `#3A3A3D` |
+| `onPrimary` | `#FFFFFF` | `#F2F2F2` |
+| `controlBorder` | `#000000` | `#F2F2F2` |
 | `bevel` (double-pane offset) | `#000000` | `#1A1A1C` |
 
-Nothing in chrome should paint darker than `#1A1A1C` except the bevel itself. Route surfaces through `Ink.*` — no `Color.black` / system window materials for chrome.
+Nothing in chrome should paint darker than `#1A1A1C` except the bevel itself. Route surfaces through `Ink.*` — no hard-coded `Color.white` / `Color.black` for chrome controls (functional Paint swatches, annotation ink, and export canvases are the exceptions).
+
+### Copy
+
+Keep Home / page chrome airy. Version lives in the status bar only (no yellow badge next to the wordmark). Cut helper lines that restate what keycaps, stats, or controls already show. Hide the Home “Get started” checklist once all three items are done.
 
 ## Typography
 
@@ -38,7 +55,9 @@ Nothing in chrome should paint darker than `#1A1A1C` except the bevel itself. Ro
 
 ## Appearance
 
-`AppAppearance` (System / Light / Dark) lives in General settings and cycles from the menu-bar panel (`theme: …`). Applies via `NSApp.appearance`. `Ink.windowNSColor` must stay in sync with `Ink.window`.
+`AppAppearance` (System / Light / Dark) lives in General settings and cycles from the menu-bar panel (`theme: …`).
+
+**One source of truth:** `AppSettings.setAppearance` → `NSApp.appearance`. Ink tokens resolve via `NSColor(name:dynamicProvider:)`. Do **not** also apply `.preferredColorScheme` on Settings / onboarding / menu roots — that double-drives the tree and makes the General segment feel buggy (double-fire, flicker, sticky selection). `InkAppearanceSegment` writes only through its binding (no separate `onChange`). Re-tapping the selected mode is a no-op. `Ink.windowNSColor` must stay in sync with `Ink.window`. System mode leaves `NSApp.appearance = nil` so OS changes re-resolve live.
 
 ## Traffic lights
 

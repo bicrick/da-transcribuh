@@ -82,7 +82,6 @@ struct OnboardingFlow: View {
         .frame(width: OnboardingMetrics.width, height: OnboardingMetrics.height)
         .background(Ink.window)
         .tint(Ink.label)
-        .preferredColorScheme(settings.appearance.preferredColorScheme)
         .background(ShortcutCapture(active: $listening) { event in
             applyShortcut(event)
         })

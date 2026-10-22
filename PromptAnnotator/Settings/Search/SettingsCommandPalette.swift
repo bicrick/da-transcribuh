@@ -222,7 +222,8 @@ struct SettingsSearchAffordance: View {
             .foregroundStyle(Ink.secondary)
             .padding(.horizontal, Ink.space2)
             .padding(.vertical, 4)
-            .overlay(Rectangle().strokeBorder(Ink.hairline, lineWidth: 1))
+            .background(Ink.fill)
+            .overlay(Rectangle().strokeBorder(Ink.controlBorder, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .help("Search settings (⌘K)")

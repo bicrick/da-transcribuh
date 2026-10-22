@@ -13,10 +13,7 @@ struct ModelPage: View {
     @State private var didLoadKey = false
 
     var body: some View {
-        SettingsPageStack(
-            title: "Models",
-            subtitle: "On-device WhisperKit, your Core ML folders, or an OpenAI-compatible server for the final pass."
-        ) {
+        SettingsPageStack(title: "Models") {
             engineSection
             if settings.speechEngine == .whisperKit {
                 builtInSection

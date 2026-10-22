@@ -73,7 +73,6 @@ struct DTMenuBarPanel: View {
                 polishMenuBarWindow(window)
             }
         }
-        .preferredColorScheme(settings.appearance.preferredColorScheme)
     }
 
     // MARK: - Sections
@@ -207,12 +206,12 @@ private struct DTMenuRow: View {
 
     private var rowForeground: Color {
         if disabled { return Ink.tertiary }
-        if hovering { return Ink.onAccent }
+        if hovering { return Ink.onPrimary }
         return Ink.label
     }
 
     private var rowBackground: Color {
         if disabled { return .clear }
-        return hovering ? Ink.label : .clear
+        return hovering ? Ink.primaryFill : .clear
     }
 }

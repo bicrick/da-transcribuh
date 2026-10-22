@@ -55,7 +55,8 @@ struct SettingsRoot: View {
         }
         .tint(Ink.label)
         .background(Ink.window)
-        .preferredColorScheme(settings.appearance.preferredColorScheme)
+        // Appearance is driven only by NSApp.appearance (AppSettings.setAppearance).
+        // Do not also apply preferredColorScheme — double source of truth flickers chrome.
         .ignoresSafeArea(.container, edges: .top)
         .onAppear {
             settings.appearance.applyToApp()
