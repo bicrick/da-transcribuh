@@ -23,6 +23,26 @@ enum OnboardingStep: Int, CaseIterable {
     var eyebrow: String {
         "Step \(rawValue + 1) of \(OnboardingStep.allCases.count)"
     }
+
+    /// Short labels for the Paint step rail.
+    static let railLabels = ["Hi", "Perm", "Keys", "Model", "Try", "Go"]
+
+    var blurb: String? {
+        switch self {
+        case .welcome:
+            return "Talk, and capture the screen when you want the picture with the words."
+        case .permissions:
+            return "Three switches. Flip them, then Reopen so da transcribuh picks them up."
+        case .shortcut:
+            return "A tap starts. A second tap stops. Shift stays free for drawing."
+        case .model:
+            return "Download an English model before the first session. Balanced is the default."
+        case .practice:
+            return "A short take now — or skip and try later from Home."
+        case .ready:
+            return "The menu bar icon opens da transcribuh again anytime."
+        }
+    }
 }
 
 enum OnboardingMetrics {
@@ -48,7 +68,8 @@ struct OnboardingFlow: View {
             onboardingChrome
             DTScrollView {
                 VStack(alignment: .leading, spacing: Ink.sectionGap) {
-                    InkEyebrow(text: step.eyebrow)
+                    InkStepRail(current: step.rawValue, labels: OnboardingStep.railLabels)
+                    InkPageHeader(title: step.title, subtitle: step.blurb)
                     stepBody
                 }
                 .padding(.top, Ink.pageTop)
@@ -102,10 +123,10 @@ struct OnboardingFlow: View {
                 .fill(Ink.label)
                 .frame(height: 1)
             HStack(spacing: Ink.space3) {
-                InkStepDots(current: step.rawValue, total: OnboardingStep.allCases.count)
-                Text("\(step.rawValue + 1) of \(OnboardingStep.allCases.count)")
-                    .font(Ink.captionFont)
+                Text("\(step.rawValue + 1) / \(OnboardingStep.allCases.count)")
+                    .font(Ink.headingFont)
                     .foregroundStyle(Ink.secondary)
+                    .monospacedDigit()
                 Spacer(minLength: Ink.space2)
                 if step != .ready {
                     Button("Skip setup") { finishSetup() }
@@ -172,10 +193,7 @@ struct OnboardingFlow: View {
                         .foregroundStyle(Ink.secondary)
                 }
             }
-            Text(step.title)
-                .font(Ink.onboardingHeroFont)
-                .foregroundStyle(Ink.label)
-            Text("Talk, and capture the screen when you want the picture with the words. This beta is free and open source.")
+            Text("This beta is free and open source.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -190,10 +208,7 @@ struct OnboardingFlow: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Ink.space5)
             }
-            Text(step.title)
-                .font(Ink.onboardingHeroFont)
-                .foregroundStyle(Ink.label)
-            Text("The menu bar icon opens da transcribuh again. \(settings.chord.display) starts a session and stops it. While da transcribuh is saving or transcribing, the icon changes so you can see it working.")
+            Text("\(settings.chord.display) starts a session and stops it. While da transcribuh is saving or transcribing, the icon changes so you can see it working.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -203,9 +218,6 @@ struct OnboardingFlow: View {
 
     private var permissionsCard: some View {
         VStack(alignment: .leading, spacing: Ink.space3) {
-            Text(step.title)
-                .font(Ink.stepTitleFont)
-                .foregroundStyle(Ink.label)
             InkCard {
                 VStack(alignment: .leading, spacing: 0) {
                     permissionRow(
@@ -297,10 +309,7 @@ struct OnboardingFlow: View {
 
     private var shortcutCard: some View {
         VStack(alignment: .leading, spacing: Ink.space3) {
-            Text(step.title)
-                .font(Ink.stepTitleFont)
-                .foregroundStyle(Ink.label)
-            Text("A tap starts. A second tap stops. The menu bar repeats this chord so you can find it later. Shift stays free, because Shift is how you draw.")
+            Text("The menu bar repeats this chord so you can find it later.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -337,10 +346,7 @@ struct OnboardingFlow: View {
 
     private var modelCard: some View {
         VStack(alignment: .leading, spacing: Ink.space3) {
-            Text(step.title)
-                .font(Ink.stepTitleFont)
-                .foregroundStyle(Ink.label)
-            Text("Download an English model before the first session. Balanced is the one this app is built around. The first download can take a minute on a slow network.")
+            Text("The first download can take a minute on a slow network. Keep this window open.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -370,9 +376,6 @@ struct OnboardingFlow: View {
 
     private var practiceCard: some View {
         VStack(alignment: .leading, spacing: Ink.space3) {
-            Text(step.title)
-                .font(Ink.stepTitleFont)
-                .foregroundStyle(Ink.label)
             InkCard {
                 VStack(alignment: .leading, spacing: 0) {
                     guideRow("1", "Talk for a few seconds, or stay quiet — both paths are fine.")
@@ -382,7 +385,7 @@ struct OnboardingFlow: View {
                     guideRow("3", "Hold Shift to annotate. Release Shift to save that tile.")
                 }
             }
-            Text("Try a short take now. da transcribuh stops after about five seconds and shows what happened.")
+            Text("da transcribuh stops after about five seconds and shows what happened.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
