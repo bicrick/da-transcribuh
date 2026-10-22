@@ -175,18 +175,21 @@ enum Ink {
     static let sidebarTileLabelFont = mono(11)
     static let sidebarSectionFont = headingFont
     static let menuBarItemFont = labelFont
-    static let menuBarMetaFont = captionFont
+    /// Menu meta / version strings — Departure Mono upright (not system mono).
+    static let menuBarMetaFont = statusFont
     static let microFont = mono(11)
 
-    /// Departure Mono for chrome. Falls back to **system monospaced only** — never proportional.
+    /// Departure Mono for chrome. Falls back to **system monospaced only** — never proportional,
+    /// never italic/oblique (Departure has no italic face; do not synthesize slant).
     static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         _ = weight
+        let ns = InkFontRegistrar.resolveNSFont(size: size)
         for name in InkFontRegistrar.candidateNames {
             if NSFont(name: name, size: size) != nil {
                 return Font.custom(name, size: size)
             }
         }
-        return Font.system(size: size, weight: .regular, design: .monospaced)
+        return Font(ns)
     }
 
     static var monoIsRegistered: Bool {

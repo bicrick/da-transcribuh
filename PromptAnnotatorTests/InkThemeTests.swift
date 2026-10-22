@@ -58,8 +58,12 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.sectionTitleFont, Ink.headingFont)
         XCTAssertEqual(Ink.rowTitleFont, Ink.labelFont)
         XCTAssertEqual(Ink.statValueFont, Ink.numberFont)
+        XCTAssertEqual(Ink.menuBarMetaFont, Ink.statusFont)
         // mono() must resolve even when the OTF is missing (system mono fallback).
         _ = Ink.mono(13)
+        // Chrome fonts stay upright — never synthesize italic/oblique.
+        let resolved = InkFontRegistrar.resolveNSFont(size: 13)
+        XCTAssertFalse(resolved.fontDescriptor.symbolicTraits.contains(.italic))
     }
 
     func testOnboardingRailLabelsMatchStepCount() {

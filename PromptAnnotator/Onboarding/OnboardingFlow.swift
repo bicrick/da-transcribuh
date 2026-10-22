@@ -188,7 +188,7 @@ struct OnboardingFlow: View {
                 VStack(alignment: .leading, spacing: Ink.titleDescGap) {
                     DTWordmark(size: 18, blinks: true)
                     Text(AppVersion.label)
-                        .font(Ink.captionFont)
+                        .font(Ink.mono(11))
                         .foregroundStyle(Ink.secondary)
                 }
             }

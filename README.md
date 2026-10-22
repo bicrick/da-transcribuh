@@ -25,9 +25,11 @@
 
 ## look
 
-ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset shadows, and a toolbox sidebar. departure mono for every “da transcribuh” wordmark and chrome label; sf mono for longer copy. custom thin scrollers. system / light / dark from general (or cycle `theme: …` in the menu bar).
+ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset shadows, and a toolbox sidebar. departure mono for every “da transcribuh” wordmark and chrome label (lowercase, block cursor only after the h — never italic). sf mono for longer copy. custom thin scrollers.
 
-light backgrounds stay white; dark is charcoal (~#1e1e1e), not pure black — surfaces a step lighter, hairlines soft gray, text off-white. paint accents stay vivid. color lives in the palette strip, tool chips, progress, meters, traffic lights, the record mark, and paint-green checks. airy margins, fewer boxed cards.
+appearance is system / light / dark from **general**, or mash `theme: …` in the menu bar to cycle. light stays white; dark is charcoal (~#1e1e1e), not crushed black — surfaces a step lighter, hairlines soft gray, text off-white. paint accents stay vivid.
+
+the start/stop chord lives in **general** as paint keycaps — click, press a combo (modifier required, or a function key), it rebinds live. reset drops you back on ⌃⌥Space. home, the status bar, the menu panel, and onboarding all read the same stored shortcut.
 
 the recording island matches home: paint-red record square, cyan waveform comb, hard offset shadow drawn inside the panel, departure mono clock, tiny palette strip. same footprint and hit targets — no new timers.
 
@@ -77,7 +79,7 @@ macos 14 or later. the first build fetches whisperkit.
 - hold **shift** and drag to grab a piece of the screen. release shift to keep the tile. stop the session and you get the picture with the words.
 - sessions save under `~/Documents/PromptAnnotator/Sessions/` (folder name stays put so your history doesn’t vanish).
 - on-device speech via whisperkit. bring your own core ml folder or hugging face variant if you want. optional openai-compatible server for the final transcript only.
-- settings window with a tool-palette sidebar, status bar, and the appearance switcher above. models page for downloads and byom.
+- settings window with a tool-palette sidebar, status bar, paint keycap shortcut recorder in general, and the appearance switcher (or `theme: …` in the menu bar). models page for downloads and byom.
 
 ## shortcuts
 

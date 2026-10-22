@@ -73,7 +73,7 @@ enum FontMetrics {
         }
         for candidate in candidates {
             if let usable = usable(candidate) {
-                return usable
+                return mono ? InkFontRegistrar.upright(usable) : usable
             }
         }
         return nil

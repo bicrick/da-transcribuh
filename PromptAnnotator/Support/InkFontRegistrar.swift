@@ -47,10 +47,20 @@ enum InkFontRegistrar {
     static func resolveNSFont(size: CGFloat) -> NSFont {
         for name in candidateNames {
             if let font = NSFont(name: name, size: size) {
-                return font
+                return upright(font)
             }
         }
-        return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+        return upright(NSFont.monospacedSystemFont(ofSize: size, weight: .regular))
+    }
+
+    /// Strip italic/oblique traits — Departure Mono has no italic; never synthesize slant.
+    static func upright(_ font: NSFont) -> NSFont {
+        var traits = font.fontDescriptor.symbolicTraits
+        traits.remove(.italic)
+        guard let descriptor = font.fontDescriptor.withSymbolicTraits(traits) else {
+            return font
+        }
+        return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
     }
 
     static var isDepartureAvailable: Bool {
