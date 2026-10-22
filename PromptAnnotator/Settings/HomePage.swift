@@ -6,15 +6,28 @@ struct HomePage: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var permissions: PermissionModel
     var sessions: [SessionSummary]
+    /// Open History; pass a session id to select that row, or nil for the list.
+    var onOpenHistory: (String?) -> Void = { _ in }
+    var onOpenModels: () -> Void = {}
+    var onOpenSound: () -> Void = {}
+
+    @State private var getStartedComplete = HomeGetStartedStore.isComplete()
+    @State private var hoveredRecentID: String?
 
     var body: some View {
         DTScrollView {
             VStack(alignment: .leading, spacing: Ink.sectionGap) {
                 hero
                 stats
-                SettingsSection(title: "Get started") {
-                    checklist
+                if showGetStarted {
+                    SettingsSection(title: "Get started") {
+                        checklist
+                    }
+                } else {
+                    thisWeek
+                    recentSection
                 }
+                statusLine
                 tips
             }
             .padding(.top, Ink.pageTop)
@@ -24,10 +37,31 @@ struct HomePage: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .inkPageChrome()
-        .onAppear { permissions.refresh() }
+        .onAppear {
+            permissions.refresh()
+            syncGetStartedFlag()
+        }
+        .onChange(of: sessions.count) { _, _ in syncGetStartedFlag() }
+        .onReceive(permissions.objectWillChange) { _ in
+            // Refresh after permission flips so completion can persist once.
+            DispatchQueue.main.async { syncGetStartedFlag() }
+        }
     }
 
-    /// Pre-#9 hero, minus yellow version badge, tagline, and shortcut caption.
+    private var showGetStarted: Bool {
+        !getStartedComplete
+    }
+
+    private func syncGetStartedFlag() {
+        guard !getStartedComplete else { return }
+        if checklistItems.allSatisfy(\.done) {
+            HomeGetStartedStore.markComplete()
+            getStartedComplete = true
+        }
+    }
+
+    // MARK: - Hero / stats (unchanged layout)
+
     private var hero: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: Ink.space4) {
@@ -98,7 +132,6 @@ struct HomePage: View {
                     Text(item.1.uppercased())
                         .font(Ink.headingFont)
                         .foregroundStyle(Ink.secondary)
-                    // Full-column neutral rule — per-stat colors moved to folder tabs.
                     Rectangle()
                         .fill(Ink.statRule)
                         .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
@@ -109,6 +142,8 @@ struct HomePage: View {
             }
         }
     }
+
+    // MARK: - Get started (incomplete only)
 
     private var checklist: some View {
         let items = checklistItems
@@ -161,6 +196,268 @@ struct HomePage: View {
             }
         }
     }
+
+    // MARK: - This week
+
+    private var thisWeek: some View {
+        let counts = SessionLibrary.weeklyWordCounts(from: sessions)
+        let maxCount = max(counts.max() ?? 0, 1)
+        let initials = weekDayInitials()
+        return VStack(alignment: .leading, spacing: Ink.space2) {
+            Text("THIS WEEK")
+                .font(Ink.headingFont)
+                .foregroundStyle(Ink.label)
+            HStack(alignment: .bottom, spacing: Ink.space2) {
+                ForEach(0..<7, id: \.self) { index in
+                    let value = counts[index]
+                    let isToday = index == 6
+                    VStack(spacing: Ink.space1) {
+                        RoundedRectangle(cornerRadius: 1, style: .continuous)
+                            .fill(isToday ? Ink.paintRed : Ink.label)
+                            .frame(
+                                width: 10,
+                                height: max(4, CGFloat(value) / CGFloat(maxCount) * 36)
+                            )
+                            .opacity(value == 0 && !isToday ? 0.25 : (isToday ? 1 : 0.7))
+                        Text(initials[index])
+                            .font(Ink.captionFont)
+                            .foregroundStyle(isToday ? Ink.label : Ink.tertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel("\(initials[index]), \(value) words")
+                }
+            }
+            .frame(height: 56, alignment: .bottom)
+        }
+    }
+
+    private func weekDayInitials(now: Date = Date(), calendar: Calendar = .current) -> [String] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEEE" // single-letter weekday
+        let today = calendar.startOfDay(for: now)
+        return (0..<7).map { offset in
+            let day = calendar.date(byAdding: .day, value: offset - 6, to: today) ?? today
+            return formatter.string(from: day).uppercased()
+        }
+    }
+
+    // MARK: - Recent
+
+    private var recentSection: some View {
+        let rows = SessionLibrary.recent(sessions, limit: 4)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("RECENT")
+                    .font(Ink.headingFont)
+                    .foregroundStyle(Ink.label)
+                Spacer(minLength: Ink.space2)
+                Button("All in History →") {
+                    onOpenHistory(nil)
+                }
+                .buttonStyle(.plain)
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
+                .accessibilityLabel("All in History")
+            }
+            .padding(.bottom, Ink.space2)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Ink.hairline).frame(height: 1)
+            }
+
+            if rows.isEmpty {
+                Text("No sessions yet — press Start for your first take.")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .padding(.vertical, Ink.space3)
+            } else {
+                ForEach(rows) { summary in
+                    recentRow(summary)
+                }
+            }
+        }
+    }
+
+    private func recentRow(_ summary: SessionSummary) -> some View {
+        let hovering = hoveredRecentID == summary.id
+        return HStack(alignment: .center, spacing: Ink.space3) {
+            Button {
+                onOpenHistory(summary.id)
+            } label: {
+                HStack(alignment: .center, spacing: Ink.space3) {
+                    Text(SessionLibrary.recentWhen(summary.started))
+                        .font(Ink.labelFont)
+                        .foregroundStyle(Ink.secondary)
+                        .monospacedDigit()
+                        .frame(width: 52, alignment: .leading)
+                        .lineLimit(1)
+
+                    Text(summary.preview.isEmpty ? "No speech" : summary.preview)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(summary.preview.isEmpty ? Ink.tertiary : Ink.label)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text("\(summary.words)")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .monospacedDigit()
+                        .frame(width: 40, alignment: .trailing)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if hovering {
+                Button("Copy") { copy(summary) }
+                    .buttonStyle(InkSecondaryButtonStyle())
+            }
+
+            recentThumb(summary)
+        }
+        .padding(.vertical, Ink.space3)
+        .onHover { over in
+            if over {
+                hoveredRecentID = summary.id
+            } else if hoveredRecentID == summary.id {
+                hoveredRecentID = nil
+            }
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Ink.hairline).frame(height: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(recentAccessibility(summary))
+        .accessibilityAddTraits(.isButton)
+    }
+
+    @ViewBuilder
+    private func recentThumb(_ summary: SessionSummary) -> some View {
+        let side: CGFloat = 28
+        if let url = SessionLibrary.thumbnailURL(for: summary),
+           let image = NSImage(contentsOf: url) {
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: side, height: side)
+                .clipped()
+                .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+        } else {
+            Rectangle()
+                .fill(Color.clear)
+                .frame(width: side, height: side)
+        }
+    }
+
+    private func recentAccessibility(_ summary: SessionSummary) -> String {
+        let when = SessionLibrary.recentWhen(summary.started)
+        let text = summary.preview.isEmpty ? "No speech" : summary.preview
+        return "\(when), \(text), \(summary.words) words"
+    }
+
+    private func copy(_ summary: SessionSummary) {
+        let image = NSImage(contentsOf: summary.url.appendingPathComponent("sheet.png"))
+        SessionClipboard.copy(image: image, transcript: summary.transcript)
+    }
+
+    // MARK: - Status line
+
+    private var statusLine: some View {
+        let issue = homeStatusIssue
+        return HStack(alignment: .center, spacing: Ink.space2) {
+            if let issue {
+                Circle()
+                    .fill(Ink.paintRed)
+                    .frame(width: 8, height: 8)
+                Text(issue.message)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.label)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: Ink.space2)
+                Button(issue.actionTitle) { issue.action() }
+                    .buttonStyle(InkSecondaryButtonStyle())
+            } else {
+                Text(homeStatusOK)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.vertical, Ink.space2)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var homeStatusOK: String {
+        let model = modelStatusLabel
+        let mic = micDisplayName
+        return "\(model) · \(mic) · Permissions OK"
+    }
+
+    private var modelStatusLabel: String {
+        if settings.speechEngine == .openAICompatible {
+            return OpenAICompatibleTranscriber.isConfigured()
+                ? "Server model ready"
+                : "Server key missing"
+        }
+        if WhisperKitTranscriber.modelIsInstalled() {
+            return settings.speechModel
+        }
+        return "Model not downloaded"
+    }
+
+    private var micDisplayName: String {
+        let uid = settings.inputDeviceUID
+        if uid.isEmpty { return "System mic" }
+        return AudioInputs.devices().first(where: { $0.id == uid })?.name ?? "Mic unavailable"
+    }
+
+    private struct HomeStatusIssue {
+        var message: String
+        var actionTitle: String
+        var action: () -> Void
+    }
+
+    private var homeStatusIssue: HomeStatusIssue? {
+        if !permissions.status.isReady {
+            let missing = permissions.status.summary ?? "permissions"
+            return HomeStatusIssue(
+                message: "Turn on \(missing).",
+                actionTitle: "Fix",
+                action: {
+                    Permissions.revealSettings(for: Permissions.current())
+                    permissions.refresh()
+                }
+            )
+        }
+        if settings.speechEngine == .openAICompatible {
+            if !OpenAICompatibleTranscriber.isConfigured() {
+                return HomeStatusIssue(
+                    message: "Add a server API key on Models.",
+                    actionTitle: "Models",
+                    action: onOpenModels
+                )
+            }
+        } else if !WhisperKitTranscriber.modelIsInstalled() {
+            return HomeStatusIssue(
+                message: "Download a speech model on Models.",
+                actionTitle: "Models",
+                action: onOpenModels
+            )
+        }
+        let uid = settings.inputDeviceUID
+        if !uid.isEmpty, AudioInputs.devices().first(where: { $0.id == uid }) == nil {
+            return HomeStatusIssue(
+                message: "Chosen mic is unavailable.",
+                actionTitle: "Sound",
+                action: onOpenSound
+            )
+        }
+        return nil
+    }
+
+    // MARK: - Tips (unchanged)
 
     private var tips: some View {
         HStack(alignment: .top, spacing: Ink.gridGap) {
@@ -218,6 +515,8 @@ struct HomePage: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    // MARK: - Checklist data
 
     private struct ChecklistItem {
         var done: Bool

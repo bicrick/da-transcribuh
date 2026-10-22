@@ -356,42 +356,67 @@ def render(pal: dict) -> Image.Image:
         d.text((x, sy + 36 * S), lab, font=font_departure(11 * S), fill=c(pal, "secondary"))
         d.rectangle([x, sy + 52 * S, x + col_w, sy + 52 * S + 4 * S], fill=c(pal, "stat_rule"), outline=c(pal, "label"), width=1)
 
-    # Get Started
-    gy = sy + 80 * S
-    d.text((PAGE_SIDE, gy), "GET STARTED", font=font_departure(11 * S), fill=c(pal, "label"))
-    d.rectangle([PAGE_SIDE, gy + 20 * S, W - PAGE_SIDE, gy + 20 * S + 1], fill=c(pal, "hairline"))
-    d.text((PAGE_SIDE, gy + 32 * S), "3 OF 3 DONE", font=font_departure(11 * S), fill=c(pal, "label"))
-    bar_x = PAGE_SIDE + 120 * S
-    bar_y = gy + 34 * S
-    bar_w = W - PAGE_SIDE - bar_x
-    d.rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + 8 * S], fill=hex_rgb("#B5E61D"), outline=c(pal, "label"), width=max(2, int(S)))
-
-    items = [
-        ("Permissions", "Screen Recording, Microphone, and Accessibility are on."),
-        ("Speech model", "Balanced (small.en_217MB) is on this Mac."),
-        ("First take", "172 sessions in History."),
-    ]
-    iy = gy + 56 * S
-    for title, detail in items:
-        # green check box (drawn, not tofu)
-        d.rectangle([PAGE_SIDE, iy, PAGE_SIDE + 16 * S, iy + 16 * S], fill=hex_rgb("#22B14C"), outline=c(pal, "label"), width=max(2, int(S)))
-        # checkmark via lines
-        d.line(
-            [
-                (PAGE_SIDE + 3 * S, iy + 8 * S),
-                (PAGE_SIDE + 6 * S, iy + 12 * S),
-                (PAGE_SIDE + 13 * S, iy + 4 * S),
-            ],
-            fill=hex_rgb("#000000"),
-            width=max(2, int(S)),
+    # THIS WEEK (completed Home — Get Started dismissed)
+    gy = sy + 72 * S
+    d.text((PAGE_SIDE, gy), "THIS WEEK", font=font_departure(11 * S), fill=c(pal, "label"))
+    week = [12, 40, 8, 90, 55, 20, 70]  # words/day, last = today
+    peak = max(week) or 1
+    bar_base = gy + 56 * S
+    day_letters = ["F", "S", "S", "M", "T", "W", "T"]
+    slot = (W - 2 * PAGE_SIDE) / 7
+    for i, (val, letter) in enumerate(zip(week, day_letters)):
+        cx = PAGE_SIDE + i * slot + slot / 2
+        bh = max(4 * S, (val / peak) * 36 * S)
+        is_today = i == 6
+        color = hex_rgb("#ED1C24") if is_today else c(pal, "label")
+        d.rectangle(
+            [cx - 5 * S, bar_base - bh, cx + 5 * S, bar_base],
+            fill=color,
         )
-        d.text((PAGE_SIDE + 24 * S, iy - 2 * S), title, font=font_departure(13 * S), fill=c(pal, "label"))
-        d.text((PAGE_SIDE + 24 * S, iy + 16 * S), detail, font=font_departure(11 * S), fill=c(pal, "secondary"))
+        d.text(
+            (cx - 4 * S, bar_base + 4 * S),
+            letter,
+            font=font_departure(11 * S),
+            fill=c(pal, "label" if is_today else "secondary"),
+        )
+
+    # RECENT
+    ry = bar_base + 28 * S
+    d.text((PAGE_SIDE, ry), "RECENT", font=font_departure(11 * S), fill=c(pal, "label"))
+    link = "All in History →"
+    lw, _ = text_size(d, link, font_departure(11 * S))
+    d.text((W - PAGE_SIDE - lw, ry), link, font=font_departure(11 * S), fill=c(pal, "secondary"))
+    d.rectangle([PAGE_SIDE, ry + 18 * S, W - PAGE_SIDE, ry + 18 * S + 1], fill=c(pal, "hairline"))
+    recent = [
+        ("11:42", "Ship the folder tabs and keep the Start button inverted.", "86", True),
+        ("Tue", "Dictate the standup notes while capturing the board.", "42", True),
+        ("Mon", "No speech", "0", False),
+        ("Oct 12", "Quick reply about the notarized build.", "19", False),
+    ]
+    iy = ry + 28 * S
+    for when, preview, words, has_thumb in recent:
+        d.text((PAGE_SIDE, iy + 6 * S), when, font=font_departure(13 * S), fill=c(pal, "secondary"))
+        d.text((PAGE_SIDE + 64 * S, iy + 8 * S), preview, font=font_departure(11 * S), fill=c(pal, "label"))
+        ww, _ = text_size(d, words, font_departure(11 * S))
+        d.text((W - PAGE_SIDE - 40 * S - ww, iy + 8 * S), words, font=font_departure(11 * S), fill=c(pal, "secondary"))
+        if has_thumb:
+            tx0 = W - PAGE_SIDE - 28 * S
+            d.rectangle([tx0, iy, tx0 + 28 * S, iy + 28 * S], fill=c(pal, "fill"), outline=c(pal, "label"), width=max(1, int(S)))
+            d.rectangle([tx0 + 6 * S, iy + 8 * S, tx0 + 22 * S, iy + 20 * S], outline=c(pal, "secondary"), width=max(1, int(S)))
         d.rectangle([PAGE_SIDE, iy + 36 * S, W - PAGE_SIDE, iy + 36 * S + 1], fill=c(pal, "hairline"))
-        iy += 48 * S
+        iy += 44 * S
+
+    # Status line (quiet OK)
+    d.text(
+        (PAGE_SIDE, iy + 4 * S),
+        "small.en_217MB · System mic · Permissions OK",
+        font=font_departure(11 * S),
+        fill=c(pal, "secondary"),
+    )
+    iy += 28 * S
 
     # Tips
-    ty = iy + 16 * S
+    ty = iy + 8 * S
     tip_w = (W - 2 * PAGE_SIDE - 16 * S) / 2
     tips = [
         (

@@ -103,7 +103,18 @@ struct SettingsRoot: View {
     private var detail: some View {
         switch page {
         case .home:
-            HomePage(session: session, settings: settings, permissions: permissions, sessions: sessions)
+            HomePage(
+                session: session,
+                settings: settings,
+                permissions: permissions,
+                sessions: sessions,
+                onOpenHistory: { id in
+                    page = .history
+                    selectHistoryID = id
+                },
+                onOpenModels: { page = .model },
+                onOpenSound: { page = .sound }
+            )
         case .history:
             HistoryPage(
                 sessions: sessions,

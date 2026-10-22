@@ -100,4 +100,65 @@ enum SessionLibrary {
         if line.count <= 90 { return line }
         return String(line.prefix(89)) + "..."
     }
+
+    /// Newest-first slice for Home RECENT (same sort as `load()` / History).
+    static func recent(_ sessions: [SessionSummary], limit: Int = 4) -> [SessionSummary] {
+        Array(sessions.prefix(max(0, limit)))
+    }
+
+    /// Words spoken on each of the last 7 calendar days (index 0 = six days ago, 6 = today).
+    static func weeklyWordCounts(
+        from sessions: [SessionSummary],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [Int] {
+        let today = calendar.startOfDay(for: now)
+        guard let start = calendar.date(byAdding: .day, value: -6, to: today) else {
+            return Array(repeating: 0, count: 7)
+        }
+        var counts = Array(repeating: 0, count: 7)
+        for session in sessions {
+            guard let started = session.started else { continue }
+            let day = calendar.startOfDay(for: started)
+            guard day >= start, day <= today else { continue }
+            let offset = calendar.dateComponents([.day], from: start, to: day).day ?? -1
+            guard offset >= 0, offset < 7 else { continue }
+            counts[offset] += session.words
+        }
+        return counts
+    }
+
+    /// Relative label for RECENT rows: `11:42` today, weekday if this week, else a short date.
+    static func recentWhen(
+        _ date: Date?,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String {
+        guard let date else { return "—" }
+        let today = calendar.startOfDay(for: now)
+        let day = calendar.startOfDay(for: date)
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        if calendar.isDate(date, inSameDayAs: now) {
+            formatter.dateFormat = "H:mm"
+            return formatter.string(from: date)
+        }
+        if let weekAgo = calendar.date(byAdding: .day, value: -6, to: today), day >= weekAgo {
+            formatter.dateFormat = "EEE"
+            return formatter.string(from: date)
+        }
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+
+    /// Contact-sheet thumbnail when the session has captures.
+    static func thumbnailURL(for session: SessionSummary) -> URL? {
+        guard session.tiles > 0 else { return nil }
+        let sheet = session.url.appendingPathComponent("sheet.png")
+        if FileManager.default.fileExists(atPath: sheet.path) { return sheet }
+        let frame = session.url.appendingPathComponent("frames/01.png")
+        if FileManager.default.fileExists(atPath: frame.path) { return frame }
+        return nil
+    }
 }

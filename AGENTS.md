@@ -46,6 +46,10 @@ Home keeps the pre-declutter structure (stats grid, Get Started checklist, tip t
 
 Selected folder tab merges into the page: fill is `Ink.front`, the shelf hairline is interrupted under it (`ShelfHairline` + preference frame), and the tab bleeds 1pt over the rule. Unselected tabs stay on `Ink.fill` with the hairline under them. README mocks: `scripts/render_home_mocks.py` (angled `FolderTabShape`, DejaVu for ⌃⌥⌘).
 
+### Home after Get Started
+
+`HomeGetStartedStore` (`home.getStarted.complete`) dismisses the checklist permanently once all three steps are done. Home then shows **THIS WEEK** (7 neutral word bars, today in `Ink.paintRed`) and **RECENT** (last 4 `SessionLibrary` rows → History on click; hover Copy). A quiet **status** line sits above the tip tiles; regressions (permissions / model / mic) show a red-dot warning with a fix control — never revive the checklist. Helpers: `SessionLibrary.recent`, `weeklyWordCounts`, `recentWhen`, `thumbnailURL`.
+
 ## Typography
 
 - Chrome labels: Departure Mono (`DepartureMono-Regular`, `ATSApplicationFontsPath=Fonts`)
