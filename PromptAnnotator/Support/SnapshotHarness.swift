@@ -17,6 +17,12 @@ enum SnapshotHarness {
             .compactMap { SettingsPage(rawValue: String($0)) }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
+            // Optional `-DTSnapshotContentSize 1040x880` to prove adaptive layouts.
+            if let size = UserDefaults.standard.string(forKey: "DTSnapshotContentSize")?
+                .split(separator: "x").compactMap({ Double($0) }), size.count == 2,
+               let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView.flatMap(pageScroll(in:)) != nil }) {
+                window.setContentSize(NSSize(width: size[0], height: size[1]))
+            }
             for page in pages {
                 select(page)
                 try? await Task.sleep(nanoseconds: 1_200_000_000)
@@ -28,6 +34,8 @@ enum SnapshotHarness {
                 scroll.reflectScrolledClipView(scroll.contentView)
                 try? await Task.sleep(nanoseconds: 400_000_000)
                 write(window.contentView?.superview ?? content, to: "\(dir)/\(page.rawValue)-top.png")
+                let fits = doc.frame.height <= scroll.contentView.bounds.height + 0.5
+                FileHandle.standardError.write(Data("dtfit \(page.rawValue) doc=\(Int(doc.frame.height)) viewport=\(Int(scroll.contentView.bounds.height)) window=\(Int(window.frame.width))x\(Int(window.frame.height)) \(fits ? "FITS" : "SCROLLS")\n".utf8))
                 let maxY = max(0, doc.frame.height - scroll.contentView.bounds.height)
                 scroll.contentView.scroll(to: NSPoint(x: 0, y: doc.isFlipped ? maxY : 0))
                 scroll.reflectScrolledClipView(scroll.contentView)
