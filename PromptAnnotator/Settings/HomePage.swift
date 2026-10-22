@@ -31,11 +31,6 @@ struct HomePage: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: Ink.space4) {
                 AppLogo(side: 48)
-                    .background(
-                        Rectangle()
-                            .fill(Ink.paintBlue)
-                            .offset(x: Ink.hardShadow, y: Ink.hardShadow)
-                    )
                 VStack(alignment: .leading, spacing: Ink.titleDescGap) {
                     HStack(spacing: Ink.space2) {
                         DTWordmark(size: 20)
@@ -191,14 +186,14 @@ struct HomePage: View {
     private var tips: some View {
         HStack(alignment: .top, spacing: Ink.gridGap) {
             tipColumn(
-                color: Ink.paintCyan,
+                color: Color.white,
                 glyph: "viewfinder",
                 title: "Talk, or drag to capture",
                 detail: "Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.",
                 trailing: nil
             )
             tipColumn(
-                color: Ink.paintOrange,
+                color: Color.white,
                 glyph: "folder.fill",
                 title: "Sessions folder",
                 detail: SessionStore.displayPath(),

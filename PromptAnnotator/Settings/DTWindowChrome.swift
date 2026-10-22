@@ -11,11 +11,8 @@ struct DTTitleStrip: View {
             HStack(spacing: 0) {
                 DTTrafficLights()
                     .padding(.leading, Ink.space3)
-                    .zIndex(1)
+                    .zIndex(2)
                 Spacer(minLength: 0)
-                InkPaintSwatchStrip(size: 9, limit: 10)
-                    .padding(.trailing, Ink.space4)
-                    .allowsHitTesting(false)
             }
 
             DTWordmark(size: 13)
@@ -41,7 +38,7 @@ struct DTTitleStrip: View {
 
 // MARK: - Traffic lights
 
-private enum DTWindowButtonKind {
+enum DTWindowButtonKind {
     case close
     case miniaturize
     case zoom
@@ -70,10 +67,16 @@ private enum DTWindowButtonKind {
         }
     }
 
+    /// Direct window ops — avoid `performClose` / `performMiniaturize`, which no-op when
+    /// the stock buttons are hidden (fullSizeContentView + custom strip).
     func perform(on window: NSWindow) {
         switch self {
         case .close:
-            window.performClose(nil)
+            // Menu-bar companion: hide without quitting. Matches ⌘W / red light expectation.
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
+            window.orderOut(nil)
         case .miniaturize:
             window.miniaturize(nil)
         case .zoom:
@@ -84,42 +87,52 @@ private enum DTWindowButtonKind {
 
 struct DTTrafficLights: View {
     @State private var windowIsKey = true
+    /// Group hover — all three glyphs appear together, like stock macOS lights.
+    @State private var groupHovering = false
 
     var body: some View {
         HStack(spacing: Ink.space2) {
-            DTTrafficLight(kind: .close, isKey: windowIsKey)
-            DTTrafficLight(kind: .miniaturize, isKey: windowIsKey)
-            DTTrafficLight(kind: .zoom, isKey: windowIsKey)
+            DTTrafficLight(kind: .close, isKey: windowIsKey, showGlyph: groupHovering)
+            DTTrafficLight(kind: .miniaturize, isKey: windowIsKey, showGlyph: groupHovering)
+            DTTrafficLight(kind: .zoom, isKey: windowIsKey, showGlyph: groupHovering)
         }
+        .padding(4)
+        .contentShape(Rectangle())
+        .onHover { groupHovering = $0 }
         .accessibilityElement(children: .contain)
-        .onAppear { refreshKey() }
+        .onAppear { refreshKey(for: SettingsPresenter.shared.attachedWindow) }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
-            if note.object as AnyObject? === SettingsPresenter.shared.attachedWindow {
+            if let window = note.object as? NSWindow, isOurWindow(window) {
                 windowIsKey = true
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { note in
-            if note.object as AnyObject? === SettingsPresenter.shared.attachedWindow {
+            if let window = note.object as? NSWindow, isOurWindow(window) {
                 windowIsKey = false
             }
         }
     }
 
-    private func refreshKey() {
-        windowIsKey = SettingsPresenter.shared.attachedWindow?.isKeyWindow ?? true
+    private func isOurWindow(_ window: NSWindow) -> Bool {
+        window === SettingsPresenter.shared.attachedWindow
+            || window === OnboardingPresenter.shared.attachedWindow
+    }
+
+    private func refreshKey(for window: NSWindow?) {
+        windowIsKey = window?.isKeyWindow ?? (SettingsPresenter.shared.attachedWindow?.isKeyWindow ?? true)
     }
 }
 
 private struct DTTrafficLight: View {
     let kind: DTWindowButtonKind
     var isKey: Bool
-    @State private var hovering = false
+    var showGlyph: Bool
 
     private let diameter: CGFloat = 12
 
     var body: some View {
         Button {
-            guard let window = SettingsPresenter.shared.attachedWindow else { return }
+            guard let window = resolvedWindow() else { return }
             kind.perform(on: window)
         } label: {
             ZStack {
@@ -127,7 +140,7 @@ private struct DTTrafficLight: View {
                     .fill(isKey ? kind.paintFill : Ink.window)
                 Circle()
                     .strokeBorder(Ink.label, lineWidth: 1)
-                if hovering {
+                if showGlyph {
                     Text(kind.glyph)
                         .font(.system(size: 8, weight: .bold))
                         .foregroundStyle(Ink.label)
@@ -138,9 +151,14 @@ private struct DTTrafficLight: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
         .help(kind.accessibilityLabel)
         .accessibilityLabel(kind.accessibilityLabel)
+    }
+
+    private func resolvedWindow() -> NSWindow? {
+        SettingsPresenter.shared.attachedWindow
+            ?? OnboardingPresenter.shared.attachedWindow
+            ?? NSApp.keyWindow
     }
 }
 
@@ -171,6 +189,8 @@ struct DTDitherGrip: View {
 // MARK: - Drag region (title-strip dragging)
 
 /// Transparent NSView whose mouse-downs move the window — classic custom-titlebar drag.
+/// `hitTest` returns nil so SwiftUI controls above (traffic lights) always win; the
+/// window still drags via `mouseDownCanMoveWindow` when the event lands on empty chrome.
 struct WindowDragRegion: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         WindowDragNSView()
@@ -181,30 +201,44 @@ struct WindowDragRegion: NSViewRepresentable {
 
 private final class WindowDragNSView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
+
+    /// Never claim hits — lets SwiftUI buttons receive clicks. Empty title-strip
+    /// areas still drag because AppKit consults `mouseDownCanMoveWindow` on the
+    /// view under the cursor when the event isn't eaten by a control.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 // MARK: - Hide / restore system buttons
 
 enum DTSystemTrafficLights {
-    /// Hide the stock macOS traffic lights. Safe no-op if buttons are missing.
+    /// Hide the stock macOS traffic lights so they cannot steal hits from our strip.
+    /// Root cause of dead custom close/min: the theme-frame button container was left
+    /// at `alphaValue = 0` (still hit-testable) while `performClose` no-ops on a hidden
+    /// close button. Hide the container outright and disable the buttons.
     static func hide(on window: NSWindow) {
         for type: NSWindow.ButtonType in [.closeButton, .miniaturizeButton, .zoomButton] {
-            window.standardWindowButton(type)?.isHidden = true
-            window.standardWindowButton(type)?.alphaValue = 0
+            if let button = window.standardWindowButton(type) {
+                button.isHidden = true
+                button.alphaValue = 0
+                button.isEnabled = false
+            }
         }
-        // Soften the system titlebar chrome so our strip reads as the top edge.
-        // Fall back quietly if the hierarchy differs across macOS builds.
         if let container = window.standardWindowButton(.closeButton)?.superview {
+            container.isHidden = true
             container.alphaValue = 0
         }
     }
 
     static func show(on window: NSWindow) {
         for type: NSWindow.ButtonType in [.closeButton, .miniaturizeButton, .zoomButton] {
-            window.standardWindowButton(type)?.isHidden = false
-            window.standardWindowButton(type)?.alphaValue = 1
+            if let button = window.standardWindowButton(type) {
+                button.isHidden = false
+                button.alphaValue = 1
+                button.isEnabled = true
+            }
         }
         if let container = window.standardWindowButton(.closeButton)?.superview {
+            container.isHidden = false
             container.alphaValue = 1
         }
     }

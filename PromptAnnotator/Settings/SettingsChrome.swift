@@ -16,7 +16,7 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         case .home: return "Home"
         case .history: return "History"
         case .recording: return "Recording"
-        // Shorter tile label so Departure Mono breathes inside the square.
+        // Compact folder-tab label.
         case .configuration: return "General"
         case .sound: return "Sound"
         case .model: return "Models"
@@ -24,7 +24,7 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Full page heading (may differ from the compact sidebar tile).
+    /// Full page heading (may differ from the compact folder-tab label).
     var pageTitle: String {
         switch self {
         case .configuration: return "General"
@@ -45,13 +45,6 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    static var sidebarSections: [(title: String, pages: [SettingsPage])] {
-        [
-            ("Session", [.home, .history, .recording]),
-            ("Speech", [.model]),
-            ("App", [.configuration, .sound, .performance]),
-        ]
-    }
 }
 
 /// Layout metrics — Ink tokens, kept under the SettingsMetrics name for call sites.
@@ -63,8 +56,7 @@ enum SettingsMetrics {
     static let rowPadding: CGFloat = Ink.rowHPad
     static let maxContentWidth: CGFloat = Ink.maxContentWidth
     static let cardCorner: CGFloat = Ink.cardRadius
-    static let sidebarFooterPadding: CGFloat = Ink.space4
-    static let sidebarWidth: CGFloat = Ink.sidebarWidth
+    static let folderTabHeight: CGFloat = Ink.folderTabHeight
 }
 
 /// Compact page title + optional one-line caption — same language as Home.

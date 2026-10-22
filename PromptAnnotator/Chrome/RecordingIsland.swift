@@ -28,7 +28,7 @@ struct RecordingIslandView: View {
             elapsed: session.elapsed
         )
         let scale = layout.scale
-        // [record + timer] — wave — [chip?]. Double-pane matches Settings sidebar tiles.
+        // [record + timer] — wave — [chip?]. Double-pane matches selected chrome / InkDtMark bevel.
         return HStack(spacing: 0) {
             leading(layout)
             Color.clear.frame(width: layout.sideGapLeading)
@@ -43,7 +43,7 @@ struct RecordingIslandView: View {
         }
         .padding(.horizontal, scale.inset)
         .frame(width: layout.panel.width, height: layout.panel.height)
-        .inkDoublePane(cornerRadius: Ink.cardRadius, fill: Ink.window)
+        .inkDoublePane(cornerRadius: Ink.cardRadius, fill: Ink.front)
         // Hits stay on the bar face — not the down-right pane gutter.
         .contentShape(
             Path(CGRect(x: 0, y: 0, width: layout.panel.width, height: layout.panel.height))

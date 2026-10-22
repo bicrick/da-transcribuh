@@ -22,7 +22,7 @@ struct CaptureCountChip: View {
         .padding(.horizontal, minHeight >= 28 ? Ink.space2 : Ink.space1 + 2)
         .padding(.vertical, Ink.space1)
         .frame(minHeight: minHeight)
-        .background(Ink.window, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
+        .background(Ink.front, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
                 .strokeBorder(Ink.hairline, lineWidth: 1)
