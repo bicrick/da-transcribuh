@@ -152,20 +152,26 @@ class Island(NamedTuple):
     wave: tuple[int, int]
 
 
-def island_width(d: ImageDraw.ImageDraw, s: float, timer: str, chip: int | None) -> tuple[float, float, float]:
+def island_metrics(
+    d: ImageDraw.ImageDraw,
+    s: float,
+    timer: str,
+    chip: int | None,
+) -> tuple[float, float, float, float, float, float, float]:
+    """One measure for the island. Returns w, h, pad, rec, tw, th, gap."""
     pad = 10 * s
     rec = 10 * s
-    tw, _ = text_size(d, timer, font(12 * s))
-    wave_w = 88 * s
+    tw, th = text_size(d, timer, font(12 * s))
+    wave_w, wave_h = 88 * s, 22 * s
     chip_w = (36 * s) if chip is not None else 0
     gap = 10 * s
-    inner_h = max(rec, 22 * s)
+    inner_h = max(rec, th, wave_h, 18 * s)
     h = pad * 2 + inner_h
     w = pad + rec + 8 * s + tw + gap + wave_w
     if chip is not None:
         w += gap + chip_w
     w += pad
-    return w, h, tw
+    return w, h, pad, rec, tw, th, gap
 
 
 def draw_island(
@@ -177,19 +183,11 @@ def draw_island(
     timer: str = "0:12",
     chip: int | None = 1,
 ) -> Island:
-    pad = 10 * s
-    rec = 10 * s
-    timer_f = font(12 * s)
-    tw, th = text_size(d, timer, timer_f)
+    w, h, pad, rec, tw, th, gap = island_metrics(d, s, timer, chip)
     wave_w, wave_h = 88 * s, 22 * s
     chip_w = (36 * s) if chip is not None else 0
-    gap = 10 * s
-    inner_h = max(rec, th, wave_h, 18 * s)
-    h = pad * 2 + inner_h
-    w = pad + rec + 8 * s + tw + gap + wave_w
-    if chip is not None:
-        w += gap + chip_w
-    w += pad
+    timer_f = font(12 * s)
+    inner_h = h - pad * 2
 
     pane(d, x, y, w, h, Ink.front, s)
     cy = y + (h - inner_h) / 2
@@ -272,7 +270,7 @@ def render_banner() -> tuple[Image.Image, Island]:
     tw, _ = text_size(d, BANNER_TAG, tf)
     d.text((wx, wy + wh + 10 * s), BANNER_TAG, font=tf, fill=Ink.secondary)
 
-    iw, ih, _ = island_width(d, s, "0:12", 1)
+    iw, ih, *_ = island_metrics(d, s, "0:12", 1)
     ix = W - 44 * s - iw - bevel_px(s)
     iy = (H - ih) / 2
     if ix < wx + max(ww, tw) + 16 * s:
@@ -287,7 +285,7 @@ def render_demo() -> tuple[Image.Image, Island]:
     img = Image.new("RGB", (W, H), Ink.window)
     d = ImageDraw.Draw(img)
 
-    iw, ih, _ = island_width(d, s, "0:12", 1)
+    iw, ih, *_ = island_metrics(d, s, "0:12", 1)
     ix = (W - iw) / 2
     iy = 72 * s
     island = draw_island(d, ix, iy, s, timer="0:12", chip=1)
