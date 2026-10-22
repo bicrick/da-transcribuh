@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/brand/screenshots/settings-home-light.png" alt="da transcribuh home" width="920">
+  <img src="assets/brand/mocks/readme-island-demo-light.png" alt="recording island — talk. it types. grab the picture." width="920">
 </p>
 
 ## install
