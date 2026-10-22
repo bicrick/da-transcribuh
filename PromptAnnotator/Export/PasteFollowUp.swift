@@ -266,6 +266,11 @@ final class PasteFollowUp {
         }
     }
 
+    /// Public entry for clipboard history / callers that already staged the pasteboard.
+    func simulateCommandV() {
+        postCommandV()
+    }
+
     private func postCommandV() {
         let source = CGEventSource(stateID: .hidSystemState)
         let key = CGKeyCode(kVK_ANSI_V)

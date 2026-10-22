@@ -76,6 +76,9 @@ final class AppSettings: ObservableObject {
 
     @Published var chord: HotkeyChord
     @Published var cancelChord: HotkeyChord?
+    @Published var clipboardHistoryEnabled: Bool
+    @Published var clipboardChord: HotkeyChord
+    @Published var clipboardHistoryLimit: Int
     @Published var pushToTalk: Bool
     @Published var islandStyle: IslandStyle
     @Published var soundEnabled: Bool
@@ -121,6 +124,16 @@ final class AppSettings: ObservableObject {
         isLoading = true
         chord = Self.loadChord(defaults: defaults)
         cancelChord = Self.chord(key: Keys.cancelKey, mods: Keys.cancelMods, defaults: defaults)
+        clipboardHistoryEnabled = defaults.object(forKey: Keys.clipboardEnabled) as? Bool ?? true
+        if let key = defaults.object(forKey: Keys.clipboardChordKey) as? Int,
+           let mods = defaults.object(forKey: Keys.clipboardChordMods) as? Int {
+            let loaded = HotkeyChord(keyCode: UInt32(key), carbonModifiers: UInt32(mods))
+            clipboardChord = loaded.canRegister(allowingShift: true) ? loaded : .clipboardDefault
+        } else {
+            clipboardChord = .clipboardDefault
+        }
+        let limit = defaults.object(forKey: Keys.clipboardLimit) as? Int ?? 200
+        clipboardHistoryLimit = min(500, max(20, limit))
         pushToTalk = defaults.bool(forKey: Keys.pushToTalk)
         islandStyle = IslandStyle.stored(defaults.string(forKey: Keys.island) ?? "")
         soundEnabled = defaults.object(forKey: Keys.sound) as? Bool ?? true
@@ -204,6 +217,7 @@ final class AppSettings: ObservableObject {
     func setChord(_ chord: HotkeyChord) -> Bool {
         guard chord.canRegister else { return false }
         guard chord != cancelChord else { return false }
+        guard chord != clipboardChord else { return false }
         guard HotkeyCenter.shared.apply(chord) else { return false }
         self.chord = chord
         defaults.set(Int(chord.keyCode), forKey: Keys.chordKey)
@@ -214,6 +228,7 @@ final class AppSettings: ObservableObject {
     func setCancelChord(_ chord: HotkeyChord?) -> Bool {
         if let chord {
             guard chord.canRegister, chord != self.chord else { return false }
+            guard chord != clipboardChord else { return false }
         }
         guard HotkeyCenter.shared.applyCancel(chord) else { return false }
         cancelChord = chord
@@ -225,6 +240,30 @@ final class AppSettings: ObservableObject {
             defaults.removeObject(forKey: Keys.cancelMods)
         }
         return true
+    }
+
+    func setClipboardHistoryEnabled(_ enabled: Bool) {
+        clipboardHistoryEnabled = enabled
+        persist(Keys.clipboardEnabled, enabled)
+        ClipboardHistoryController.shared.applyEnabled(enabled)
+    }
+
+    func setClipboardChord(_ chord: HotkeyChord) -> Bool {
+        guard chord.canRegister(allowingShift: true) else { return false }
+        guard chord != self.chord, chord != cancelChord else { return false }
+        if clipboardHistoryEnabled {
+            guard ClipboardHistoryController.shared.applyHotkey(chord) else { return false }
+        }
+        clipboardChord = chord
+        defaults.set(Int(chord.keyCode), forKey: Keys.clipboardChordKey)
+        defaults.set(Int(chord.carbonModifiers), forKey: Keys.clipboardChordMods)
+        return true
+    }
+
+    func setClipboardHistoryLimit(_ limit: Int) {
+        let clamped = min(500, max(20, limit))
+        clipboardHistoryLimit = clamped
+        defaults.set(clamped, forKey: Keys.clipboardLimit)
     }
 
     func setPushToTalk(_ enabled: Bool) {
@@ -434,6 +473,10 @@ final class AppSettings: ObservableObject {
         static let chordMigratedOptionSpace = "hotkey.migratedToOptionSpace"
         static let cancelKey = "hotkey.cancel.keyCode"
         static let cancelMods = "hotkey.cancel.modifiers"
+        static let clipboardEnabled = "clipboard.historyEnabled"
+        static let clipboardChordKey = "clipboard.hotkey.keyCode"
+        static let clipboardChordMods = "clipboard.hotkey.modifiers"
+        static let clipboardLimit = "clipboard.historyLimit"
         static let pushToTalk = "hotkey.pushToTalk"
         static let island = "island.style"
         static let sound = "sound.enabled"

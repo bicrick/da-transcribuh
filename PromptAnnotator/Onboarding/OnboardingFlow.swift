@@ -5,6 +5,8 @@ enum OnboardingStep: Int, CaseIterable {
     case welcome
     case permissions
     case shortcut
+    case clipboard
+    case appearance
     case model
     case practice
     case ready
@@ -13,7 +15,9 @@ enum OnboardingStep: Int, CaseIterable {
         switch self {
         case .welcome: return "Welcome"
         case .permissions: return "Permissions"
-        case .shortcut: return "Shortcut"
+        case .shortcut: return "Keybinds"
+        case .clipboard: return "Clipboard history"
+        case .appearance: return "Appearance"
         case .model: return "Model"
         case .practice: return "Try a session"
         case .ready: return "Ready"
@@ -25,22 +29,26 @@ enum OnboardingStep: Int, CaseIterable {
     }
 
     /// Short labels for the Paint step rail.
-    static let railLabels = ["Hi", "Perm", "Keys", "Model", "Try", "Go"]
+    static let railLabels = ["Hi", "Perm", "Rec", "Clip", "Look", "Model", "Try", "Go"]
 
     var blurb: String? {
         switch self {
         case .welcome:
             return "Talk, and capture the screen when you want the picture with the words."
         case .permissions:
-            return "Three switches. Flip them, then Reopen so da transcribuh picks them up."
+            return "Microphone, Screen Recording, and Accessibility. Flip them, then Reopen so da transcribuh picks them up."
         case .shortcut:
-            return "A tap starts. A second tap stops. Shift stays free for drawing."
+            return "Recording defaults to ⌥Space; clipboard history to ⌘⇧C. Both are rebindable. ⌘Space / ⌥⌘Space stay with the system."
+        case .clipboard:
+            return "Maccy-style history of text, images, and files. Default shortcut ⌘⇧C — uses Accessibility you already granted for paste."
+        case .appearance:
+            return "Light, dark graphite, or follow the system. Same control as the Appearance tab."
         case .model:
-            return "Download an English model before the first session. Balanced is the default."
+            return "Download an English speech model before the first session. Pick one on this step (same list as Models)."
         case .practice:
             return "A short take now — or skip and try later from Home."
         case .ready:
-            return "The menu bar icon opens da transcribuh again anytime."
+            return "Home, Appearance, History, Models, General, Sound, Perf — and the menu bar icon anytime."
         }
     }
 }
@@ -56,6 +64,7 @@ struct OnboardingFlow: View {
     @StateObject private var permissions = PermissionModel()
     @State private var step: OnboardingStep = .welcome
     @State private var listening = false
+    @State private var listeningClipboard = false
     @State private var shortcutNote: String?
     @StateObject private var transfer = ModelTransfer()
     @State private var practiceTask: Task<Void, Never>?
@@ -82,8 +91,15 @@ struct OnboardingFlow: View {
         .frame(width: OnboardingMetrics.width, height: OnboardingMetrics.height)
         .background(Ink.window)
         .tint(Ink.label)
-        .background(ShortcutCapture(active: $listening) { event in
-            applyShortcut(event)
+        .background(ShortcutCapture(active: Binding(
+            get: { listening || listeningClipboard },
+            set: { if !$0 { listening = false; listeningClipboard = false } }
+        )) { event in
+            if listeningClipboard {
+                applyClipboardShortcut(event)
+            } else {
+                applyShortcut(event)
+            }
         })
         .onAppear { permissions.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -160,6 +176,10 @@ struct OnboardingFlow: View {
             permissionsCard
         case .shortcut:
             shortcutCard
+        case .clipboard:
+            clipboardCard
+        case .appearance:
+            appearanceCard
         case .model:
             modelCard
         case .practice:
@@ -200,7 +220,7 @@ struct OnboardingFlow: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Ink.space5)
             }
-            Text("\(settings.chord.display) starts a session and stops it. While da transcribuh is saving or transcribing, the icon changes so you can see it working.")
+            Text("\(settings.chord.display) starts and stops a session. \(settings.clipboardChord.display) opens clipboard history. While da transcribuh is saving or transcribing, the menu bar icon changes so you can see it working.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -232,7 +252,7 @@ struct OnboardingFlow: View {
                     InkDivider(leading: 0)
                     permissionRow(
                         title: "Accessibility",
-                        detail: "Watches the shortcut and Shift for drawing.",
+                        detail: "Global shortcuts, Shift-draw, paste into other apps, and clipboard history. One grant covers all of them.",
                         on: permissions.status.accessibility,
                         recovery: permissions.status.accessibility
                             ? nil
@@ -301,20 +321,41 @@ struct OnboardingFlow: View {
 
     private var shortcutCard: some View {
         VStack(alignment: .leading, spacing: Ink.space3) {
-            Text("The menu bar repeats this chord so you can find it later.")
+            Text("The menu bar and Home keycaps repeat this chord. ⌘Space and ⌥⌘Space stay with the system.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             InkCard {
-                VStack(spacing: Ink.space4) {
-                    InkKeycapRow(keys: settings.chord.keycaps)
+                VStack(alignment: .leading, spacing: Ink.space3) {
+                    HStack(alignment: .center, spacing: Ink.space2) {
+                        Text(listening ? "press keys… esc to cancel" : "click to rebind")
+                            .font(Ink.mono(10))
+                            .foregroundStyle(Ink.secondary)
+                            .fixedSize()
+                        Spacer(minLength: 0)
+                        InkKeycapRow(keys: settings.chord.keycaps)
+                            .padding(3)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
+                                    .strokeBorder(
+                                        listening ? Ink.label : Color.clear,
+                                        style: StrokeStyle(lineWidth: Ink.stroke, dash: listening ? [4, 3] : [])
+                                    )
+                            )
+                            .onTapGesture {
+                                listening = true
+                                listeningClipboard = false
+                                shortcutNote = nil
+                            }
+                    }
                     HStack(spacing: Ink.space2) {
                         Button(listening ? "Listening" : "Change") {
                             listening = true
+                            listeningClipboard = false
                             shortcutNote = nil
                         }
                         .buttonStyle(InkSecondaryButtonStyle())
-                        .disabled(listening)
+                        .disabled(listening || listeningClipboard)
                         Button("Use ⌥Space") {
                             listening = false
                             shortcutNote = settings.setChord(.default) ? nil : "macOS would not register that shortcut."
@@ -322,7 +363,7 @@ struct OnboardingFlow: View {
                         .buttonStyle(InkSecondaryButtonStyle())
                     }
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(Ink.cardPad)
             }
             Text("Hold the chord instead of tapping if you turn on push-to-talk later in General.")
@@ -331,6 +372,92 @@ struct OnboardingFlow: View {
                 .fixedSize(horizontal: false, vertical: true)
             if let shortcutNote {
                 InkErrorBanner(message: shortcutNote)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var clipboardCard: some View {
+        VStack(alignment: .leading, spacing: Ink.space3) {
+            Text("Copies from other apps land here automatically. Session transcripts and screenshots are tagged. Accessibility for paste already covers this — nothing new to grant.")
+                .font(Ink.bodyFont)
+                .foregroundStyle(Ink.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            InkCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    InkToggleRow(
+                        title: "Enable clipboard history",
+                        detail: "On by default. Turn off anytime in General.",
+                        isOn: Binding(
+                            get: { settings.clipboardHistoryEnabled },
+                            set: { settings.setClipboardHistoryEnabled($0) }
+                        )
+                    )
+                    InkDivider(leading: 0)
+                    VStack(alignment: .leading, spacing: Ink.space3) {
+                        HStack(alignment: .center, spacing: Ink.space2) {
+                            Text(listeningClipboard ? "press keys… esc to cancel" : "click to rebind")
+                                .font(Ink.mono(10))
+                                .foregroundStyle(Ink.secondary)
+                                .fixedSize()
+                            Spacer(minLength: 0)
+                            InkKeycapRow(keys: settings.clipboardChord.keycaps)
+                                .padding(3)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
+                                        .strokeBorder(
+                                            listeningClipboard ? Ink.label : Color.clear,
+                                            style: StrokeStyle(lineWidth: Ink.stroke, dash: listeningClipboard ? [4, 3] : [])
+                                        )
+                                )
+                                .onTapGesture {
+                                    listeningClipboard = true
+                                    listening = false
+                                    shortcutNote = nil
+                                }
+                        }
+                        HStack(spacing: Ink.space2) {
+                            Button(listeningClipboard ? "Listening" : "Change") {
+                                listeningClipboard = true
+                                listening = false
+                                shortcutNote = nil
+                            }
+                            .buttonStyle(InkSecondaryButtonStyle())
+                            .disabled(listening || listeningClipboard)
+                            Button("Use ⌘⇧C") {
+                                listeningClipboard = false
+                                shortcutNote = settings.setClipboardChord(.clipboardDefault)
+                                    ? nil
+                                    : "macOS would not register that shortcut."
+                            }
+                            .buttonStyle(InkSecondaryButtonStyle())
+                        }
+                    }
+                    .padding(Ink.cardPad)
+                }
+            }
+            if let shortcutNote {
+                InkErrorBanner(message: shortcutNote)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var appearanceCard: some View {
+        VStack(alignment: .leading, spacing: Ink.space3) {
+            Text("Dark mode uses soft graphite (never midnight black) with a light bevel offset.")
+                .font(Ink.bodyFont)
+                .foregroundStyle(Ink.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            InkCard {
+                InkAppearanceSegment(
+                    selection: Binding(
+                        get: { settings.appearance },
+                        set: { settings.setAppearance($0) }
+                    )
+                )
+                .padding(.horizontal, Ink.rowHPad)
+                .padding(.vertical, Ink.rowVPad)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -473,6 +600,8 @@ struct OnboardingFlow: View {
 
     private func advance() {
         listening = false
+        listeningClipboard = false
+        shortcutNote = nil
         guard let next = OnboardingStep(rawValue: step.rawValue + 1) else {
             finishSetup()
             return
@@ -499,6 +628,8 @@ struct OnboardingFlow: View {
 
     private func retreat() {
         listening = false
+        listeningClipboard = false
+        shortcutNote = nil
         cancelPractice()
         if let previous = OnboardingStep(rawValue: step.rawValue - 1) {
             step = previous
@@ -578,12 +709,31 @@ struct OnboardingFlow: View {
 
     private func applyShortcut(_ event: NSEvent) {
         listening = false
+        let outcome = RecordingChordCapture.applyToggleEvent(event, settings: settings)
+        shortcutNote = RecordingChordCapture.message(for: outcome)
+    }
+
+    private func applyClipboardShortcut(_ event: NSEvent) {
+        listeningClipboard = false
+        let bare = event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty
+        if bare, event.keyCode == 53 {
+            shortcutNote = nil
+            return
+        }
+        if bare, event.keyCode == 51 || event.keyCode == 117 {
+            shortcutNote = settings.setClipboardChord(.clipboardDefault)
+                ? nil
+                : "macOS would not register the default shortcut."
+            return
+        }
         let chord = HotkeyChord(event: event)
-        if let rejection = chord.rejection {
+        if let rejection = chord.rejection(allowingShift: true) {
             shortcutNote = rejection
             return
         }
-        shortcutNote = settings.setChord(chord) ? nil : "That shortcut is already used, or macOS would not register it."
+        shortcutNote = settings.setClipboardChord(chord)
+            ? nil
+            : "That shortcut is already used, or macOS would not register it."
     }
 }
 

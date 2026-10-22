@@ -42,6 +42,14 @@ struct DTMenuBarPanel: View {
                 settings.cycleAppearance()
             }
 
+            if settings.clipboardHistoryEnabled {
+                hairline
+                row("Clipboard history (\(settings.clipboardChord.display))") {
+                    ClipboardHistoryController.shared.togglePanel()
+                    dismiss()
+                }
+            }
+
             hairline
 
             Text(AppVersion.label)

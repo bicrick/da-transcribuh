@@ -86,7 +86,7 @@ final class InkThemeTests: XCTestCase {
 
     func testOnboardingRailLabelsMatchStepCount() {
         XCTAssertEqual(OnboardingStep.railLabels.count, OnboardingStep.allCases.count)
-        XCTAssertEqual(OnboardingStep.railLabels.count, 6)
+        XCTAssertEqual(OnboardingStep.railLabels.count, 8)
     }
 
     func testPaintPaletteIsClassicFlat() {
@@ -154,9 +154,9 @@ final class InkThemeTests: XCTestCase {
     }
 
     func testOnboardingStepCountAndEyebrows() {
-        XCTAssertEqual(OnboardingStep.allCases.count, 6)
-        XCTAssertEqual(OnboardingStep.welcome.eyebrow, "Step 1 of 6")
-        XCTAssertEqual(OnboardingStep.ready.eyebrow, "Step 6 of 6")
+        XCTAssertEqual(OnboardingStep.allCases.count, 8)
+        XCTAssertEqual(OnboardingStep.welcome.eyebrow, "Step 1 of 8")
+        XCTAssertEqual(OnboardingStep.ready.eyebrow, "Step 8 of 8")
     }
 
     func testSegmentMeterClampsFraction() {
