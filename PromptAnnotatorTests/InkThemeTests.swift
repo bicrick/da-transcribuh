@@ -60,6 +60,16 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.statValueFont, Ink.numberFont)
     }
 
+    func testPaintPaletteIsClassicFlat() {
+        XCTAssertEqual(round(Ink.nsColor(hex: "#ED1C24").redComponent * 255), 237)
+        XCTAssertEqual(round(Ink.nsColor(hex: "#FFF200").greenComponent * 255), 242)
+        XCTAssertEqual(round(Ink.nsColor(hex: "#22B14C").greenComponent * 255), 177)
+        XCTAssertEqual(round(Ink.nsColor(hex: "#3F48CC").blueComponent * 255), 204)
+        // Accents alias the Paint primaries.
+        XCTAssertEqual(Ink.record, Ink.paintRed)
+        XCTAssertEqual(Ink.success, Ink.paintGreen)
+    }
+
     func testSidebarTileTitlesAreCompact() {
         XCTAssertEqual(SettingsPage.configuration.title, "General")
         XCTAssertEqual(SettingsPage.performance.title, "Perf")

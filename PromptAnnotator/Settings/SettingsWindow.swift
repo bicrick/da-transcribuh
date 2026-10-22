@@ -33,7 +33,11 @@ struct SettingsRoot: View {
                     detail
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .toolbar(.hidden, for: .automatic)
-                    DTStatusBar(cells: statusCells, trailing: AppVersion.label)
+                    DTStatusBar(
+                        cells: statusCells,
+                        trailing: AppVersion.label,
+                        recording: session.phase == .recording
+                    )
                 }
                 .background(Ink.window)
             }
@@ -86,7 +90,7 @@ struct SettingsRoot: View {
             if let hint = session.pasteReadyHint, !hint.isEmpty { return "ready to paste" }
             return "idle"
         }()
-        cells.append("■ \(state)")
+        cells.append(state)
         cells.append(settings.speechModel)
         let n = sessions.count
         cells.append("\(n) session\(n == 1 ? "" : "s")")

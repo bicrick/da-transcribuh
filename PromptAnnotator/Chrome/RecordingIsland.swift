@@ -151,10 +151,11 @@ struct RecordingIslandView: View {
         return "0%"
     }
 
-    /// Pulsing record marker — B/W square (same 8pt footprint as the old red dot).
+    /// Pulsing record marker — flat Paint red square (same 8pt footprint).
     private var recordDot: some View {
         Rectangle()
-            .fill(Ink.label)
+            .fill(Ink.record)
+            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
             .frame(width: 8, height: 8)
             .opacity(pulse ? 1 : 0.35)
             .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: pulse)

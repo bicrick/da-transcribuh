@@ -6,7 +6,12 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–20)
+## Final summary (Runs 1–21)
+
+### Run 21 — Models layout polish + classic Paint accents
+
+- Models: one selection language (radio + thick border + hard shadow gutter); no corner check badge; aligned equal-height built-in cards; download folded into card footers; duplicate captions/rows removed; meter label column fixed; section captions flush to the grid.
+- Paint accents (flat 8-bit): `paintRed #ED1C24`, `paintYellow #FFF200`, `paintGreen #22B14C`, `paintBlue #3F48CC`. Traffic lights use RGB when key; inactive stays B&W outline. Record dots + status recording mark use paintRed; success checks use paintGreen. Everything else stays B/W.
 
 ### Run 20 — Recording island / waveform / annotate B&W reskin
 

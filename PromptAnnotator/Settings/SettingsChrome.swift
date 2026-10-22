@@ -124,7 +124,7 @@ struct SettingsSection<Content: View>: View {
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, Ink.space1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }

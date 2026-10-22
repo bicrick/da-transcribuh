@@ -63,33 +63,28 @@ struct InkTile<Content: View>: View {
 
     var body: some View {
         content()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .background(Ink.card, in: RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(Ink.cardPad)
+            .background {
+                ZStack(alignment: .topLeading) {
+                    // Hard shadow is paint-only — always reserved via outer padding so
+                    // selection never shifts the card in a grid.
+                    if selected {
+                        RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
+                            .fill(Ink.label)
+                            .offset(x: Ink.hardShadow, y: Ink.hardShadow)
+                    }
+                    RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
+                        .fill(Ink.card)
+                }
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
                     .strokeBorder(Ink.label, lineWidth: selected ? Ink.selectedBorder : Ink.lineWidth)
             )
-            .background(alignment: .topLeading) {
-                if selected {
-                    RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
-                        .fill(Ink.label)
-                        .offset(x: Ink.hardShadow, y: Ink.hardShadow)
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                if selected {
-                    ZStack {
-                        Rectangle()
-                            .fill(Ink.label)
-                            .frame(width: 18, height: 18)
-                        Image(systemName: "checkmark")
-                            .font(Ink.microFont)
-                            .foregroundStyle(Ink.onAccent)
-                    }
-                    .offset(x: 1, y: -1)
-                }
-            }
+            // Reserve shadow gutter on every tile (selected or not) so tops/heights line up.
+            .padding(.trailing, Ink.hardShadow)
+            .padding(.bottom, Ink.hardShadow)
     }
 }
 
@@ -223,13 +218,15 @@ struct InkSegmentMeter: View {
     var fraction: Double
     var emphasized: Bool = false
     private let segments = 10
+    /// Fixed label column so bars line up across sibling cards.
+    static let labelWidth: CGFloat = 56
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Ink.space2) {
             Text(label)
                 .font(Ink.headingFont)
                 .foregroundStyle(Ink.secondary)
-                .frame(width: 52, alignment: .leading)
+                .frame(width: Self.labelWidth, alignment: .leading)
             HStack(spacing: 2) {
                 ForEach(0..<segments, id: \.self) { index in
                     Rectangle()
@@ -238,6 +235,7 @@ struct InkSegmentMeter: View {
                         .frame(height: 7)
                 }
             }
+            .frame(maxWidth: .infinity)
         }
         .opacity(emphasized ? 1 : 1)
     }
@@ -300,10 +298,10 @@ struct InkCheck: View {
                 .strokeBorder(Ink.label, lineWidth: 1)
             if done {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Ink.label)
+                    .fill(Ink.window)
                 Image(systemName: "checkmark")
                     .font(Ink.microFont)
-                    .foregroundStyle(Ink.onAccent)
+                    .foregroundStyle(Ink.success)
             }
         }
         .frame(width: 16, height: 16)
@@ -510,15 +508,25 @@ struct InkDashedEmpty: View {
 struct DTStatusBar: View {
     var cells: [String]
     var trailing: String
+    /// When true, leading cell gets a flat Paint-red record square.
+    var recording: Bool = false
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
-                Text(cell)
-                    .font(Ink.statusFont)
-                    .foregroundStyle(Ink.label)
-                    .padding(.horizontal, 10)
-                    .frame(height: Ink.statusBarHeight)
+            ForEach(Array(cells.enumerated()), id: \.offset) { index, cell in
+                HStack(spacing: 6) {
+                    if index == 0 {
+                        Rectangle()
+                            .fill(recording ? Ink.record : Ink.label)
+                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: recording ? 1 : 0))
+                            .frame(width: 7, height: 7)
+                    }
+                    Text(cell)
+                        .font(Ink.statusFont)
+                        .foregroundStyle(Ink.label)
+                }
+                .padding(.horizontal, 10)
+                .frame(height: Ink.statusBarHeight)
                 Rectangle()
                     .fill(Ink.hairline)
                     .frame(width: 1, height: Ink.statusBarHeight)

@@ -46,8 +46,8 @@ struct ModelPage: View {
         SettingsSection(
             title: "Engine",
             footer: settings.speechEngine == .openAICompatible
-                ? "Live captions are off. Audio is sent to your server only when you stop."
-                : "Models run on this Mac. Live captions stay available while you record."
+                ? "Live captions are off. Audio goes to your server only when you stop."
+                : nil
         ) {
             HStack(alignment: .top, spacing: Ink.gridGap) {
                 ForEach(SpeechEngineKind.allCases) { engine in
@@ -64,9 +64,9 @@ struct ModelPage: View {
             clearStatus()
         } label: {
             InkTile(selected: selected) {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: Ink.space3) {
                     InkRadio(selected: selected)
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Ink.titleDescGap) {
                         Text(engine.title)
                             .font(Ink.rowTitleFont)
                             .foregroundStyle(Ink.label)
@@ -87,7 +87,7 @@ struct ModelPage: View {
     private var builtInSection: some View {
         SettingsSection(
             title: "Built-in WhisperKit",
-            footer: "English models from argmaxinc/whisperkit-coreml. Size is the download."
+            footer: "English weights from argmaxinc/whisperkit-coreml. Size is the download."
         ) {
             SpeechModelPicker(settings: settings, transfer: transfer)
         }
@@ -97,7 +97,7 @@ struct ModelPage: View {
         SettingsSection(
             title: "Your models",
             footer: settings.customModels.isEmpty
-                ? "Add a local WhisperKit Core ML folder, or download another Hugging Face variant below."
+                ? nil
                 : "Selecting a model unloads the previous one and prepares the new weights."
         ) {
             if settings.customModels.isEmpty {

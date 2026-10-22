@@ -98,10 +98,9 @@ struct SoundPage: View {
                     AppSounds.preview()
                 } label: {
                     InkTile(selected: settings.soundTheme == theme) {
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: settings.soundTheme == theme ? "checkmark.circle.fill" : "speaker.wave.2")
-                                .foregroundStyle(settings.soundTheme == theme ? Ink.accent : Ink.secondary)
-                            VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .top, spacing: Ink.space3) {
+                            InkRadio(selected: settings.soundTheme == theme)
+                            VStack(alignment: .leading, spacing: Ink.titleDescGap) {
                                 Text(theme.title)
                                     .font(Ink.rowTitleFont)
                                     .foregroundStyle(Ink.label)

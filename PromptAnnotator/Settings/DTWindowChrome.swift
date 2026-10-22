@@ -64,6 +64,14 @@ private enum DTWindowButtonKind {
         }
     }
 
+    var paintFill: Color {
+        switch self {
+        case .close: return Ink.paintRed
+        case .miniaturize: return Ink.paintYellow
+        case .zoom: return Ink.paintGreen
+        }
+    }
+
     func perform(on window: NSWindow) {
         switch self {
         case .close:
@@ -77,18 +85,36 @@ private enum DTWindowButtonKind {
 }
 
 struct DTTrafficLights: View {
+    @State private var windowIsKey = true
+
     var body: some View {
         HStack(spacing: 8) {
-            DTTrafficLight(kind: .close)
-            DTTrafficLight(kind: .miniaturize)
-            DTTrafficLight(kind: .zoom)
+            DTTrafficLight(kind: .close, isKey: windowIsKey)
+            DTTrafficLight(kind: .miniaturize, isKey: windowIsKey)
+            DTTrafficLight(kind: .zoom, isKey: windowIsKey)
         }
         .accessibilityElement(children: .contain)
+        .onAppear { refreshKey() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
+            if note.object as AnyObject? === SettingsPresenter.shared.attachedWindow {
+                windowIsKey = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { note in
+            if note.object as AnyObject? === SettingsPresenter.shared.attachedWindow {
+                windowIsKey = false
+            }
+        }
+    }
+
+    private func refreshKey() {
+        windowIsKey = SettingsPresenter.shared.attachedWindow?.isKeyWindow ?? true
     }
 }
 
 private struct DTTrafficLight: View {
     let kind: DTWindowButtonKind
+    var isKey: Bool
     @State private var hovering = false
 
     private let diameter: CGFloat = 12
@@ -100,7 +126,7 @@ private struct DTTrafficLight: View {
         } label: {
             ZStack {
                 Circle()
-                    .fill(Ink.window)
+                    .fill(isKey ? kind.paintFill : Ink.window)
                 Circle()
                     .strokeBorder(Ink.label, lineWidth: 1)
                 if hovering {

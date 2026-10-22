@@ -57,7 +57,11 @@ struct RecordingPage: View {
                     session.refreshChrome()
                 } label: {
                     InkTile(selected: settings.islandStyle == style) {
-                        VStack(spacing: 10) {
+                        VStack(spacing: Ink.space2) {
+                            HStack {
+                                InkRadio(selected: settings.islandStyle == style)
+                                Spacer(minLength: 0)
+                            }
                             styleGlyph(style)
                                 .frame(height: 28)
                             Text(style.title)
@@ -69,7 +73,7 @@ struct RecordingPage: View {
                                 .multilineTextAlignment(.center)
                                 .frame(minHeight: 28)
                         }
-                        .frame(maxWidth: .infinity)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
                 }
                 .buttonStyle(.plain)
@@ -85,7 +89,10 @@ struct RecordingPage: View {
         switch style {
         case .classic:
             HStack(spacing: 5) {
-                Circle().fill(Ink.accent).frame(width: 6, height: 6)
+                Rectangle()
+                    .fill(Ink.record)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                    .frame(width: 6, height: 6)
                 WaveformBars(levels: preview, slotWidth: 64, slotHeight: 16)
                 Text("1")
                     .font(Ink.badgeFont)
@@ -96,7 +103,10 @@ struct RecordingPage: View {
             }
         case .compact:
             HStack(spacing: 5) {
-                Circle().fill(Ink.accent).frame(width: 6, height: 6)
+                Rectangle()
+                    .fill(Ink.record)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                    .frame(width: 6, height: 6)
                 WaveformBars(levels: preview, slotWidth: 72, slotHeight: 16)
                 Text("0:12")
                     .font(Ink.captionFont)

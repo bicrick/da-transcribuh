@@ -25,7 +25,15 @@ enum Ink {
     static let card = window
     static let keycap = window
     static let sidebar = window
-    static let success = label
+    /// Classic MS Paint 16-color primaries — flat 8-bit fills only, used sparingly
+    /// (traffic lights, record dot, true success checks). Everything else stays B/W.
+    static let paintRed = color(light: "#ED1C24", dark: "#ED1C24")
+    static let paintYellow = color(light: "#FFF200", dark: "#FFF200")
+    static let paintGreen = color(light: "#22B14C", dark: "#22B14C")
+    static let paintBlue = color(light: "#3F48CC", dark: "#3F48CC")
+    /// Recording-active marker (status / island).
+    static let record = paintRed
+    static let success = paintGreen
     static let error = label
 
     // MARK: - Radii / stroke

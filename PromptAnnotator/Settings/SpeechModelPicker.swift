@@ -51,12 +51,14 @@ final class ModelTransfer: ObservableObject {
 struct SpeechModelPicker: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var transfer: ModelTransfer
-    var showsDownloadButton = true
     var horizontalTiles = true
     @State private var installed: Set<String> = []
 
+    /// Shared card height so Fast / Balanced / Highest tops and footers line up.
+    private let tileMinHeight: CGFloat = 248
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Ink.space3) {
             if horizontalTiles {
                 LazyVGrid(
                     columns: Array(repeating: GridItem(.flexible(), spacing: Ink.gridGap), count: 3),
@@ -71,26 +73,8 @@ struct SpeechModelPicker: View {
                     modelTile(choice)
                 }
             }
-            Text("Weights from argmaxinc/whisperkit-coreml. Size is the download. Speed and quality compare these three.")
-                .font(Ink.headingFont)
-                .foregroundStyle(Ink.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             if let message = transfer.message {
                 InkErrorBanner(message: message)
-            }
-            if showsDownloadButton {
-                HStack(spacing: 8) {
-                    Button(downloadTitle) {
-                        transfer.download(settings.speechModel)
-                    }
-                    .buttonStyle(InkSecondaryButtonStyle())
-                    .disabled(selectedIsInstalled || transfer.isWorking)
-                    if selectedIsInstalled {
-                        Label("On this Mac", systemImage: "checkmark.circle.fill")
-                            .font(Ink.captionFont)
-                            .foregroundStyle(Ink.success)
-                    }
-                }
             }
         }
         .onAppear(perform: refresh)
@@ -99,78 +83,101 @@ struct SpeechModelPicker: View {
         }
     }
 
-    private var selectedIsInstalled: Bool {
-        installed.contains(settings.speechModel)
-    }
-
-    private var downloadTitle: String {
-        guard transfer.workingVariant == settings.speechModel, let fraction = transfer.fraction else {
-            return selectedIsInstalled ? "Downloaded" : "Download"
-        }
-        return "Downloading \(Int((fraction * 100).rounded()))%"
-    }
-
     private func modelTile(_ choice: SpeechModelChoice) -> some View {
         let selected = settings.customModelID == nil && settings.speechModel == choice.variant
         let onDisk = installed.contains(choice.variant)
+        let downloading = transfer.workingVariant == choice.variant
         return Button {
             settings.setSpeechModel(choice.variant)
             transfer.message = nil
         } label: {
             InkTile(selected: selected) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: Ink.space3) {
+                    HStack(alignment: .top, spacing: Ink.space2) {
+                        InkRadio(selected: selected)
                         Image(systemName: iconName(for: choice))
                             .font(Ink.labelFont)
                             .foregroundStyle(Ink.label)
-                        Spacer(minLength: 4)
-                        if selected {
-                            ZStack {
-                                Rectangle().fill(Ink.label).frame(width: 18, height: 18)
-                                Image(systemName: "checkmark")
-                                    .font(Ink.microFont)
-                                    .foregroundStyle(Ink.onAccent)
-                            }
-                        }
+                            .frame(width: 16, alignment: .center)
+                        Spacer(minLength: 0)
                     }
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
+
+                    VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                        HStack(spacing: Ink.space2) {
                             Text(choice.title)
                                 .font(Ink.tileTitleFont)
                                 .foregroundStyle(Ink.label)
+                                .lineLimit(1)
                             if choice.isDefault {
-                                InkBadge(text: "Default", accented: true)
+                                InkBadge(text: "Default")
                             }
                         }
                         Text(choice.variant)
                             .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
-                    }
-                    Text(choice.detail)
-                        .font(Ink.captionFont)
-                        .foregroundStyle(Ink.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.leading)
-                        .frame(minHeight: 34, alignment: .topLeading)
-                    InkSegmentMeter(label: "Speed", fraction: choice.speed, emphasized: selected)
-                    InkSegmentMeter(label: "Quality", fraction: choice.quality, emphasized: selected)
-                    InkSegmentMeter(label: "Size", fraction: choice.size, emphasized: selected)
-                    if transfer.workingVariant == choice.variant, let fraction = transfer.fraction {
-                        InkProgressBar(fraction: fraction)
-                    } else if onDisk {
-                        Label("On disk", systemImage: "checkmark.circle.fill")
-                            .font(Ink.buttonSmallFont)
-                            .foregroundStyle(Ink.success)
-                    } else {
-                        Label("\(choice.megabytes) MB", systemImage: "arrow.down.circle")
-                            .font(Ink.buttonSmallFont)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        Text(choice.detail)
+                            .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading)
                     }
+
+                    VStack(alignment: .leading, spacing: Ink.space2) {
+                        InkSegmentMeter(label: "Speed", fraction: choice.speed)
+                        InkSegmentMeter(label: "Quality", fraction: choice.quality)
+                        InkSegmentMeter(label: "Size", fraction: choice.size)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    footer(for: choice, onDisk: onDisk, downloading: downloading)
                 }
+                .frame(maxWidth: .infinity, minHeight: tileMinHeight - 40, alignment: .topLeading)
             }
         }
         .buttonStyle(.plain)
-        .disabled(transfer.isWorking)
+        .disabled(transfer.isWorking && !downloading)
+    }
+
+    @ViewBuilder
+    private func footer(for choice: SpeechModelChoice, onDisk: Bool, downloading: Bool) -> some View {
+        if downloading, let fraction = transfer.fraction {
+            VStack(alignment: .leading, spacing: Ink.space1) {
+                InkProgressBar(fraction: fraction)
+                Text("Downloading \(Int((fraction * 100).rounded()))%")
+                    .font(Ink.buttonSmallFont)
+                    .foregroundStyle(Ink.secondary)
+            }
+        } else if onDisk {
+            HStack(spacing: Ink.space2) {
+                Image(systemName: "checkmark")
+                    .font(Ink.microFont)
+                    .foregroundStyle(Ink.success)
+                Text("On disk")
+                    .font(Ink.buttonSmallFont)
+                    .foregroundStyle(Ink.label)
+                Spacer(minLength: 0)
+            }
+        } else {
+            // Footer action (not a nested Button — those fight the card Button on macOS).
+            Text("Download \(choice.megabytes) MB")
+                .font(Ink.buttonSmallFont)
+                .foregroundStyle(Ink.label)
+                .padding(.horizontal, Ink.space2)
+                .padding(.vertical, Ink.space1)
+                .overlay(
+                    Rectangle()
+                        .strokeBorder(Ink.label, lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard !transfer.isWorking else { return }
+                    settings.setSpeechModel(choice.variant)
+                    transfer.download(choice.variant)
+                }
+        }
     }
 
     private func iconName(for choice: SpeechModelChoice) -> String {
