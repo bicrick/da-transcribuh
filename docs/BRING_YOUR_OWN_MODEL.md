@@ -1,12 +1,12 @@
 # Bring Your Own Model (BYOM)
 
-Design notes for Mutter’s speech-engine flexibility. **Implemented on `overnight-audit`:** custom WhisperKit Core ML folders, Hugging Face repo+variant downloads, and an optional OpenAI-compatible `/v1/audio/transcriptions` final engine (Keychain API key, live captions off). whisper.cpp remains deferred.
+Design notes for da transcribuh’s speech-engine flexibility. **Implemented on `overnight-audit`:** custom WhisperKit Core ML folders, Hugging Face repo+variant downloads, and an optional OpenAI-compatible `/v1/audio/transcriptions` final engine (Keychain API key, live captions off). whisper.cpp remains deferred.
 
-Original analysis goal: understand how hard it would be to let Mutter users plug in their own speech-to-text engine while keeping the current WhisperKit path as the default.
+Original analysis goal: understand how hard it would be to let da transcribuh users plug in their own speech-to-text engine while keeping the current WhisperKit path as the default.
 
 ## Current state
 
-Mutter’s live and final transcription go through `Transcribing` → `WhisperKitTranscriber`:
+da transcribuh’s live and final transcription go through `Transcribing` → `WhisperKitTranscriber`:
 
 - Fixed Hugging Face repo (`argmaxinc/whisperkit-coreml`) and a small set of English Core ML variants.
 - Local PCM for live decode; AAC file (or merged PCM) for the final pass.

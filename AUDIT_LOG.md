@@ -6,7 +6,12 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 
 ---
 
-## Final summary (Runs 1–14)
+## Final summary (Runs 1–15)
+
+### Run 15a — README + brand assets (da transcribuh)
+
+- Repo is `bicrick/da-transcribuh`. README restyled (lowercase/mellow); assets under `assets/brand/`.
+- Docs URLs/name updated. No broken `demo.gif`. DMG link still points at real `Mutter.dmg` asset until renamed on a future release.
 
 ### What changed overall (kept)
 
@@ -22,10 +27,18 @@ Branch: `overnight-audit` (from `main`). Linux VM — no Xcode build. Changes ke
 | **Ink restyle (Run 13)** | Settings + onboarding “Ink” theme (warm paper + logo red); shared design system; continuous waveform→pen motif; Advanced copy fix. Recording island/overlay untouched. |
 | **Ink polish (Run 13b)** | Fixed stacked top padding (~90pt); custom Ink sidebar selection (no system blue List highlight). |
 | **Paste hold (Run 14)** | Skip synthetic ⌘V when no editable focus; stage multi-rep clipboard; menu “Ready to paste”; ⌃⌥V still sequential. Cancel discards. |
+| **Brand / README (Run 15a)** | da transcribuh README + `assets/brand/` (banner, logo, social previews, bubble16). |
 
 ### Reverted (Run 9, still gone)
 
 - **Quiet-room calibration** — fixed SpeechGate **0.28** (matches `main`). No dangling Swift/pbxproj refs.
+
+### Run 15a (README + brand)
+
+- `assets/brand/`: readme-banner, social-preview 1x/2x, icon-a-bubble-1024, logo-a-bubble, bubble16.
+- README matches mock top (banner, one-liner, link row, install). Honest links only (MIT exists; DMG is still named `Mutter.dmg` on the v0.9.0-beta.2 release; no demo gif yet — HTML TODO).
+- `docs/BRING_YOUR_OWN_MODEL.md` → da transcribuh naming; clone URL `bicrick/da-transcribuh`.
+- Patrick must upload social preview in GitHub repo Settings (not API-settable here).
 
 ### Run 14 (Paste when no text field)
 

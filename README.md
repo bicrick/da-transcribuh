@@ -1,48 +1,89 @@
 <p align="center">
-  <img src="assets/mark.png" width="96" alt="Mutter">
+  <img src="assets/brand/readme-banner.png" alt="da transcribuh — talk. it types. drag if u want the picture too." width="920">
 </p>
 
-<h1 align="center">Mutter</h1>
-
-<p align="center">Talk, and capture the screen when you want the picture with the words.</p>
-
-<p align="center">Open source, <a href="LICENSE">MIT</a>.</p>
+<p align="center">dictation in ur menu bar. grab the screen when u want the picture with the words.</p>
 
 <p align="center">
-  <img src="assets/recording-pill.png" width="440" alt="Recording pill">
+  <a href="https://github.com/bicrick/da-transcribuh/releases/latest">download</a>
+  ·
+  <a href="#install">build from source</a>
+  ·
+  <a href="LICENSE">MIT</a>
+  ·
+  macOS 14+
 </p>
 
-<p align="center">
-  <img src="assets/markup-bar.png" width="480" alt="Markup bar">
-</p>
+<!-- TODO: drop a short demo gif at assets/demo.gif (talk, drag, paste) and embed it here when ready -->
 
-<p align="center">
-  <img src="assets/settings.png" width="680" alt="Mutter window">
-</p>
+## install
 
-## Install
+download the [latest beta dmg](https://github.com/bicrick/da-transcribuh/releases/download/v0.9.0-beta.2/Mutter.dmg), open it, drag it to applications. done.
 
-Download [Mutter.dmg](https://github.com/bicrick/mutter/releases/download/v0.9.0-beta.2/Mutter.dmg), open it, and drag Mutter to Applications.
+<!-- TODO: rename the release asset to da-transcribuh.dmg on the next cut; the current file is still Mutter.dmg -->
 
-To build from source:
+from source:
 
 ```sh
-git clone https://github.com/bicrick/mutter.git
-cd mutter
+git clone https://github.com/bicrick/da-transcribuh.git
+cd da-transcribuh
 open PromptAnnotator.xcodeproj
 ```
 
-macOS 14 or later. The first build fetches WhisperKit.
+macos 14 or later. the first build fetches whisperkit.
 
-## Shortcuts
+## what it does
+
+- lives in the menu bar. press the shortcut, talk, press it again. words land on the clipboard (and paste into the front app when that makes sense).
+- hold **shift** and drag to grab a piece of the screen. release shift to keep the tile. stop the session and you get the picture with the words.
+- sessions save under `~/Documents/PromptAnnotator/Sessions/` (folder name stays put so your history doesn’t vanish).
+- on-device speech via whisperkit. bring your own core ml folder or hugging face variant if you want. optional openai-compatible server for the final transcript only.
+
+## shortcuts
 
 | | |
 | --- | --- |
-| Start and stop | Control-Option-Space |
-| Mark | Hold Shift |
-| Capture | Release Shift |
-| Clipboard | Stop puts the sheet and the transcript on the clipboard |
+| start / stop | control-option-space (changeable) |
+| mark / capture | hold shift, drag, release |
+| paste image + text | control-option-v |
+| cancel take | optional; set one in configuration |
 
-Sessions are saved in `~/Documents/PromptAnnotator/Sessions/`.
+## permissions
 
-Screen Recording, Microphone, and Accessibility.
+needs three switches. after you flip them, reopen the app so they stick.
+
+- **microphone** — hears you
+- **screen recording** — grabs the tiles you drag
+- **accessibility** — watches the shortcut and shift
+
+## models
+
+open **models** in the settings window.
+
+- **on this mac (whisperkit)** — built-in english models (fast / balanced / highest). balanced is the default. download once; it stays on disk.
+- **your models** — add a local whisperkit core ml folder, or pull another hugging face variant.
+- **openai-compatible server** — optional. final transcript only via `/v1/audio/transcriptions`. live captions stay off. api key lives in the keychain.
+
+more detail: [`docs/BRING_YOUR_OWN_MODEL.md`](docs/BRING_YOUR_OWN_MODEL.md).
+
+## paste behavior
+
+when you stop a session, da transcribuh stages the sheet and the transcript. if a text field is focused, it pastes for you. if not, it leaves everything on the pasteboard and the menu bar says it’s ready — hit ⌃⌥V or ⌘V wherever you’re typing.
+
+cancel drops the take. nothing gets staged.
+
+## troubleshooting
+
+- **no speech detected** — quiet rooms do that on purpose. say a sentence next time.
+- **permissions look on but nothing works** — turn the switch off and on, then reopen.
+- **model missing** — open models and download balanced (or whatever you picked).
+- **paste missed the field** — check the menu bar for the ready-to-paste hint, focus a text field, then ⌃⌥V.
+- **updates** — configuration → check. releases live at [github.com/bicrick/da-transcribuh/releases](https://github.com/bicrick/da-transcribuh/releases).
+
+## brand bits
+
+logo and social preview art sit in [`assets/brand/`](assets/brand/). patrick: upload `social-preview-1280x640.png` (and the `@2x` if you want) under the repo’s **settings → general → social preview** — that part isn’t settable from here.
+
+## license
+
+[MIT](LICENSE). free and open source. be kind.
