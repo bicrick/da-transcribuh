@@ -38,13 +38,13 @@ struct RecordingIslandView: View {
         .padding(.horizontal, IslandMetrics.inset)
         .frame(width: layout.panel.width, height: layout.panel.height)
         .background {
-            // Solid B/W chrome (no vibrancy). Hard offset shadow omitted — ChromePanel
-            // masks to bounds; a 1px outline is enough without clipping or extra padding.
+            // Solid Paint chrome (no vibrancy). Hard offset shadow omitted — ChromePanel
+            // masks to bounds; a chunky outline is enough without clipping.
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
                 .fill(Ink.window)
                 .overlay(
                     RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                        .strokeBorder(Ink.label, lineWidth: 1)
+                        .strokeBorder(Ink.label, lineWidth: 1.5)
                 )
         }
         .accessibilityElement(children: .ignore)

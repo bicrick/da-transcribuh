@@ -28,99 +28,112 @@ struct HomePage: View {
     }
 
     private var hero: some View {
-        InkCard {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .center, spacing: Ink.space3) {
-                    AppLogo(side: 40)
-                    VStack(alignment: .leading, spacing: Ink.titleDescGap) {
-                        HStack(spacing: Ink.space2) {
-                            DTWordmark(size: 16)
-                            InkBadge(text: AppVersion.label)
-                        }
-                        Text("Dictation in the menu bar. Capture the screen when you want the picture with the words.")
-                            .font(Ink.bodyFont)
-                            .foregroundStyle(Ink.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: Ink.space4) {
+                AppLogo(side: 48)
+                    .background(
+                        Rectangle()
+                            .fill(Ink.paintBlue)
+                            .offset(x: Ink.hardShadow, y: Ink.hardShadow)
+                    )
+                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                    HStack(spacing: Ink.space2) {
+                        DTWordmark(size: 20)
+                        Text(AppVersion.label)
+                            .font(Ink.badgeFont)
+                            .foregroundStyle(Ink.paintBlack)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Ink.paintYellow)
+                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
                     }
-                    Spacer(minLength: 0)
+                    Text("Dictation in the menu bar. Capture the screen when you want the picture with the words.")
+                        .font(Ink.bodyFont)
+                        .foregroundStyle(Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(Ink.cardPad)
+                Spacer(minLength: 0)
+            }
 
-                Rectangle().fill(Ink.label).frame(height: 1)
-
-                HStack(alignment: .center, spacing: Ink.space3) {
-                    VStack(alignment: .leading, spacing: Ink.titleDescGap) {
-                        HStack(spacing: Ink.space2) {
-                            Rectangle()
-                                .fill(Ink.label)
-                                .frame(width: 8, height: 8)
-                            Text(startRowTitle)
-                                .font(Ink.labelFont)
-                                .foregroundStyle(Ink.label)
-                        }
-                        Text(startRowDetail)
-                            .font(Ink.captionFont)
-                            .foregroundStyle(Ink.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(alignment: .center, spacing: Ink.space3) {
+                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                    HStack(spacing: Ink.space2) {
+                        Rectangle()
+                            .fill(Ink.record)
+                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                            .frame(width: 10, height: 10)
+                        Text(startRowTitle)
+                            .font(Ink.labelFont)
+                            .foregroundStyle(Ink.label)
                     }
-                    Spacer(minLength: Ink.space2)
-                    InkKeycapRow(keys: settings.chord.keycaps)
-                    Button {
-                        session.toggle()
-                    } label: {
-                        Label(
-                            session.phase == .recording ? "Stop" : "Start",
-                            systemImage: session.phase == .recording ? "stop.circle.fill" : "record.circle"
-                        )
-                    }
-                    .buttonStyle(InkPrimaryButtonStyle(large: true, enabled: !session.isBusy))
-                    .disabled(session.isBusy)
-                    .accessibilityLabel(session.phase == .recording ? "Stop session" : "Start session")
-                    .accessibilityHint("Shortcut \(settings.chord.display)")
+                    Text(startRowDetail)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(Ink.cardPad)
+                Spacer(minLength: Ink.space2)
+                InkKeycapRow(keys: settings.chord.keycaps)
+                Button {
+                    session.toggle()
+                } label: {
+                    HStack(spacing: Ink.space2) {
+                        Rectangle()
+                            .fill(Ink.record)
+                            .overlay(Rectangle().strokeBorder(Ink.onAccent, lineWidth: 1))
+                            .frame(width: 8, height: 8)
+                        Text(session.phase == .recording ? "Stop" : "Start")
+                            .font(Ink.buttonFont)
+                    }
+                }
+                .buttonStyle(InkPrimaryButtonStyle(large: true, enabled: !session.isBusy))
+                .background(
+                    Rectangle()
+                        .fill(Ink.paintRed)
+                        .offset(x: Ink.hardShadow, y: Ink.hardShadow)
+                )
+                .disabled(session.isBusy)
+                .accessibilityLabel(session.phase == .recording ? "Stop session" : "Start session")
+                .accessibilityHint("Shortcut \(settings.chord.display)")
+            }
+            .padding(.top, Ink.space5)
+            .overlay(alignment: .top) {
+                Rectangle().fill(Ink.hairline).frame(height: 1)
+                    .padding(.top, Ink.space4)
             }
         }
     }
 
     private var stats: some View {
         let numbers = SessionLibrary.stats(from: sessions)
-        return LazyVGrid(
-            columns: Array(repeating: GridItem(.flexible(), spacing: Ink.gridGap), count: 4),
-            spacing: Ink.gridGap
-        ) {
-            statTile(icon: "mic", value: numbers.sessions, label: numbers.sessions == 1 ? "Session" : "Sessions")
-            statTile(icon: "photo", value: numbers.tiles, label: numbers.tiles == 1 ? "Tile" : "Tiles")
-            statTile(icon: "text.alignleft", value: numbers.words, label: numbers.words == 1 ? "Word" : "Words")
-            statTile(icon: "timer", value: numbers.minutes, label: numbers.minutes == 1 ? "Minute" : "Minutes")
+        let accents = [Ink.paintBlue, Ink.paintOrange, Ink.paintMagenta, Ink.paintGreen]
+        let items: [(String, Int, String)] = [
+            ("Sessions", numbers.sessions, numbers.sessions == 1 ? "Session" : "Sessions"),
+            ("Tiles", numbers.tiles, numbers.tiles == 1 ? "Tile" : "Tiles"),
+            ("Words", numbers.words, numbers.words == 1 ? "Word" : "Words"),
+            ("Minutes", numbers.minutes, numbers.minutes == 1 ? "Minute" : "Minutes"),
+        ]
+        return HStack(alignment: .top, spacing: Ink.gridGap) {
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                VStack(alignment: .leading, spacing: Ink.space2) {
+                    Text("\(item.1)")
+                        .font(Ink.numberFont)
+                        .monospacedDigit()
+                        .foregroundStyle(Ink.label)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    Text(item.2.uppercased())
+                        .font(Ink.headingFont)
+                        .foregroundStyle(Ink.secondary)
+                    Rectangle()
+                        .fill(accents[index])
+                        .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                        .frame(height: 4)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
-    }
-
-    private func statTile(icon: String, value: Int, label: String) -> some View {
-        VStack(alignment: .leading, spacing: Ink.space2) {
-            Image(systemName: icon)
-                .font(Ink.labelFont)
-                .foregroundStyle(Ink.label)
-            Text("\(value)")
-                .font(Ink.numberFont)
-                .monospacedDigit()
-                .foregroundStyle(Ink.label)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(label.uppercased())
-                .font(Ink.headingFont)
-                .foregroundStyle(Ink.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
-        .padding(Ink.space3)
-        .overlay(
-            Rectangle()
-                .strokeBorder(Ink.label, lineWidth: 1)
-        )
     }
 
     private var checklist: some View {
@@ -131,13 +144,22 @@ struct HomePage: View {
                 Text("\(done) of \(items.count) done".uppercased())
                     .font(Ink.headingFont)
                     .foregroundStyle(Ink.label)
-                InkProgressBar(fraction: items.isEmpty ? 0 : Double(done) / Double(items.count))
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Ink.window)
+                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1.5))
+                        Rectangle()
+                            .fill(Ink.paintLime)
+                            .frame(width: max(0, geo.size.width * (items.isEmpty ? 0 : CGFloat(done) / CGFloat(items.count))))
+                            .overlay(alignment: .trailing) {
+                                Rectangle().fill(Ink.label).frame(width: 1)
+                            }
+                    }
+                }
+                .frame(height: 8)
             }
-            .padding(.horizontal, Ink.rowHPad)
-            .padding(.vertical, Ink.space3)
-            .overlay(alignment: .bottom) {
-                Rectangle().fill(Ink.label).frame(height: 1)
-            }
+            .padding(.bottom, Ink.space3)
 
             ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                 HStack(alignment: .top, spacing: Ink.space3) {
@@ -158,29 +180,26 @@ struct HomePage: View {
                         trail
                     }
                 }
-                .padding(.horizontal, Ink.rowHPad)
                 .padding(.vertical, Ink.space3)
                 .overlay(alignment: .bottom) {
-                    Rectangle().fill(Ink.label).frame(height: 1)
+                    Rectangle().fill(Ink.hairline).frame(height: 1)
                 }
             }
         }
-        .overlay(
-            Rectangle()
-                .strokeBorder(Ink.label, lineWidth: 1)
-        )
     }
 
     private var tips: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            tipRow(
-                icon: "viewfinder",
+        HStack(alignment: .top, spacing: Ink.gridGap) {
+            tipColumn(
+                color: Ink.paintCyan,
+                glyph: "viewfinder",
                 title: "Talk, or drag to capture",
                 detail: "Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.",
                 trailing: nil
             )
-            tipRow(
-                icon: "folder",
+            tipColumn(
+                color: Ink.paintOrange,
+                glyph: "folder",
                 title: "Sessions folder",
                 detail: SessionStore.displayPath(),
                 trailing: AnyView(
@@ -193,35 +212,39 @@ struct HomePage: View {
                 )
             )
         }
-        .overlay(
-            Rectangle()
-                .strokeBorder(Ink.label, lineWidth: 1)
-        )
     }
 
-    private func tipRow(icon: String, title: String, detail: String, trailing: AnyView?) -> some View {
-        HStack(alignment: .center, spacing: Ink.space3) {
-            InkIconChip(systemName: icon)
-            VStack(alignment: .leading, spacing: Ink.titleDescGap) {
-                Text(title)
+    private func tipColumn(
+        color: Color,
+        glyph: String,
+        title: String,
+        detail: String,
+        trailing: AnyView?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: Ink.space2) {
+            ZStack {
+                Rectangle()
+                    .fill(color)
+                Rectangle()
+                    .strokeBorder(Ink.label, lineWidth: 1.5)
+                Image(systemName: glyph)
                     .font(Ink.labelFont)
-                    .foregroundStyle(Ink.label)
-                Text(detail)
-                    .font(Ink.captionFont)
-                    .foregroundStyle(Ink.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(Ink.paintBlack)
             }
-            Spacer(minLength: Ink.space2)
+            .frame(width: 28, height: 28)
+            Text(title)
+                .font(Ink.labelFont)
+                .foregroundStyle(Ink.label)
+            Text(detail)
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             if let trailing {
                 trailing
             }
         }
-        .padding(.horizontal, Ink.rowHPad)
-        .padding(.vertical, Ink.space3)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Ink.label).frame(height: 1)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private struct ChecklistItem {

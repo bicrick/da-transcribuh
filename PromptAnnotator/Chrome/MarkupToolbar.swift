@@ -30,17 +30,24 @@ struct MarkupToolbarView: View {
                 colorButton(color)
             }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 44)
+        .padding(.horizontal, 10)
+        .frame(height: 46)
         .fixedSize(horizontal: true, vertical: false)
         .background {
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
                 .fill(Ink.window)
                 .overlay(
                     RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                        .strokeBorder(Ink.label, lineWidth: 1)
+                        .strokeBorder(Ink.label, lineWidth: 1.5)
+                )
+                .background(
+                    RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
+                        .fill(Ink.label)
+                        .offset(x: Ink.hardShadow, y: Ink.hardShadow)
                 )
         }
+        .padding(.trailing, Ink.hardShadow)
+        .padding(.bottom, Ink.hardShadow)
     }
 
     private var captureButton: some View {

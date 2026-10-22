@@ -13,6 +13,17 @@ struct DTMenuBarPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                DTWordmark(size: 11)
+                Spacer(minLength: 0)
+                InkPaintSwatchStrip(size: 7, limit: 6)
+            }
+            .padding(.horizontal, Ink.space3)
+            .padding(.vertical, Ink.space2)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Ink.label).frame(height: 1)
+            }
+
             row("open da transcribuh") {
                 SettingsPresenter.shared.show()
             }

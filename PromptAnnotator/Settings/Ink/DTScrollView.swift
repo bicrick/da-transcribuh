@@ -74,9 +74,9 @@ struct DTScrollView<Content: View>: View {
                             else { flash() }
                         }
                     )
-                    .padding(.vertical, 2)
-                    .padding(.trailing, 2)
-                    .opacity((visible || hovering || dragging) ? 1 : 0)
+                    .padding(.vertical, Ink.scrollerInset)
+                    .padding(.trailing, Ink.scrollerInset)
+                    .opacity((visible || hovering || dragging) ? 0.85 : 0)
                     .animation(.easeOut(duration: 0.18), value: visible || hovering || dragging)
                 }
             }

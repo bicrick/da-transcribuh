@@ -294,17 +294,35 @@ struct InkCheck: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .strokeBorder(Ink.label, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                .fill(done ? Ink.paintGreen : Ink.window)
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                .strokeBorder(Ink.label, lineWidth: 1.5)
             if done {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Ink.window)
                 Image(systemName: "checkmark")
-                    .font(Ink.microFont)
-                    .foregroundStyle(Ink.success)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Ink.paintBlack)
             }
         }
         .frame(width: 16, height: 16)
+    }
+}
+
+/// Classic Paint palette strip (status bar / title).
+struct InkPaintSwatchStrip: View {
+    var size: CGFloat = 8
+    var limit: Int = 10
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(Array(Ink.paintSwatches.prefix(limit).enumerated()), id: \.offset) { _, swatch in
+                Rectangle()
+                    .fill(swatch)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                    .frame(width: size, height: size)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -774,12 +792,19 @@ struct DTStatusBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
+            InkPaintSwatchStrip(size: 8, limit: 4)
+                .padding(.horizontal, 10)
+                .frame(height: Ink.statusBarHeight)
+            Rectangle()
+                .fill(Ink.label)
+                .frame(width: 1, height: Ink.statusBarHeight)
+
             ForEach(Array(cells.enumerated()), id: \.offset) { index, cell in
                 HStack(spacing: 6) {
                     if index == 0 {
                         Rectangle()
                             .fill(recording ? Ink.record : Ink.label)
-                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: recording ? 1 : 0))
+                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
                             .frame(width: 7, height: 7)
                     }
                     Text(cell)
@@ -789,13 +814,10 @@ struct DTStatusBar: View {
                 .padding(.horizontal, 10)
                 .frame(height: Ink.statusBarHeight)
                 Rectangle()
-                    .fill(Ink.hairline)
+                    .fill(Ink.label)
                     .frame(width: 1, height: Ink.statusBarHeight)
             }
             Spacer(minLength: 0)
-            Rectangle()
-                .fill(Ink.hairline)
-                .frame(width: 1, height: Ink.statusBarHeight)
             Text(trailing)
                 .font(Ink.statusFont)
                 .foregroundStyle(Ink.secondary)
@@ -805,7 +827,7 @@ struct DTStatusBar: View {
         .frame(height: Ink.statusBarHeight)
         .frame(maxWidth: .infinity)
         .overlay(alignment: .top) {
-            Rectangle().fill(Ink.label).frame(height: 1)
+            Rectangle().fill(Ink.label).frame(height: 2)
         }
         .background(Ink.window)
     }

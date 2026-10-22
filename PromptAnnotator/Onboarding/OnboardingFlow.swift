@@ -98,11 +98,10 @@ struct OnboardingFlow: View {
     /// Wordmark strip — same language as Settings, without SettingsPresenter traffic lights.
     private var onboardingChrome: some View {
         ZStack {
-            DTWordmark(size: 12)
+            DTWordmark(size: 13)
             HStack {
                 Spacer()
-                DTDitherGrip()
-                    .frame(width: 100, height: 12)
+                InkPaintSwatchStrip(size: 8, limit: 8)
                     .padding(.trailing, 14)
                     .allowsHitTesting(false)
             }
@@ -113,7 +112,7 @@ struct OnboardingFlow: View {
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Ink.label)
-                .frame(height: 1)
+                .frame(height: 2)
         }
     }
 

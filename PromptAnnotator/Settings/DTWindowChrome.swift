@@ -13,14 +13,12 @@ struct DTTitleStrip: View {
                     .padding(.leading, 12)
                     .zIndex(1)
                 Spacer(minLength: 0)
-                DTDitherGrip()
-                    .frame(maxWidth: 160)
-                    .frame(height: 12)
+                InkPaintSwatchStrip(size: 9, limit: 10)
                     .padding(.trailing, 14)
                     .allowsHitTesting(false)
             }
 
-            DTWordmark(size: 12)
+            DTWordmark(size: 13)
                 .allowsHitTesting(false)
         }
         .frame(height: Ink.titleStripHeight)
@@ -34,7 +32,7 @@ struct DTTitleStrip: View {
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Ink.label)
-                .frame(height: 1)
+                .frame(height: 2)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("da transcribuh window")

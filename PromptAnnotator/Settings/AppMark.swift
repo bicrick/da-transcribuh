@@ -9,6 +9,7 @@ struct AppLogo: View {
             .resizable()
             .interpolation(.high)
             .frame(width: side, height: side)
+            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1.5))
             .accessibilityLabel("da transcribuh")
     }
 }
