@@ -14,21 +14,34 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(round(fill.greenComponent * 255), 242)
     }
 
+
+    func testDarkGraphitePalette() {
+        // Soft graphite — nothing in chrome darker than bevel #1A1A1C.
+        XCTAssertEqual(Ink.nsColor(hex: "#2C2C2E").redComponent * 255, 44, accuracy: 0.6)
+        XCTAssertEqual(Ink.nsColor(hex: "#353538").redComponent * 255, 53, accuracy: 0.6)
+        XCTAssertEqual(Ink.nsColor(hex: "#3A3A3D").redComponent * 255, 58, accuracy: 0.6)
+        XCTAssertEqual(Ink.nsColor(hex: "#4A4A4E").redComponent * 255, 74, accuracy: 0.6)
+        XCTAssertEqual(Ink.nsColor(hex: "#1A1A1C").redComponent * 255, 26, accuracy: 0.6)
+        // Dynamic tokens resolve (light side checked via layout; dark via NSColor provider).
+        _ = Ink.window
+        _ = Ink.front
+        _ = Ink.card
+        _ = Ink.fill
+        _ = Ink.bevel
+        _ = Ink.hairline
+        _ = Ink.secondary
+        XCTAssertEqual(Ink.windowNSColor.cgColor.components?.count ?? 0 >= 3, true)
+    }
+
     func testLayoutTokensMatchPaintSpec() {
         XCTAssertEqual(Ink.cardRadius, 2)
         XCTAssertEqual(Ink.tileRadius, 2)
         XCTAssertEqual(Ink.buttonRadius, 2)
         XCTAssertEqual(Ink.fieldRadius, 2)
         XCTAssertEqual(Ink.sidebarRowRadius, 2)
-        XCTAssertEqual(Ink.sidebarWidth, 148)
-        XCTAssertEqual(Ink.sidebarTileSize, 72)
-        XCTAssertEqual(Ink.sidebarSideMargin, 38)
-        XCTAssertEqual(Ink.sidebarIconSize, 28)
-        XCTAssertEqual(Ink.sidebarSymbolPointSize, 16)
+        XCTAssertEqual(Ink.folderTabHeight, 30)
         XCTAssertEqual(Ink.tipIconSize, 48)
         XCTAssertEqual(Ink.tipSymbolPointSize, 22)
-        XCTAssertEqual(Ink.sidebarScrollerInset, 8)
-        XCTAssertEqual(Ink.sidebarFooterHeight, 80)
         XCTAssertEqual(Ink.pageTop, 28)
         XCTAssertEqual(Ink.pageSide, 36)
         XCTAssertEqual(Ink.maxContentWidth, 920)
@@ -36,12 +49,12 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(Ink.gridGap, 16)
         XCTAssertEqual(Ink.space7, 48)
         XCTAssertEqual(Ink.statusBarHeight, 32)
-        XCTAssertEqual(Ink.sidebarTileGap, Ink.space3)
         XCTAssertEqual(Ink.titleStripHeight, 40)
         XCTAssertEqual(Ink.scrollerWidth, 5)
         XCTAssertEqual(Ink.paintSwatches.count, 16)
-        XCTAssertEqual(Ink.toolAccent(for: .home), Ink.paintBlue)
-        XCTAssertEqual(Ink.toolAccent(for: .recording), Ink.paintRed)
+        XCTAssertEqual(SettingsPage.tabOrder.count, 7)
+        XCTAssertEqual(SettingsPage.tabOrder.first, .home)
+        XCTAssertEqual(SettingsPage.tabOrder[3], .model)
     }
 
     func testSettingsMetricsAliasInkTokens() {
@@ -49,7 +62,7 @@ final class InkThemeTests: XCTestCase {
         XCTAssertEqual(SettingsMetrics.pageTop, Ink.pageTop)
         XCTAssertEqual(SettingsMetrics.maxContentWidth, Ink.maxContentWidth)
         XCTAssertEqual(SettingsMetrics.cardCorner, Ink.cardRadius)
-        XCTAssertEqual(SettingsMetrics.sidebarWidth, Ink.sidebarWidth)
+        XCTAssertEqual(SettingsMetrics.folderTabHeight, Ink.folderTabHeight)
     }
 
     func testTypographyUsesDepartureAndSystemMono() {

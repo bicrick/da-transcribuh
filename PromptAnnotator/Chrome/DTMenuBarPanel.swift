@@ -16,7 +16,6 @@ struct DTMenuBarPanel: View {
             HStack {
                 DTWordmark(size: 11)
                 Spacer(minLength: 0)
-                InkPaintSwatchStrip(size: 7, limit: 6)
             }
             .padding(.horizontal, Ink.space3)
             .padding(.vertical, Ink.space2)
@@ -64,7 +63,7 @@ struct DTMenuBarPanel: View {
         )
         .background(alignment: .topLeading) {
             Rectangle()
-                .fill(Ink.label)
+                .fill(Ink.bevel)
                 .offset(x: shadow, y: shadow)
         }
         .padding(.trailing, shadow)

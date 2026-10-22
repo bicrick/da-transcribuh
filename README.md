@@ -22,13 +22,15 @@
 
 ## look
 
-ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset shadows, and a toolbox sidebar. departure mono for every “da transcribuh” wordmark and chrome label (lowercase, block cursor only after the h — never italic). sf mono for longer copy. custom thin scrollers.
+ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset shadows, and manila **folder tabs** across the top of settings (no toolbox sidebar). departure mono for every “da transcribuh” wordmark and chrome label (lowercase, block cursor only after the h — never italic). sf mono for longer copy. custom thin scrollers. chrome keeps decorative palette strips out of the title bar and status bar.
 
-appearance is system / light / dark from **general**, or mash `theme: …` in the menu bar to cycle. light stays white; dark is charcoal (~#1e1e1e), not crushed black — surfaces a step lighter, hairlines soft gray, text off-white. paint accents stay vivid.
+appearance is system / light / dark from **general**, or mash `theme: …` in the menu bar to cycle. light stays white; dark is soft graphite (window `#2C2C2E`, raised `#353538`, front `#3A3A3D`, hairline `#4A4A4E`, text `#F2F2F2` / `#A8A8AD`, bevel floor `#1A1A1C`) — never midnight black. paint accents stay vivid.
 
 the start/stop chord lives in **general** as paint keycaps — click, press a combo (modifier required, or a function key), it rebinds live. reset drops you back on ⌃⌥Space. home, the status bar, the menu panel, and onboarding all read the same stored shortcut.
 
-the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform, screenshot-count chip on the right when you’ve grabbed a tile (the chip slot fully collapses when there are none). default size is the everyday footprint; compact is the same layout, tighter. same double-pane hard offset as the settings sidebar tiles (ink.label block down-right) — no palette strip, no extra chrome.
+the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform, screenshot-count chip on the right when you’ve grabbed a tile (the chip slot fully collapses when there are none). default size is the everyday footprint; compact is the same layout, tighter. same double-pane hard offset as selected chrome (`Ink.bevel` block down-right) — no palette strip, no extra chrome.
+
+the app mark is Departure Mono **d** + inverted **t** (white knock-out on a black block) inside a white square with a black hard-offset bevel. dark mode keeps that tile white; the bevel uses `#1A1A1C`. regenerate icons with `scripts/render_dt_icon.py`.
 
 <p align="center">
   <img src="assets/brand/screenshots/settings-home-light.png" alt="da transcribuh settings — home" width="920">
@@ -46,7 +48,7 @@ the recording island stays minimal and symmetric: paint-red record square + fixe
   <img src="assets/brand/mocks/icon-concepts.png" alt="da transcribuh app icon concepts" width="920">
 </p>
 
-<p align="center"><em>icon concepts (not shipped) · recommend #1 dt-block square + red shadow</em></p>
+<p align="center"><em>icon concepts · <strong>chosen:</strong> d + inverted-t on white square + black bevel (ships as AppIcon)</em></p>
 
 ## install
 
@@ -70,7 +72,7 @@ macos 14 or later. the first build fetches whisperkit.
 - hold **shift** and drag to grab a piece of the screen. release shift to keep the tile. stop the session and you get the picture with the words.
 - sessions save under `~/Documents/PromptAnnotator/Sessions/` (folder name stays put so your history doesn’t vanish).
 - on-device speech via whisperkit. bring your own core ml folder or hugging face variant if you want. optional openai-compatible server for the final transcript only.
-- settings window with a tool-palette sidebar, status bar, paint keycap shortcut recorder in general, and the appearance switcher (or `theme: …` in the menu bar). models page for downloads and byom.
+- settings window with folder-tab navigation, status bar, paint keycap shortcut recorder in general, and the appearance switcher (or `theme: …` in the menu bar). models page for downloads and byom.
 
 ## shortcuts
 
@@ -124,7 +126,7 @@ final **dt block** art lives in [`assets/brand/`](assets/brand/):
 - `screenshots/settings-home-light.png` — settings home mock embedded in the readme (dark twin: `settings-home-dark.png`)
 - `mocks/home-paint-light.png` — Paint-direction lock mock (dark twin: `home-paint-dark.png`)
 - `mocks/recording-paint-light.png` — recording island default size with a capture (dark twin: `recording-paint-dark.png`; empty: `recording-paint-empty-{light,dark}.png`)
-- `mocks/icon-concepts.png` — app icon explorations (AppIcon not replaced); recommend #1 dt-block square + red shadow
+- `mocks/icon-concepts.png` — app icon explorations; chosen mark is d + inverted-t / white square / black bevel (also AppIcon)
 - `menubar-g-dt-block-16.png` / `menubar-g-dt-block-32.png` — template menu-bar glyph
 
 patrick: upload `assets/brand/social-preview.png` under the repo’s **settings → general → social preview** at launch (repo stays private until then). that part isn’t settable from here.

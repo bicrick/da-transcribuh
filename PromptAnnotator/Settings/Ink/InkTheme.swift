@@ -2,32 +2,39 @@ import AppKit
 import SwiftUI
 
 /// "da transcribuh" chrome — MS Paint retro: flat color accents, chunky outlines,
-/// hard offset shadows, Departure Mono labels. Light stays white; dark is charcoal
-/// (not pure black) so the Paint accents still pop.
+/// hard offset shadows, Departure Mono labels. Light stays white; dark is soft
+/// graphite (never near-black) so the Paint accents still pop.
 /// Kept under the `Ink` name so existing call sites stay compile-safe.
 enum Ink {
     // MARK: - Dynamic surfaces (light / dark)
+    //
+    // Dark graphite (Patrick): window #2C2C2E · raised/cards #353538 · front #3A3A3D
+    // hairline #4A4A4E · secondary #A8A8AD · label #F2F2F2 · bevel #1A1A1C (floor).
 
-    /// Charcoal dark (~#1E1E1E) — softer than pure black.
-    static let window = color(light: "#FFFFFF", dark: "#1E1E1E")
-    static let canvas = color(light: "#FFFFFF", dark: "#1E1E1E")
-    static let label = color(light: "#000000", dark: "#EDEDED")
-    static let onAccent = color(light: "#FFFFFF", dark: "#1E1E1E")
+    /// Outer chrome / title / status / page gutter.
+    static let window = color(light: "#FFFFFF", dark: "#2C2C2E")
+    static let canvas = color(light: "#FFFFFF", dark: "#2C2C2E")
+    static let label = color(light: "#000000", dark: "#F2F2F2")
+    static let onAccent = color(light: "#FFFFFF", dark: "#2C2C2E")
     /// Primary fill / border rule.
     static let accent = label
     static let accentSoft = fill
-    static let sidebarSelection = label
-    static let hairline = color(light: "#C0C0C0", dark: "#3A3A3A")
+    static let hairline = color(light: "#C0C0C0", dark: "#4A4A4E")
     static let borderStrong = label
-    static let fill = color(light: "#F0F0F0", dark: "#2B2B2B")
+    /// Raised surfaces, tab shelf, inset wells.
+    static let fill = color(light: "#F0F0F0", dark: "#353538")
     static let track = hairline
     static let meter = label
-    static let secondary = color(light: "#666666", dark: "#A8A8A8")
-    static let tertiary = color(light: "#999999", dark: "#6E6E6E")
-    static let field = window
-    static let card = window
-    static let keycap = window
-    static let sidebar = color(light: "#F7F7F7", dark: "#232323")
+    static let secondary = color(light: "#666666", dark: "#A8A8AD")
+    static let tertiary = color(light: "#999999", dark: "#7A7A80")
+    /// Selected tab + content front pane (slightly above window).
+    static let front = color(light: "#FFFFFF", dark: "#3A3A3D")
+    /// Cards / raised panels.
+    static let card = color(light: "#FFFFFF", dark: "#353538")
+    static let field = front
+    static let keycap = front
+    /// Double-pane hard offset — darkest UI paint; nothing darker except this bevel.
+    static let bevel = color(light: "#000000", dark: "#1A1A1C")
 
     // MARK: - Classic MS Paint flat swatches (Win95/98 era)
 
@@ -48,7 +55,7 @@ enum Ink {
     static let paintNavy = color(light: "#1E3A8A", dark: "#1E3A8A")
     static let paintTeal = color(light: "#008080", dark: "#008080")
 
-    /// Ordered toolbox / status-bar palette strip.
+    /// Classic Paint flat palette (annotate / functional accents).
     static var paintSwatches: [Color] {
         [
             paintBlack, paintGray, paintSilver, paintWhite,
@@ -56,19 +63,6 @@ enum Ink {
             paintGreen, paintTeal, paintCyan, paintBlue,
             paintNavy, paintMagenta, paintPink, paintBrown,
         ]
-    }
-
-    /// Per-sidebar-page accent (icon / pressed fill hint).
-    static func toolAccent(for page: SettingsPage) -> Color {
-        switch page {
-        case .home: return paintBlue
-        case .history: return paintOrange
-        case .recording: return paintRed
-        case .model: return paintMagenta
-        case .configuration: return paintGray
-        case .sound: return paintCyan
-        case .performance: return paintGreen
-        }
     }
 
     /// Recording-active marker (status / island).
@@ -103,20 +97,9 @@ enum Ink {
 
     // MARK: - Layout
 
-    /// Paint toolbox column — roomy tiles, big icons.
-    static let sidebarWidth: CGFloat = 148
-    static let sidebarTileSize: CGFloat = 72
-    /// Equal left/right margin around a 72px tile in a 148px column.
-    static let sidebarSideMargin: CGFloat = (sidebarWidth - sidebarTileSize) / 2
-    static let sidebarTilePad: CGFloat = space2 - 2
-    static let sidebarIconSize: CGFloat = 28
-    /// Chunky SF Symbol weight inside the colored chip.
-    static let sidebarSymbolPointSize: CGFloat = 16
-    static let sidebarIconLabelGap: CGFloat = 4
-    static let sidebarTileGap: CGFloat = space3
-    static let sidebarSectionGap: CGFloat = 16
-    static let sidebarFooterHeight: CGFloat = 80
-    /// Tip row: readable icon in a Paint color square.
+    /// Folder-tab shelf height (selected face).
+    static let folderTabHeight: CGFloat = 30
+    /// Tip row: monochrome glyph square.
     static let tipIconSize: CGFloat = 48
     static let tipSymbolPointSize: CGFloat = 22
 
@@ -138,8 +121,6 @@ enum Ink {
     static let scrollerWidth: CGFloat = 5
     static let scrollerThumbMin: CGFloat = 24
     static let scrollerInset: CGFloat = 3
-    /// Sidebar rail sits inside the right tile margin so the thumb never kisses a tile.
-    static let sidebarScrollerInset: CGFloat = 8
 
     // MARK: - Type
     //
@@ -172,8 +153,7 @@ enum Ink {
     static let keycapFont = labelFont
     static let keycapCompactFont = mono(11)
     static let badgeFont = mono(11)
-    static let sidebarTileLabelFont = mono(11)
-    static let sidebarSectionFont = headingFont
+    static let folderTabFont = mono(11)
     static let menuBarItemFont = labelFont
     /// Menu meta / version strings — Departure Mono upright (not system mono).
     static let menuBarMetaFont = statusFont
@@ -223,7 +203,7 @@ enum Ink {
     static var windowNSColor: NSColor {
         NSColor(name: nil, dynamicProvider: { appearance in
             let match = appearance.bestMatch(from: [.darkAqua, .aqua])
-            return match == .darkAqua ? nsColor(hex: "#1E1E1E") : nsColor(hex: "#FFFFFF")
+            return match == .darkAqua ? nsColor(hex: "#2C2C2E") : nsColor(hex: "#FFFFFF")
         })
     }
 }

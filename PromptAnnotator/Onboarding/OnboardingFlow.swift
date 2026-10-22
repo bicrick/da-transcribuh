@@ -99,12 +99,6 @@ struct OnboardingFlow: View {
     private var onboardingChrome: some View {
         ZStack {
             DTWordmark(size: 13)
-            HStack {
-                Spacer()
-                InkPaintSwatchStrip(size: 8, limit: 8)
-                    .padding(.trailing, Ink.space4)
-                    .allowsHitTesting(false)
-            }
         }
         .frame(height: Ink.titleStripHeight)
         .frame(maxWidth: .infinity)

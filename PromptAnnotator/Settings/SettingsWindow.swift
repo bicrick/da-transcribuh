@@ -17,31 +17,21 @@ struct SettingsRoot: View {
         VStack(spacing: 0) {
             DTTitleStrip()
 
-            NavigationSplitView {
-                VStack(spacing: 0) {
-                    SettingsSidebar(selection: $page)
-                    sidebarFooter
-                }
-                .background(Ink.sidebar)
-                .navigationSplitViewColumnWidth(
-                    min: Ink.sidebarWidth - 4,
-                    ideal: Ink.sidebarWidth,
-                    max: Ink.sidebarWidth + 20
+            SettingsFolderTabs(selection: $page)
+
+            VStack(spacing: 0) {
+                detail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .toolbar(.hidden, for: .automatic)
+                DTStatusBar(
+                    cells: statusCells,
+                    trailing: AppVersion.label,
+                    recording: session.phase == .recording
                 )
-            } detail: {
-                VStack(spacing: 0) {
-                    detail
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .toolbar(.hidden, for: .automatic)
-                    DTStatusBar(
-                        cells: statusCells,
-                        trailing: AppVersion.label,
-                        recording: session.phase == .recording
-                    )
-                }
-                .background(Ink.window)
             }
-            .navigationSplitViewStyle(.balanced)
+            .background(Ink.front)
+            // Content sits under the selected folder tab (no gap / no double hairline).
+            .zIndex(0)
         }
         .tint(Ink.label)
         .background(Ink.window)
@@ -61,6 +51,8 @@ struct SettingsRoot: View {
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSessionsChanged)) { _ in
             reload()
         }
+        .focusable()
+        .onMoveCommand(perform: handleMove)
     }
 
     @ViewBuilder
@@ -98,102 +90,21 @@ struct SettingsRoot: View {
         return cells
     }
 
-    private var sidebarFooter: some View {
-        VStack(spacing: Ink.space1) {
-            InkDtMark(side: 28, shadow: Ink.paintRed)
-            Text(AppVersion.label)
-                // Departure Mono (no italic face) — upright chrome only.
-                .font(Ink.mono(10))
-                .foregroundStyle(Ink.secondary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: Ink.sidebarFooterHeight)
-        .padding(.horizontal, Ink.space2)
-        .overlay(alignment: .top) {
-            Rectangle().fill(Ink.label).frame(height: 1)
+    private func handleMove(_ direction: MoveCommandDirection) {
+        let pages = SettingsPage.tabOrder
+        guard let index = pages.firstIndex(of: page) else { return }
+        switch direction {
+        case .left where index > 0:
+            page = pages[index - 1]
+        case .right where index < pages.count - 1:
+            page = pages[index + 1]
+        default:
+            break
         }
     }
 
     private func reload() {
         sessions = SessionLibrary.load()
-    }
-}
-
-/// Paint toolbox sidebar — square tools with flat color chips, pressed when selected.
-struct SettingsSidebar: View {
-    @Binding var selection: SettingsPage
-
-    var body: some View {
-        DTScrollView(bottomInset: Ink.space2, railInset: Ink.sidebarScrollerInset) {
-            VStack(alignment: .center, spacing: Ink.sidebarSectionGap) {
-                ForEach(SettingsPage.sidebarSections, id: \.title) { section in
-                    VStack(alignment: .center, spacing: Ink.space2) {
-                        Text(section.title.uppercased())
-                            .font(Ink.sidebarSectionFont)
-                            .foregroundStyle(Ink.secondary)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
-
-                        VStack(spacing: Ink.sidebarTileGap) {
-                            ForEach(section.pages) { item in
-                                toolTile(item)
-                            }
-                        }
-                    }
-                }
-            }
-            // Equal side margins so tiles sit centered; scroller lives in the right margin.
-            .padding(.horizontal, Ink.sidebarSideMargin)
-            .padding(.top, Ink.space3)
-            .padding(.bottom, Ink.space3)
-            .frame(maxWidth: .infinity, alignment: .top)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Settings")
-    }
-
-    private func toolTile(_ item: SettingsPage) -> some View {
-        let selected = selection == item
-        let accent = Ink.toolAccent(for: item)
-        return Button {
-            selection = item
-        } label: {
-            VStack(spacing: Ink.sidebarIconLabelGap) {
-                RoundedRectangle(cornerRadius: 1, style: .continuous)
-                    .fill(accent)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 1, style: .continuous)
-                            .strokeBorder(selected ? Ink.onAccent : Ink.label, lineWidth: 1.5)
-                    )
-                    .overlay {
-                        Image(systemName: item.symbol)
-                            .font(.system(size: Ink.sidebarSymbolPointSize, weight: .black))
-                            .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(Ink.paintBlack)
-                    }
-                    .frame(width: Ink.sidebarIconSize, height: Ink.sidebarIconSize)
-                Text(item.title)
-                    .font(Ink.sidebarTileLabelFont)
-                    .foregroundStyle(selected ? Ink.onAccent : Ink.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .padding(.horizontal, Ink.sidebarTilePad)
-                    .frame(maxWidth: .infinity)
-            }
-            .frame(width: Ink.sidebarTileSize, height: Ink.sidebarTileSize)
-            .inkDoublePane(
-                fill: selected ? Ink.label : Ink.window,
-                pressed: selected
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(item.title)
-        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
     }
 }
 
@@ -229,7 +140,7 @@ final class SettingsPresenter {
         let host = NSHostingView(rootView: root)
         host.autoresizingMask = [.width, .height]
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 880, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 980, height: 600),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -241,8 +152,9 @@ final class SettingsPresenter {
         window.isReleasedWhenClosed = false
         window.backgroundColor = Ink.windowNSColor
         window.contentView = host
-        window.setContentSize(NSSize(width: 1000, height: 700))
-        window.minSize = NSSize(width: 880, height: 600)
+        window.setContentSize(NSSize(width: 1040, height: 700))
+        // Wide enough for all seven folder tabs without truncation.
+        window.minSize = NSSize(width: 980, height: 600)
         window.center()
         self.window = window
         applyChrome()

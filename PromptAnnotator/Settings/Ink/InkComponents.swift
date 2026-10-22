@@ -39,16 +39,16 @@ struct DTWordmark: View {
     }
 }
 
-// MARK: - Double pane (sidebar tile / recording island)
+// MARK: - Double pane (recording island / selected chrome)
 
-/// Hard offset “double pane” — identical tokens to the Settings sidebar tiles:
-/// `Ink.label` face border (1.5), `Ink.label` solid offset block at `Ink.buttonShadow`,
-/// gutter reserved so the offset never clips. Charcoal dark uses the same dynamic colors.
+/// Hard offset “double pane” — shared by island + selected chrome:
+/// `Ink.label` face border (1.5), `Ink.bevel` solid offset at `Ink.buttonShadow`,
+/// gutter reserved so the offset never clips. Dark bevel floors at #1A1A1C.
 struct InkDoublePaneModifier: ViewModifier {
     var cornerRadius: CGFloat = Ink.sidebarRowRadius
     var borderWidth: CGFloat = 1.5
-    var fill: Color = Ink.window
-    /// Pressed/selected: pane sits flush and the face slides into the gutter (sidebar tiles).
+    var fill: Color = Ink.front
+    /// Pressed/selected: pane sits flush and the face slides into the gutter.
     var pressed: Bool = false
 
     func body(content: Content) -> some View {
@@ -63,7 +63,7 @@ struct InkDoublePaneModifier: ViewModifier {
             )
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Ink.label)
+                    .fill(Ink.bevel)
                     .offset(
                         x: pressed ? 0 : Ink.buttonShadow,
                         y: pressed ? 0 : Ink.buttonShadow
@@ -76,11 +76,11 @@ struct InkDoublePaneModifier: ViewModifier {
 }
 
 extension View {
-    /// Shared double-pane chrome (sidebar tiles + recording island).
+    /// Shared double-pane chrome (recording island + selected chrome).
     func inkDoublePane(
         cornerRadius: CGFloat = Ink.sidebarRowRadius,
         borderWidth: CGFloat = 1.5,
-        fill: Color = Ink.window,
+        fill: Color = Ink.front,
         pressed: Bool = false
     ) -> some View {
         modifier(
@@ -126,7 +126,7 @@ struct InkTile<Content: View>: View {
                     // selection never shifts the card in a grid.
                     if selected {
                         RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
-                            .fill(Ink.label)
+                            .fill(Ink.bevel)
                             .offset(x: Ink.hardShadow, y: Ink.hardShadow)
                     }
                     RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
@@ -248,7 +248,7 @@ struct InkKeycap: View {
             )
             .background(
                 RoundedRectangle(cornerRadius: Ink.keycapRadius, style: .continuous)
-                    .fill(Ink.label)
+                    .fill(Ink.bevel)
                     .offset(y: compact ? 1 : 2)
             )
     }
@@ -301,7 +301,7 @@ struct InkShortcutRecorder: View {
             )
             .background(
                 RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
-                    .fill(Ink.label)
+                    .fill(Ink.bevel)
                     .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
             )
         }
@@ -407,23 +407,6 @@ struct InkCheck: View {
     }
 }
 
-/// Classic Paint palette strip (status bar / title).
-struct InkPaintSwatchStrip: View {
-    var size: CGFloat = 8
-    var limit: Int = 10
-
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(Array(Ink.paintSwatches.prefix(limit).enumerated()), id: \.offset) { _, swatch in
-                Rectangle()
-                    .fill(swatch)
-                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
-                    .frame(width: size, height: size)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
 
 /// B/W switch — flat track + sliding block. Shared across Settings / onboarding.
 struct InkToggleStyle: ToggleStyle {
@@ -740,7 +723,7 @@ struct InkSecondaryButtonStyle: ButtonStyle {
             )
             .background(
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                    .fill(Ink.label)
+                    .fill(Ink.bevel)
                     .offset(y: Ink.buttonShadow)
             )
             .opacity(configuration.isPressed ? 0.85 : 1)
@@ -768,7 +751,7 @@ extension View {
     func inkPageChrome() -> some View {
         self
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Ink.window)
+            .background(Ink.front)
             .tint(Ink.label)
     }
 }
@@ -891,13 +874,6 @@ struct DTStatusBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            InkPaintSwatchStrip(size: 8, limit: 4)
-                .padding(.horizontal, Ink.space3)
-                .frame(height: Ink.statusBarHeight)
-            Rectangle()
-                .fill(Ink.label)
-                .frame(width: 1, height: Ink.statusBarHeight)
-
             ForEach(Array(cells.enumerated()), id: \.offset) { index, cell in
                 HStack(spacing: Ink.space2 - 2) {
                     if index == 0 {

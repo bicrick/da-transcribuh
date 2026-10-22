@@ -35,7 +35,7 @@ struct MarkupToolbarView: View {
         .fixedSize(horizontal: true, vertical: false)
         .background {
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
-                .fill(Ink.window)
+                .fill(Ink.front)
                 .overlay(
                     RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
                         .strokeBorder(Ink.hairline, lineWidth: 1)

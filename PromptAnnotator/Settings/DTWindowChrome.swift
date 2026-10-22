@@ -13,9 +13,6 @@ struct DTTitleStrip: View {
                     .padding(.leading, Ink.space3)
                     .zIndex(1)
                 Spacer(minLength: 0)
-                InkPaintSwatchStrip(size: 9, limit: 10)
-                    .padding(.trailing, Ink.space4)
-                    .allowsHitTesting(false)
             }
 
             DTWordmark(size: 13)
