@@ -78,14 +78,13 @@ struct SettingsFolderTabs: View {
                     .stroke(Ink.label, lineWidth: 1)
             }
             .overlay(alignment: .top) {
-                if selected {
-                    // Sparse accent — thin paint-red strip on the selected tab only.
-                    Rectangle()
-                        .fill(Ink.paintRed)
-                        .frame(height: 2)
-                        .padding(.horizontal, 10)
-                        .padding(.top, 1)
-                }
+                // Per-tab Paint accent: full stripe when selected; quiet tick when not.
+                Rectangle()
+                    .fill(page.tabAccent)
+                    .frame(height: selected ? 2 : 1)
+                    .padding(.horizontal, selected ? 10 : 14)
+                    .padding(.top, selected ? 1 : 2)
+                    .opacity(selected ? 1 : 0.45)
             }
             .padding(.bottom, selected ? 0 : unselectedInset)
             // Cover the shelf hairline when selected.
@@ -154,6 +153,19 @@ extension SettingsPage {
         case .configuration: return "5"
         case .sound: return "6"
         case .performance: return "7"
+        }
+    }
+
+    /// Quiet Paint accent for the folder-tab top stripe (moved off Home stats).
+    var tabAccent: Color {
+        switch self {
+        case .home: return Ink.paintRed
+        case .history: return Ink.paintBlue
+        case .recording: return Ink.paintOrange
+        case .model: return Ink.paintMagenta
+        case .configuration: return Ink.paintGreen
+        case .sound: return Ink.paintTeal
+        case .performance: return Ink.paintPink
         }
     }
 }

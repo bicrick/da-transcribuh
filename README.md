@@ -30,7 +30,7 @@ the start/stop chord lives in **general** as paint keycaps — click, press a co
 
 the recording island stays minimal and symmetric: paint-red record square + fixed-width timer on the left, cyan waveform, screenshot-count chip on the right when you’ve grabbed a tile (the chip slot fully collapses when there are none). default size is the everyday footprint; compact is the same layout, tighter. same double-pane hard offset as selected chrome (`Ink.bevel` block down-right) — no palette strip, no extra chrome.
 
-the app mark is Departure Mono **d** + inverted **t** block inside a square with a hard-offset bevel. light keeps the white plate; dark inverts to a graphite tile with a light border / “d” and a light “t” block (bevel stays `#1A1A1C`). primary buttons, keycaps, tip tiles, and the ⌘K chip follow the same invert. regenerate AppIcon (always the light plate) with `scripts/render_dt_icon.py`.
+the app mark is Departure Mono **d** + inverted **t** block inside a square with a hard-offset bevel. light keeps the white plate; dark inverts to a graphite tile with a light border / “d” and a light “t” block (bevel stays `#1A1A1C`). keycaps / tip tiles / secondary chrome follow graphite invert; **Start** stays high-contrast (black in light, light fill in dark) with the red bevel. folder tabs carry quiet per-page Paint accents on the top stripe. regenerate AppIcon (always the light plate) with `scripts/render_dt_icon.py`.
 
 <p align="center">
   <img src="assets/brand/screenshots/settings-home-light.png" alt="da transcribuh settings — home" width="920">
