@@ -374,8 +374,12 @@ final class SessionController: ObservableObject {
         if let shape = redoShapes.popLast() {
             shapes.append(shape)
         } else if shapes.isEmpty, textEdit == nil, draft == nil, let group = redoGroups.popLast() {
-            try? PNG.write(group.image, to: group.frameURL)
             groups.append(group)
+            let image = group.image
+            let url = group.frameURL
+            Task(priority: .utility) {
+                try? await PNG.writeAsync(image, to: url)
+            }
         }
         syncOverlay()
         refreshControls()
@@ -622,14 +626,24 @@ final class SessionController: ObservableObject {
         guard phase == .recording, markupMode == .capture else { return }
         drawingDisplayID = display
         selectionRect = CaptureGesture.rect(from: origin, to: current)
-        syncOverlay()
+        // Layer-only selection update — do not redraw baked marks on drag start.
+        overlay.updateSelection(selectionRect, displayID: display)
     }
 
     func captureDragMoved(origin: CGPoint, current: CGPoint, display: CGDirectDisplayID) {
         guard phase == .recording, display == drawingDisplayID else { return }
         guard markupMode == .capture || selectionRect != nil else { return }
-        selectionRect = CaptureGesture.rect(from: origin, to: current)
-        syncOverlay()
+        let rect = CaptureGesture.rect(from: origin, to: current)
+        // Coalesce no-ops (same integral box) so 120 Hz mice do not thrash layers.
+        if let previous = selectionRect,
+           Int(previous.minX) == Int(rect.minX),
+           Int(previous.minY) == Int(rect.minY),
+           Int(previous.width) == Int(rect.width),
+           Int(previous.height) == Int(rect.height) {
+            return
+        }
+        selectionRect = rect
+        overlay.updateSelection(rect, displayID: display)
     }
 
     func captureDragEnded(origin: CGPoint, current: CGPoint, display: CGDirectDisplayID) {
@@ -638,7 +652,7 @@ final class SessionController: ObservableObject {
         let armed = markupMode == .capture || selectionRect != nil
         selectionRect = nil
         drawingDisplayID = nil
-        syncOverlay()
+        overlay.updateSelection(nil, displayID: nil)
         guard phase == .recording, armed, displayID == display else { return }
         if !monitor.shiftIsDown {
             markupMode = .capture
@@ -658,7 +672,7 @@ final class SessionController: ObservableObject {
     func captureDragCancelled() {
         selectionRect = nil
         drawingDisplayID = nil
-        syncOverlay()
+        overlay.updateSelection(nil, displayID: nil)
     }
 
     func penKey(_ key: PenKey) {
@@ -778,6 +792,11 @@ final class SessionController: ObservableObject {
             transcriber.resetLive()
             startSpeechFollow()
             prepareModel()
+            // Warm ScreenCaptureKit window list once per session; refresh on display change.
+            ShareableContentCacheWatcher.installIfNeeded()
+            Task(priority: .utility) {
+                _ = try? await ShareableContentCache.shared.content(forceRefresh: true)
+            }
             AppSounds.sessionStarted()
             log.info("Session started at \(folder.path, privacy: .public)")
 
@@ -926,19 +945,21 @@ final class SessionController: ObservableObject {
         }
 
         do {
-            let saved = try SessionWriter.write(
+            let exportGroups = groups.map {
+                ExportGroup(
+                    index: $0.index,
+                    committedAt: $0.committedAt,
+                    display: $0.display,
+                    shapes: $0.shapes,
+                    image: $0.image
+                )
+            }
+            // Markdown/JSON + contact-sheet thumbnail off MainActor.
+            let saved = try await SessionWriter.writeAsync(
                 directory: directory,
                 started: startedAt,
                 ended: ended,
-                groups: groups.map {
-                    ExportGroup(
-                        index: $0.index,
-                        committedAt: $0.committedAt,
-                        display: $0.display,
-                        shapes: $0.shapes,
-                        image: $0.image
-                    )
-                },
+                groups: exportGroups,
                 words: spoken,
                 model: model,
                 transcriptionError: transcriptionError
@@ -1018,6 +1039,7 @@ final class SessionController: ObservableObject {
         fallbackFrame: Bool = false
     ) {
         let previous = captureTail
+        // Serial chain stays on MainActor for session state; capture+encode hop off inside.
         captureTail = Task { @MainActor in
             await previous.value
             await self.performCapture(
@@ -1059,33 +1081,34 @@ final class SessionController: ObservableObject {
         // Hold the session folder across the await. Cancel clears `directory`; a new
         // session replaces it. Either way, discard this shot instead of writing again.
         let sessionDirectory = directory
+        let excludedWindowIDs = overlay.windowIDs() + chrome.windowIDs()
+        let pointSize = screen.frame.size
+        let index = groups.count + 1
+        let url = sessionDirectory.appendingPathComponent(String(format: "frames/%02d.png", index))
+        // Snapshot screen metrics for DisplaySnapshot after the off-main hop.
+        let screenForSnapshot = screen
+
         do {
-            let captured = try await DisplayCapture.capture(
-                displayID: resolvedID,
-                pointSize: screen.frame.size,
-                shapes: significant,
-                excludedWindowIDs: overlay.windowIDs() + chrome.windowIDs()
-            )
+            // Detached so PNG/ImageIO never resume onto MainActor.
+            // userInitiated: above utility encode, below audio real-time.
+            let image = try await Task.detached(priority: .userInitiated) {
+                try await CapturePipeline.captureAndEncode(
+                    displayID: resolvedID,
+                    pointSize: pointSize,
+                    shapes: significant,
+                    excludedWindowIDs: excludedWindowIDs,
+                    crop: crop,
+                    url: url
+                )
+            }.value
             guard !Task.isCancelled, self.directory == sessionDirectory else { return }
-            let image: CGImage
-            if let crop {
-                guard let cropped = RegionCrop.crop(captured, selection: crop, pointSize: screen.frame.size) else {
-                    lastError = "The selection was too small to capture."
-                    return
-                }
-                image = cropped
-            } else {
-                image = captured
-            }
-            let index = groups.count + 1
-            let url = sessionDirectory.appendingPathComponent(String(format: "frames/%02d.png", index))
-            try PNG.write(image, to: url)
+            let ui = CapturePerf.begin(.uiUpdate)
             groups.append(
                 StoredGroup(
                     index: index,
                     committedAt: committedAt,
                     display: DisplaySnapshot(
-                        screen: screen,
+                        screen: screenForSnapshot,
                         pixelWidth: image.width,
                         pixelHeight: image.height,
                         contentSize: crop?.standardized.size
@@ -1099,8 +1122,13 @@ final class SessionController: ObservableObject {
             )
             redoGroups.removeAll()
             refreshControls()
+            CapturePerf.end(.uiUpdate, ui)
         } catch {
             guard self.directory == sessionDirectory else { return }
+            if let export = error as? ExportError, export.message.contains("too small") {
+                lastError = "The selection was too small to capture."
+                return
+            }
             log.error("Capture failed: \(error.localizedDescription, privacy: .public)")
             lastError = UserFacingError.capture(error)
             restore(significant, allowEmpty: allowEmpty)
