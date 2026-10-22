@@ -104,6 +104,27 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
         pinKey = try c.decodeIfPresent(String.self, forKey: .pinKey)
     }
 
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(kind, forKey: .kind)
+        try c.encode(source, forKey: .source)
+        try c.encodeIfPresent(text, forKey: .text)
+        try c.encodeIfPresent(imageFileName, forKey: .imageFileName)
+        try c.encodeIfPresent(filePaths, forKey: .filePaths)
+        try c.encode(pinned, forKey: .pinned)
+        try c.encode(fingerprint, forKey: .fingerprint)
+        try c.encodeIfPresent(applicationName, forKey: .applicationName)
+        try c.encode(firstCopiedAt, forKey: .firstCopiedAt)
+        try c.encode(lastCopiedAt, forKey: .lastCopiedAt)
+        try c.encode(copyCount, forKey: .copyCount)
+        try c.encodeIfPresent(imageWidth, forKey: .imageWidth)
+        try c.encodeIfPresent(imageHeight, forKey: .imageHeight)
+        try c.encodeIfPresent(pinTitle, forKey: .pinTitle)
+        try c.encodeIfPresent(pinKey, forKey: .pinKey)
+    }
+
     var previewLine: String {
         if let pinTitle, !pinTitle.isEmpty { return pinTitle }
         switch kind {
