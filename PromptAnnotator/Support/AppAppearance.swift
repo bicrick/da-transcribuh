@@ -2,7 +2,11 @@ import AppKit
 import SwiftUI
 
 /// Light / dark / system appearance for Settings, menu-bar, onboarding, and Ink chrome.
-/// Applied via `NSApp.appearance` so dynamic Ink colors (including island / annotate) re-resolve.
+///
+/// **One source of truth:** `AppSettings.appearance` → `NSApp.appearance`.
+/// Ink tokens resolve via `NSColor(name:dynamicProvider:)` against the effective AppKit
+/// appearance. Do **not** also apply `.preferredColorScheme` on SwiftUI roots — that
+/// double-drives the tree (flicker, half-switched chrome, sticky segment selection).
 enum AppAppearance: String, CaseIterable, Identifiable, Codable {
     case system
     case light
@@ -23,33 +27,25 @@ enum AppAppearance: String, CaseIterable, Identifiable, Codable {
         "theme: \(rawValue)"
     }
 
-    var preferredColorScheme: ColorScheme? {
-        switch self {
-        case .system: return nil
-        case .light: return .light
-        case .dark: return .dark
-        }
-    }
-
     var next: AppAppearance {
         let all = Self.allCases
         guard let index = all.firstIndex(of: self) else { return .system }
         return all[(index + 1) % all.count]
     }
 
-    /// Apply to the whole app via `NSApp.appearance`.
+    /// AppKit appearance to install on `NSApp`. `nil` follows the OS (System).
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
+
+    /// Apply to the whole app via `NSApp.appearance` only.
     @MainActor
     func applyToApp() {
-        switch self {
-        case .system:
-            NSApp.appearance = nil
-        case .light:
-            NSApp.appearance = NSAppearance(named: .aqua)
-        case .dark:
-            NSApp.appearance = NSAppearance(named: .darkAqua)
-        }
-        // Refresh Settings window background so Ink dynamic colors re-resolve.
-        SettingsPresenter.shared.applyChrome()
+        NSApp.appearance = nsAppearance
     }
 
     static func stored(_ raw: String?) -> AppAppearance {

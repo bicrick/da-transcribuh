@@ -188,16 +188,16 @@ struct InkBadge: View {
     var body: some View {
         Text(text)
             .font(Ink.badgeFont)
-            .foregroundStyle(accented ? Ink.onAccent : Ink.label)
+            .foregroundStyle(accented ? Ink.onPrimary : Ink.label)
             .padding(.horizontal, 5)
             .frame(height: 17)
             .background(
-                (accented ? Ink.label : Color.clear),
+                (accented ? Ink.primaryFill : Color.clear),
                 in: RoundedRectangle(cornerRadius: 2, style: .continuous)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .strokeBorder(Ink.label, lineWidth: 1)
+                    .strokeBorder(Ink.controlBorder, lineWidth: 1)
             )
     }
 }
@@ -244,7 +244,7 @@ struct InkKeycap: View {
             .background(Ink.keycap, in: RoundedRectangle(cornerRadius: Ink.keycapRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.keycapRadius, style: .continuous)
-                    .strokeBorder(Ink.label, lineWidth: 1)
+                    .strokeBorder(Ink.controlBorder, lineWidth: 1)
             )
             .background(
                 RoundedRectangle(cornerRadius: Ink.keycapRadius, style: .continuous)
@@ -297,7 +297,7 @@ struct InkShortcutRecorder: View {
             .background(Ink.fill, in: RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
-                    .strokeBorder(listening ? Ink.paintCyan : Ink.label, lineWidth: listening ? 2 : 1.5)
+                    .strokeBorder(listening ? Ink.paintCyan : Ink.controlBorder, lineWidth: listening ? 2 : 1.5)
             )
             .background(
                 RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
@@ -432,11 +432,11 @@ struct InkSwitch: View {
     var body: some View {
         ZStack(alignment: isOn ? .trailing : .leading) {
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(isOn ? Ink.label : Ink.window)
+                .fill(isOn ? Ink.primaryFill : Ink.window)
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .strokeBorder(Ink.label, lineWidth: 1)
+                .strokeBorder(Ink.controlBorder, lineWidth: 1)
             RoundedRectangle(cornerRadius: 1, style: .continuous)
-                .fill(isOn ? Ink.onAccent : Ink.label)
+                .fill(isOn ? Ink.onPrimary : Ink.label)
                 .frame(width: 12, height: 12)
                 .padding(Ink.space1 / 2)
         }
@@ -664,8 +664,8 @@ struct InkStepRail: View {
         return VStack(spacing: Ink.space1) {
             ZStack {
                 Rectangle()
-                    .fill(state == .current ? Ink.label : Ink.window)
-                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                    .fill(state == .current ? Ink.primaryFill : Ink.window)
+                    .overlay(Rectangle().strokeBorder(Ink.controlBorder, lineWidth: 1))
                 if state == .done {
                     Image(systemName: "checkmark")
                         .font(Ink.microFont)
@@ -673,7 +673,7 @@ struct InkStepRail: View {
                 } else {
                     Text("\(index + 1)")
                         .font(Ink.headingFont)
-                        .foregroundStyle(state == .current ? Ink.onAccent : Ink.label)
+                        .foregroundStyle(state == .current ? Ink.onPrimary : Ink.label)
                 }
             }
             .frame(width: 22, height: 22)
@@ -700,16 +700,16 @@ struct InkPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(large ? Ink.buttonFont : Ink.buttonSmallFont)
-            .foregroundStyle(enabled ? Ink.onAccent : Ink.tertiary)
+            .foregroundStyle(enabled ? Ink.onPrimary : Ink.tertiary)
             .padding(.horizontal, large ? 15 : 11)
             .frame(height: large ? 30 : 24)
             .background(
-                (enabled ? Ink.label : Ink.window),
+                (enabled ? Ink.primaryFill : Ink.fill),
                 in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                    .strokeBorder(enabled ? Color.clear : Ink.tertiary, lineWidth: 1)
+                    .strokeBorder(enabled ? Ink.controlBorder : Ink.tertiary, lineWidth: 1)
             )
             .opacity(configuration.isPressed ? 0.88 : 1)
     }
@@ -722,10 +722,10 @@ struct InkSecondaryButtonStyle: ButtonStyle {
             .foregroundStyle(Ink.label)
             .padding(.horizontal, Ink.space3)
             .frame(height: 24)
-            .background(Ink.window, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
+            .background(Ink.front, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                    .strokeBorder(Ink.label, lineWidth: 1)
+                    .strokeBorder(Ink.controlBorder, lineWidth: 1)
             )
             .background(
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
@@ -823,9 +823,9 @@ struct InkErrorBanner: View {
         HStack(alignment: .top, spacing: Ink.space3) {
             Text("!")
                 .font(Ink.headingFont)
-                .foregroundStyle(Ink.onAccent)
+                .foregroundStyle(Ink.onPrimary)
                 .frame(width: 16, height: 16)
-                .background(Ink.label, in: RoundedRectangle(cornerRadius: 2, style: .continuous))
+                .background(Ink.primaryFill, in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
             Text(message)
                 .font(Ink.captionFont)
                 .foregroundStyle(Ink.label)

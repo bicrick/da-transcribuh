@@ -12,8 +12,10 @@ struct HomePage: View {
             VStack(alignment: .leading, spacing: Ink.sectionGap) {
                 hero
                 stats
-                SettingsSection(title: "Get started") {
-                    checklist
+                if !checklistComplete {
+                    SettingsSection(title: "Get started") {
+                        checklist
+                    }
                 }
                 tips
             }
@@ -31,42 +33,19 @@ struct HomePage: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: Ink.space4) {
                 AppLogo(side: 48)
-                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
-                    HStack(spacing: Ink.space2) {
-                        DTWordmark(size: 20)
-                        Text(AppVersion.label)
-                            .font(Ink.badgeFont)
-                            .foregroundStyle(Ink.paintBlack)
-                            .padding(.horizontal, Ink.space2 - 2)
-                            .padding(.vertical, Ink.space1 / 2)
-                            .background(Ink.paintYellow)
-                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
-                    }
-                    Text("Dictation in the menu bar. Capture the screen when you want the picture with the words.")
-                        .font(Ink.bodyFont)
-                        .foregroundStyle(Ink.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                DTWordmark(size: 20)
                 Spacer(minLength: 0)
             }
 
             HStack(alignment: .center, spacing: Ink.space3) {
-                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
-                    HStack(spacing: Ink.space2) {
-                        Rectangle()
-                            .fill(Ink.record)
-                            .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
-                            .frame(width: 10, height: 10)
-                        Text(startRowTitle)
-                            .font(Ink.labelFont)
-                            .foregroundStyle(Ink.label)
-                    }
-                    Text(startRowDetail)
-                        .font(Ink.captionFont)
-                        .foregroundStyle(Ink.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: Ink.space2) {
+                    Rectangle()
+                        .fill(Ink.record)
+                        .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                        .frame(width: 10, height: 10)
+                    Text(startRowTitle)
+                        .font(Ink.labelFont)
+                        .foregroundStyle(Ink.label)
                 }
                 Spacer(minLength: Ink.space2)
                 InkKeycapRow(keys: settings.chord.keycaps)
@@ -76,7 +55,7 @@ struct HomePage: View {
                     HStack(spacing: Ink.space2) {
                         Rectangle()
                             .fill(Ink.record)
-                            .overlay(Rectangle().strokeBorder(Ink.onAccent, lineWidth: 1))
+                            .overlay(Rectangle().strokeBorder(Ink.onPrimary, lineWidth: 1))
                             .frame(width: 8, height: 8)
                         Text(session.phase == .recording ? "Stop" : "Start")
                             .font(Ink.buttonFont)
@@ -164,11 +143,13 @@ struct HomePage: View {
                         Text(item.title)
                             .font(Ink.labelFont)
                             .foregroundStyle(Ink.label)
-                        Text(item.detail)
-                            .font(Ink.captionFont)
-                            .foregroundStyle(Ink.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if let detail = item.detail, !detail.isEmpty {
+                            Text(detail)
+                                .font(Ink.captionFont)
+                                .foregroundStyle(Ink.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                     Spacer(minLength: 0)
                     if let trail = item.trail {
@@ -186,14 +167,12 @@ struct HomePage: View {
     private var tips: some View {
         HStack(alignment: .top, spacing: Ink.gridGap) {
             tipColumn(
-                color: Color.white,
                 glyph: "viewfinder",
                 title: "Talk, or drag to capture",
-                detail: "Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.",
+                detail: nil,
                 trailing: nil
             )
             tipColumn(
-                color: Color.white,
                 glyph: "folder.fill",
                 title: "Sessions folder",
                 detail: SessionStore.displayPath(),
@@ -210,32 +189,38 @@ struct HomePage: View {
     }
 
     private func tipColumn(
-        color: Color,
         glyph: String,
         title: String,
-        detail: String,
+        detail: String?,
         trailing: AnyView?
     ) -> some View {
         VStack(alignment: .leading, spacing: Ink.space2) {
             ZStack {
                 Rectangle()
-                    .fill(color)
+                    .fill(Ink.tileFace)
                 Rectangle()
-                    .strokeBorder(Ink.label, lineWidth: 1.5)
+                    .strokeBorder(Ink.controlBorder, lineWidth: 1.5)
                 Image(systemName: glyph)
                     .font(.system(size: Ink.tipSymbolPointSize, weight: .black))
                     .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(Ink.paintBlack)
+                    .foregroundStyle(Ink.onTile)
             }
             .frame(width: Ink.tipIconSize, height: Ink.tipIconSize)
+            .background(
+                Rectangle()
+                    .fill(Ink.bevel)
+                    .offset(x: Ink.buttonShadow, y: Ink.buttonShadow)
+            )
             Text(title)
                 .font(Ink.labelFont)
                 .foregroundStyle(Ink.label)
-            Text(detail)
-                .font(Ink.captionFont)
-                .foregroundStyle(Ink.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if let detail, !detail.isEmpty {
+                Text(detail)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             if let trailing {
                 trailing
             }
@@ -246,7 +231,7 @@ struct HomePage: View {
     private struct ChecklistItem {
         var done: Bool
         var title: String
-        var detail: String
+        var detail: String?
         var trail: AnyView?
     }
 
@@ -255,7 +240,7 @@ struct HomePage: View {
             ChecklistItem(
                 done: permissions.status.isReady,
                 title: "Permissions",
-                detail: permissionDetail,
+                detail: permissions.status.isReady ? nil : permissionDetail,
                 trail: permissions.status.isReady ? nil : AnyView(
                     HStack(spacing: Ink.space2) {
                         Button("Turn On") {
@@ -274,18 +259,20 @@ struct HomePage: View {
             ChecklistItem(
                 done: modelReady,
                 title: "Speech model",
-                detail: modelDetail,
+                detail: modelReady ? nil : modelDetail,
                 trail: nil
             ),
             ChecklistItem(
                 done: !sessions.isEmpty,
                 title: "First take",
-                detail: sessions.isEmpty
-                    ? firstSessionDetail
-                    : "\(sessions.count) session\(sessions.count == 1 ? "" : "s") in History.",
+                detail: sessions.isEmpty ? firstSessionDetail : nil,
                 trail: nil
             ),
         ]
+    }
+
+    private var checklistComplete: Bool {
+        checklistItems.allSatisfy(\.done)
     }
 
     private var modelReady: Bool {
@@ -297,13 +284,7 @@ struct HomePage: View {
 
     private var modelDetail: String {
         if settings.speechEngine == .openAICompatible {
-            return OpenAICompatibleTranscriber.isConfigured()
-                ? "OpenAI-compatible server is configured."
-                : "Add a server API key on the Models page."
-        }
-        if WhisperKitTranscriber.modelIsInstalled() {
-            let choice = SpeechModelChoice.stored(settings.speechModel)
-            return "\(choice.title) (\(choice.variant)) is on this Mac."
+            return "Add a server API key on the Models page."
         }
         return "Download a speech model on the Models page."
     }
@@ -314,30 +295,20 @@ struct HomePage: View {
         return "Start a session"
     }
 
-    private var startRowDetail: String {
-        if session.isBusy {
-            return "da transcribuh is finishing this take. the menu bar icon shows the same state."
-        }
-        if settings.pushToTalk {
-            return "Hold \(settings.chord.display) to talk. Release to stop. The Start button stays a tap."
-        }
-        return "\(settings.chord.display) starts. The same shortcut stops."
-    }
-
     private var firstSessionDetail: String {
         if !permissions.status.isReady {
-            return "Turn on permissions above, then press Start or \(settings.chord.display)."
+            return "Turn on permissions above, then press Start."
         }
         if settings.speechEngine == .openAICompatible {
             if !OpenAICompatibleTranscriber.isConfigured() {
-                return "Add a server API key on the Models page, then press Start or \(settings.chord.display)."
+                return "Add a server API key on the Models page, then press Start."
             }
-            return "Press Start or \(settings.chord.display), speak, then stop."
+            return "Press Start, speak, then stop."
         }
         if !WhisperKitTranscriber.modelIsInstalled() {
-            return "Download a speech model on the Models page, then press Start or \(settings.chord.display)."
+            return "Download a speech model on the Models page, then press Start."
         }
-        return "Press Start or \(settings.chord.display), speak, then stop. History fills in after your first take."
+        return "Press Start, speak, then stop."
     }
 
     private var permissionDetail: String {

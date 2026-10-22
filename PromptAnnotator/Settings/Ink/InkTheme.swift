@@ -32,7 +32,25 @@ enum Ink {
     /// Cards / raised panels.
     static let card = color(light: "#FFFFFF", dark: "#353538")
     static let field = front
+    /// Keycaps / tip tiles / control faces — invert with the theme (never hard-coded white).
     static let keycap = front
+    static let tileFace = front
+    /// Glyph / icon on `tileFace`.
+    static let onTile = label
+    /// Solid primary button plate (Start). Light = black; dark = graphite front (not glare white).
+    static let primaryFill = color(light: "#000000", dark: "#3A3A3D")
+    /// Label on `primaryFill`.
+    static let onPrimary = color(light: "#FFFFFF", dark: "#F2F2F2")
+    /// Strong outline on chrome controls (buttons, keycaps, mark). Light = black; dark = light hairline.
+    static let controlBorder = color(light: "#000000", dark: "#F2F2F2")
+    /// dt mark tile face — white plate in light; graphite in dark.
+    static let markFace = color(light: "#FFFFFF", dark: "#3A3A3D")
+    /// “d” + outer hairline on the mark tile.
+    static let markInk = color(light: "#000000", dark: "#F2F2F2")
+    /// Inverted “t” block on the mark.
+    static let markInvertFace = color(light: "#000000", dark: "#F2F2F2")
+    /// Letter inside the inverted “t” block.
+    static let markInvertInk = color(light: "#FFFFFF", dark: "#3A3A3D")
     /// Double-pane hard offset — darkest UI paint; nothing darker except this bevel.
     static let bevel = color(light: "#000000", dark: "#1A1A1C")
 

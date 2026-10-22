@@ -167,9 +167,10 @@ struct ShortcutBadge: View {
 }
 
 /// B/W segmented control for System / Light / Dark.
+/// Writes only through `selection` — callers must not also fire a second onChange
+/// (that double-called `setAppearance` and re-applied `NSApp.appearance` every click).
 struct InkAppearanceSegment: View {
     @Binding var selection: AppAppearance
-    var onChange: (AppAppearance) -> Void
 
     var body: some View {
         HStack(spacing: 0) {
@@ -177,26 +178,26 @@ struct InkAppearanceSegment: View {
                 let selected = selection == mode
                 Button {
                     selection = mode
-                    onChange(mode)
                 } label: {
                     Text(mode.title.uppercased())
                         .font(Ink.buttonSmallFont)
-                        .foregroundStyle(selected ? Ink.onAccent : Ink.label)
+                        .foregroundStyle(selected ? Ink.onPrimary : Ink.label)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, Ink.space2)
-                        .background(selected ? Ink.label : Color.clear)
+                        .contentShape(Rectangle())
+                        .background(selected ? Ink.primaryFill : Color.clear)
                 }
                 .buttonStyle(.plain)
                 if mode != AppAppearance.allCases.last {
                     Rectangle()
-                        .fill(Ink.label)
+                        .fill(Ink.controlBorder)
                         .frame(width: 1)
                 }
             }
         }
         .overlay(
             Rectangle()
-                .strokeBorder(Ink.label, lineWidth: 1)
+                .strokeBorder(Ink.controlBorder, lineWidth: 1)
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Appearance")

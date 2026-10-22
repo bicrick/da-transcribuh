@@ -162,11 +162,10 @@ final class AppSettings: ObservableObject {
         appearance.applyToApp()
     }
 
+    /// Single path for General segment + menu-bar `theme:` cycle.
+    /// Idempotent: re-tapping the selected mode is a no-op (no flicker / re-apply).
     func setAppearance(_ mode: AppAppearance) {
-        guard appearance != mode else {
-            mode.applyToApp()
-            return
-        }
+        guard appearance != mode else { return }
         appearance = mode
         persist(Keys.appearance, mode.rawValue)
         mode.applyToApp()
