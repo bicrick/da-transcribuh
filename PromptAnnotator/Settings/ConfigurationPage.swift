@@ -58,7 +58,7 @@ struct ConfigurationPage: View {
                     Text("Theme")
                         .font(Ink.rowTitleFont)
                         .foregroundStyle(Ink.label)
-                    Text("System follows macOS. Light and Dark lock the Settings window and menu panel. The recording island keeps its own look.")
+                    Text("System follows macOS. Light and Dark lock Settings, the menu panel, and the recording island / annotate chrome.")
                         .font(Ink.captionFont)
                         .foregroundStyle(Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)

@@ -38,11 +38,13 @@ struct RecordingIslandView: View {
         .padding(.horizontal, IslandMetrics.inset)
         .frame(width: layout.panel.width, height: layout.panel.height)
         .background {
-            Capsule(style: .continuous)
-                .fill(.regularMaterial)
+            // Solid B/W chrome (no vibrancy). Hard offset shadow omitted — ChromePanel
+            // masks to bounds; a 1px outline is enough without clipping or extra padding.
+            RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
+                .fill(Ink.window)
                 .overlay(
-                    Capsule(style: .continuous)
-                        .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)
+                        .strokeBorder(Ink.label, lineWidth: 1)
                 )
         }
         .accessibilityElement(children: .ignore)
@@ -90,7 +92,8 @@ struct RecordingIslandView: View {
         HStack(spacing: 8) {
             recordDot
             Text("Recording")
-                .font(.system(size: 13, weight: .semibold))
+                .font(Ink.labelFont)
+                .foregroundStyle(Ink.label)
                 .lineLimit(1)
         }
         .fixedSize()
@@ -110,8 +113,8 @@ struct RecordingIslandView: View {
 
     private func clock(_ layout: IslandLayout) -> some View {
         Text(TimeFormat.clock(session.elapsed))
-            .font(.system(size: 13, weight: .medium, design: .monospaced))
-            .foregroundStyle(.secondary)
+            .font(Ink.systemMono(13))
+            .foregroundStyle(Ink.secondary)
             .lineLimit(1)
             .fixedSize()
             .frame(width: layout.clock, alignment: .leading)
@@ -131,8 +134,8 @@ struct RecordingIslandView: View {
 
     private func percent(_ layout: IslandLayout) -> some View {
         Text(percentText)
-            .font(.system(size: 12, weight: .medium, design: .monospaced))
-            .foregroundStyle(.secondary)
+            .font(Ink.systemMono(11))
+            .foregroundStyle(Ink.secondary)
             .lineLimit(1)
             .fixedSize()
             .frame(width: layout.percent, alignment: .leading)
@@ -148,9 +151,10 @@ struct RecordingIslandView: View {
         return "0%"
     }
 
+    /// Pulsing record marker — B/W square (same 8pt footprint as the old red dot).
     private var recordDot: some View {
-        Circle()
-            .fill(Color.red)
+        Rectangle()
+            .fill(Ink.label)
             .frame(width: 8, height: 8)
             .opacity(pulse ? 1 : 0.35)
             .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: pulse)

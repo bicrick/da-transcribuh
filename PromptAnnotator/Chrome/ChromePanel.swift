@@ -15,7 +15,8 @@ final class ChromePanel: NSPanel {
         isMovable = false
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        // Soft system shadow off — SwiftUI draws a hard 1px offset shadow instead.
+        hasShadow = false
         sharingType = .none
         isReleasedWhenClosed = false
         animationBehavior = .utilityWindow
@@ -23,7 +24,7 @@ final class ChromePanel: NSPanel {
         cornerRadius = radius
     }
 
-    var cornerRadius: CGFloat = 16 {
+    var cornerRadius: CGFloat = 3 {
         didSet { applyShape() }
     }
 

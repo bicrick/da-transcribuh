@@ -5,12 +5,13 @@ enum WaveformSamples {
     static let count = 64
 }
 
-/// Thin centered lines. Each one stays in its slot and only changes height.
+/// Solid B/W centered bars. Each one stays in its slot and only changes height.
+/// Square-capped (no soft round caps) to match the Paint/terminal chrome.
 struct WaveformBars: View {
     var levels: [CGFloat]
     var slotWidth: CGFloat = 210
     var slotHeight: CGFloat = 26
-    var ink: Color = .primary
+    var ink: Color = Ink.label
 
     var body: some View {
         Canvas { context, size in
@@ -23,6 +24,7 @@ struct WaveformBars: View {
             let origin = (size.width - used) / 2
             for index in 0..<count {
                 let level = min(1, max(0, bars[index]))
+                // Keep height continuous (no per-frame snapping) — only the fill is hard-edged.
                 let height = max(2, 2 + level * (size.height - 2))
                 let rect = CGRect(
                     x: origin + CGFloat(index) * (barWidth + gap),
@@ -30,8 +32,7 @@ struct WaveformBars: View {
                     width: barWidth,
                     height: height
                 )
-                let path = Path(roundedRect: rect, cornerRadius: min(1, barWidth / 2))
-                context.fill(path, with: .color(ink.opacity(0.88)))
+                context.fill(Path(rect), with: .color(ink))
             }
         }
         .frame(width: slotWidth, height: slotHeight)

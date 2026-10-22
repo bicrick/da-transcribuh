@@ -39,15 +39,17 @@ final class AnnotationCanvasView: NSView {
         shade.addRect(bounds)
         shade.addRect(box)
         context.addPath(shade)
-        context.setFillColor(NSColor.black.withAlphaComponent(0.28).cgColor)
+        // Light dim so the 1px marching border stays the focus (B&W chrome).
+        context.setFillColor(NSColor.black.withAlphaComponent(0.22).cgColor)
         context.fillPath(using: .evenOdd)
     }
 
     private func drawSelectionBorder(_ rect: CGRect, in context: CGContext) {
         let box = rect.standardized
         guard box.width >= 1, box.height >= 1 else { return }
+        // Crisp dual stroke: black outer, white inner — readable on any desktop.
         context.setLineWidth(1)
-        context.setStrokeColor(NSColor.black.withAlphaComponent(0.85).cgColor)
+        context.setStrokeColor(NSColor.black.cgColor)
         context.stroke(box)
         context.setStrokeColor(NSColor.white.cgColor)
         context.stroke(box.insetBy(dx: 1, dy: 1))
