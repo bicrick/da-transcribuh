@@ -30,7 +30,7 @@ final class InkThemeTests: XCTestCase {
         _ = Ink.bevel
         _ = Ink.hairline
         _ = Ink.secondary
-        XCTAssertEqual(Ink.windowNSColor.cgColor.components?.count ?? 0 >= 3, true)
+        XCTAssertGreaterThanOrEqual(Ink.windowNSColor.cgColor.numberOfComponents, 3)
     }
 
     func testLayoutTokensMatchPaintSpec() {
