@@ -259,7 +259,7 @@ struct InkProgressBar: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(2)
+        .padding(Ink.space1 / 2)
         .frame(height: 12)
         .overlay(
             RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -338,7 +338,7 @@ struct InkSwitch: View {
             RoundedRectangle(cornerRadius: 1, style: .continuous)
                 .fill(isOn ? Ink.onAccent : Ink.label)
                 .frame(width: 12, height: 12)
-                .padding(2)
+                .padding(Ink.space1 / 2)
         }
         .frame(width: 34, height: 18)
         .accessibilityHidden(true)
@@ -528,6 +528,65 @@ struct InkStepDots: View {
     }
 }
 
+/// Paint-style step rail for onboarding: filled past, inverted current, outlined ahead.
+struct InkStepRail: View {
+    var current: Int
+    var labels: [String]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
+                stepCell(index: index, label: label)
+                if index < labels.count - 1 {
+                    Rectangle()
+                        .fill(index < current ? Ink.label : Ink.hairline)
+                        .frame(height: 1)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(current + 1) of \(labels.count)")
+    }
+
+    private func stepCell(index: Int, label: String) -> some View {
+        let state: StepState = {
+            if index < current { return .done }
+            if index == current { return .current }
+            return .ahead
+        }()
+        return VStack(spacing: Ink.space1) {
+            ZStack {
+                Rectangle()
+                    .fill(state == .current ? Ink.label : Ink.window)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                if state == .done {
+                    Image(systemName: "checkmark")
+                        .font(Ink.microFont)
+                        .foregroundStyle(Ink.success)
+                } else {
+                    Text("\(index + 1)")
+                        .font(Ink.headingFont)
+                        .foregroundStyle(state == .current ? Ink.onAccent : Ink.label)
+                }
+            }
+            .frame(width: 22, height: 22)
+            Text(label.uppercased())
+                .font(Ink.headingFont)
+                .foregroundStyle(state == .ahead ? Ink.tertiary : Ink.label)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(width: 56)
+    }
+
+    private enum StepState {
+        case done
+        case current
+        case ahead
+    }
+}
+
 struct InkPrimaryButtonStyle: ButtonStyle {
     var large: Bool = true
     var enabled: Bool = true
@@ -696,7 +755,7 @@ struct InkDashedEmpty: View {
                     .buttonStyle(InkSecondaryButtonStyle())
             }
         }
-        .padding(16)
+        .padding(Ink.cardPad)
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(
             RoundedRectangle(cornerRadius: Ink.cardRadius, style: .continuous)

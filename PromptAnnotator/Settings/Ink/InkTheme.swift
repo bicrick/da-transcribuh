@@ -133,8 +133,17 @@ enum Ink {
 
     static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         // Weight variants are not shipped; size is what matters for motifs.
+        // Graceful fallback if the bundled OTF failed to register.
         _ = weight
-        return Font.custom(monoName, size: size)
+        if NSFont(name: monoName, size: size) != nil {
+            return Font.custom(monoName, size: size)
+        }
+        return Font.system(size: size, weight: .regular, design: .monospaced)
+    }
+
+    /// True when Departure Mono resolved from the bundle (ATSApplicationFontsPath).
+    static var monoIsRegistered: Bool {
+        NSFont(name: monoName, size: 12) != nil
     }
 
     static func systemMono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {

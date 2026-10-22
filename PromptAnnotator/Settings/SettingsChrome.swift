@@ -67,6 +67,30 @@ enum SettingsMetrics {
     static let sidebarWidth: CGFloat = Ink.sidebarWidth
 }
 
+/// Compact page title + optional one-line caption — same language as Home.
+struct InkPageHeader: View {
+    var title: String
+    var subtitle: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+            Text(title)
+                .font(Ink.pageTitleFont)
+                .foregroundStyle(Ink.label)
+                .fixedSize(horizontal: false, vertical: true)
+            if let subtitle {
+                Text(subtitle)
+                    .font(Ink.bodyFont)
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct SettingsPageStack<Content: View>: View {
     var title: String
     var subtitle: String? = nil
@@ -75,17 +99,7 @@ struct SettingsPageStack<Content: View>: View {
     var body: some View {
         DTScrollView {
             VStack(alignment: .leading, spacing: Ink.sectionGap) {
-                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
-                    Text(title)
-                        .font(Ink.pageTitleFont)
-                        .foregroundStyle(Ink.label)
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(Ink.bodyFont)
-                            .foregroundStyle(Ink.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
+                InkPageHeader(title: title, subtitle: subtitle)
                 content()
             }
             .padding(.top, Ink.pageTop)
@@ -100,6 +114,7 @@ struct SettingsPageStack<Content: View>: View {
 
 struct SettingsSection<Content: View>: View {
     var title: String? = nil
+    /// One short caption under the section header (flush to the grid).
     var footer: String? = nil
     @ViewBuilder var content: () -> Content
 
@@ -116,16 +131,15 @@ struct SettingsSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Ink.sectionInnerGap) {
             if let title {
-                InkSectionHeader(title: title)
-            }
-            content()
-            if let footer {
+                InkSectionHeader(title: title, caption: footer)
+            } else if let footer {
                 Text(footer)
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            content()
         }
     }
 }

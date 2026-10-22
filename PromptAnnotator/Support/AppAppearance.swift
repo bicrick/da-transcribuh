@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Light / dark / system appearance for Settings + menu-bar chrome.
-/// Island / overlay keep their own look and are not forced here.
+/// Light / dark / system appearance for Settings, menu-bar, onboarding, and Ink chrome.
+/// Applied via `NSApp.appearance` so dynamic Ink colors (including island / annotate) re-resolve.
 enum AppAppearance: String, CaseIterable, Identifiable, Codable {
     case system
     case light
