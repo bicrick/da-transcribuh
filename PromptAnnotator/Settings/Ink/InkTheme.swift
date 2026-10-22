@@ -170,6 +170,17 @@ enum Ink {
     /// Dedicated track width inside the reserved gutter (content never draws under it).
     static let scrollerWidth: CGFloat = 10
     static let scrollerThumbMin: CGFloat = 24
+    /// Checker size on the "missing texture" thumb. 2pt = 4px at 2x, so the 6pt
+    /// face inside the 2pt border holds exactly three checks across.
+    static let scrollerCheck: CGFloat = 2
+    /// Flat Paint gray track (light silver, darker graphite gray in dark).
+    static let scrollerTrack = color(light: "#C3C3C3", dark: "#48484C")
+    /// Thumb checks. Light: white + light gray under a black outline.
+    static let scrollerCheckLightA = nsColor(hex: "#FFFFFF")
+    static let scrollerCheckLightB = nsColor(hex: "#D4D4D4")
+    /// Dark: mid gray + graphite under a light outline.
+    static let scrollerCheckDarkA = nsColor(hex: "#8E8E93")
+    static let scrollerCheckDarkB = nsColor(hex: "#5C5C60")
     /// Gap between scroll content and the track.
     static let scrollerGutterGap: CGFloat = 4
     /// Total trailing gutter reserved beside content (`gap + track`).

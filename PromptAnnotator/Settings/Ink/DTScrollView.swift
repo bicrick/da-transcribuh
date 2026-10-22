@@ -114,40 +114,68 @@ private struct DTScrollerRail: View {
     var geometry: DTScrollGeometry
     var scrollView: NSScrollView?
     var onDragging: (Bool) -> Void
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         GeometryReader { geo in
             let trackH = max(geo.size.height, 1)
-            let thumbH = geometry.thumbHeight(trackH: trackH, minH: Ink.scrollerThumbMin)
-            let thumbY = geometry.thumbY(trackH: trackH, minH: Ink.scrollerThumbMin)
+            // Whole points keep the 2pt checks on device pixels at 1x and 2x.
+            let thumbH = geometry.thumbHeight(trackH: trackH, minH: Ink.scrollerThumbMin).rounded()
+            let thumbY = geometry.thumbY(trackH: trackH, minH: Ink.scrollerThumbMin).rounded()
 
             ZStack(alignment: .top) {
+                // Track: flat Paint gray with the ink border.
                 Rectangle()
-                    .fill(Ink.window)
+                    .fill(Ink.scrollerTrack)
                     .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
-                    .overlay {
-                        DTDitherGrip()
-                            .opacity(0.28)
-                            .clipShape(Rectangle())
-                    }
                     .allowsHitTesting(false)
-
-                Rectangle()
-                    .fill(Ink.label)
-                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
+                // Thumb: "missing texture" checkerboard, one cached tile, tiled by the GPU.
+                Image(nsImage: DTCheckerTile.image(dark: scheme == .dark))
+                    .resizable(resizingMode: .tile)
+                    .interpolation(.none)
                     .frame(height: thumbH)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
                     .offset(y: thumbY)
                     .allowsHitTesting(false)
-
-                DTScrollDragSurface(
-                    geometry: geometry,
-                    scrollView: scrollView,
-                    onDragging: onDragging
-                )
+                DTScrollDragSurface(geometry: geometry, scrollView: scrollView, onDragging: onDragging)
             }
         }
         .frame(width: Ink.scrollerWidth)
         .frame(maxHeight: .infinity)
+    }
+}
+
+/// 2x2 checker tile (each check `Ink.scrollerCheck` pt) built once per appearance.
+/// Drawn with integer rects so it stays crisp at every backing scale.
+enum DTCheckerTile {
+    private static let light = make(a: Ink.scrollerCheckLightA, b: Ink.scrollerCheckLightB)
+    private static let dark = make(a: Ink.scrollerCheckDarkA, b: Ink.scrollerCheckDarkB)
+
+    static func image(dark isDark: Bool) -> NSImage { isDark ? dark : light }
+
+    private static func make(a: NSColor, b: NSColor) -> NSImage {
+        let c = Ink.scrollerCheck
+        let image = NSImage(size: NSSize(width: c * 2, height: c * 2))
+        // Explicit 1x and 2x bitmaps: no resampling, so checks land on whole pixels.
+        for scale in [1, 2] {
+            let px = Int(c) * 2 * scale
+            guard let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+            ) else { continue }
+            rep.size = image.size
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+            a.setFill()
+            NSRect(x: 0, y: 0, width: c * 2, height: c * 2).fill()
+            b.setFill()
+            NSRect(x: c, y: 0, width: c, height: c).fill()
+            NSRect(x: 0, y: c, width: c, height: c).fill()
+            NSGraphicsContext.restoreGraphicsState()
+            image.addRepresentation(rep)
+        }
+        return image
     }
 }
 
