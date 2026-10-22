@@ -333,7 +333,6 @@ def render(pal: dict) -> Image.Image:
     wf = font_departure(13 * S)
     tw, th = text_size(d, "da transcribuh", wf)
     d.text(((W - tw) / 2, (strip_h - th) / 2 - 2), "da transcribuh", font=wf, fill=c(pal, "label"))
-    d.rectangle([(W + tw) / 2 + 4, strip_h / 2 - 6, (W + tw) / 2 + 4 + 6 * S, strip_h / 2 + 6], fill=c(pal, "label"))
 
     # Folder shelf — fill only ABOVE the shelf stroke; page color from the stroke down
     # (avoids a fill→front band under the red line in graphite).

@@ -179,7 +179,7 @@ struct OnboardingFlow: View {
             HStack(spacing: Ink.space3) {
                 AppLogo(side: 44)
                 VStack(alignment: .leading, spacing: Ink.titleDescGap) {
-                    DTWordmark(size: 18, blinks: true)
+                    DTWordmark(size: 18)
                     Text(AppVersion.label)
                         .font(Ink.mono(11))
                         .foregroundStyle(Ink.secondary)

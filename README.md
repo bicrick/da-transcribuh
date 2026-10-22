@@ -22,7 +22,7 @@
 
 ## look
 
-ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset shadows, and manila **folder tabs** across the top of settings (no toolbox sidebar). departure mono for every “da transcribuh” wordmark and chrome label (lowercase, block cursor only after the h — never italic). sf mono for longer copy. custom thin scrollers. chrome keeps decorative palette strips out of the title bar and status bar.
+ms paint vibes — flat classic swatches, chunky 1–2px outlines, hard offset shadows, and manila **folder tabs** across the top of settings (no toolbox sidebar). departure mono for every “da transcribuh” wordmark and chrome label (lowercase — never italic). sf mono for longer copy. custom thin scrollers. chrome keeps decorative palette strips out of the title bar and status bar.
 
 appearance is system / light / dark from **general**, or mash `theme: …` in the menu bar to cycle. light stays white; dark is soft graphite (window `#2C2C2E`, raised `#353538`, front `#3A3A3D`, hairline `#4A4A4E`, text `#F2F2F2` / `#A8A8AD`, bevel `#F2F2F2` theme-inverted) — never midnight black. paint accents stay vivid.
 
@@ -119,7 +119,7 @@ cancel drops the take. nothing gets staged.
 
 final **dt block** art lives in [`assets/brand/`](assets/brand/):
 
-- `wordmark-g-dt-block.png` — lowercase “da transcribuh” plus a separate block cursor after the h (readme embeds this light mark; `wordmark-g-dt-block-dark.png` is available for dark surfaces)
+- `wordmark-g-dt-block.png` — lowercase “da transcribuh” (readme embeds this light mark; `wordmark-g-dt-block-dark.png` is available for dark surfaces)
 - `icon-g-dt-block-1024.png` — app mark
 - `readme-banner.png` — hero (paint traffic lights on the session window mock)
 - `social-preview.png` (1280×640) — repo social preview; also mirrored as `social-preview-1280x640.png` / `@2x`

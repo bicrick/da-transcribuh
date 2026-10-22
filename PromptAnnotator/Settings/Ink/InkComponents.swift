@@ -1,41 +1,16 @@
 import SwiftUI
 
-// MARK: - Wordmark (name + separate block cursor; does NOT invert the h)
+// MARK: - Wordmark (lowercase name only — no trailing block cursor)
 
 struct DTWordmark: View {
     var size: CGFloat = 11
-    /// Subtle blink in onboarding only. Honors Reduce Motion.
-    var blinks: Bool = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var cursorOn = true
 
     var body: some View {
-        HStack(alignment: .center, spacing: 1) {
-            Text("da transcribuh")
-                .font(Ink.mono(size))
-                .foregroundStyle(Ink.label)
-                .tracking(0)
-            Rectangle()
-                .fill(Ink.label)
-                .frame(width: max(5, size * 0.55), height: max(8, size * 0.95))
-                .opacity(shouldBlink ? (cursorOn ? 1 : 0.15) : 1)
-                .accessibilityHidden(true)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("da transcribuh")
-        .onAppear {
-            guard shouldBlink else { return }
-            Task { @MainActor in
-                while !Task.isCancelled && shouldBlink {
-                    try? await Task.sleep(nanoseconds: 530_000_000)
-                    cursorOn.toggle()
-                }
-            }
-        }
-    }
-
-    private var shouldBlink: Bool {
-        blinks && !reduceMotion
+        Text("da transcribuh")
+            .font(Ink.mono(size))
+            .foregroundStyle(Ink.label)
+            .tracking(0)
+            .accessibilityLabel("da transcribuh")
     }
 }
 
