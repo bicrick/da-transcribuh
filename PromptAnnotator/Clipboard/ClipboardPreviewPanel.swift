@@ -55,13 +55,17 @@ final class ClipboardPreviewPanelController {
             host?.rootView = root
         }
         guard let panel, let host else { return }
-        let fitting = host.fittingSize
+        // Measure the free-height card, then pin it to the capped height. The card
+        // clips inside its own border, so a long body can no longer push the top
+        // and bottom strokes out of the window (only the side strokes showed).
+        let measured = host.fittingSize.height
         let size = CGSize(
-            width: max(ClipboardPreviewPopover.width, min(fitting.width, 420)),
-            height: max(160, min(fitting.height, 520))
+            width: ClipboardPreviewPopover.width,
+            height: ClipboardPreviewLayout.cardHeight(measured: measured)
         )
-        host.frame = NSRect(origin: .zero, size: size)
+        host.rootView = ClipboardPreviewPopover(item: item, image: image, height: size.height)
         let chrome = CGSize(width: size.width + Ink.bevelOffset, height: size.height + Ink.bevelOffset)
+        host.frame = NSRect(origin: .zero, size: chrome)
         let target = place(size: chrome, visual: size, beside: listFrame)
         isShowing = true
         hideGeneration &+= 1

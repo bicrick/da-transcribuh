@@ -104,13 +104,16 @@ final class ClipboardHistoryPanelController {
         } else {
             place(panel: panel, size: chrome, visual: size)
             restingFrame = panel.frame
-            if !wasOnScreen { scrollListToTop() }
         }
         // Nonactivating panel can still be key so arrows/Enter work with search off.
         // Focus first, motion second: nothing waits on the animation.
         panel.orderFrontRegardless()
         panel.makeKey()
-        panel.makeFirstResponder(host)
+        // Every open starts at the top with the search field focused (Maccy). Typing
+        // filters at once; the key monitor still takes arrows and Return from the
+        // field. This used to make the hosting view first responder, which took
+        // focus off the search field on every reopen.
+        resetForOpen(panel: panel)
         if !wasOnScreen {
             // Fade in while dropping 6pt into place.
             PanelMotion.present(panel, to: restingFrame, alpha: Self.restingAlpha,
@@ -126,18 +129,56 @@ final class ClipboardHistoryPanelController {
 
     private static let restingAlpha: CGFloat = 0.95
 
-    /// The hosting view is reused across opens, so the list keeps its old scroll offset.
-    /// Reset it so the preselected first row is on screen.
-    private func scrollListToTop() {
-        guard let scroll = Self.firstScrollView(in: host),
-              let doc = scroll.documentView else { return }
+    /// The hosting view is reused across opens, so the list kept its old scroll
+    /// offset and AppKit kept whatever responder had focus. Reset both now and
+    /// again after SwiftUI applies the cleared search (the list relayouts async).
+    private func resetForOpen(panel: NSPanel) {
+        let generation = showGeneration
+        let apply = { [weak self, weak panel] in
+            guard let self, let panel, self.showGeneration == generation, !self.isClosing else { return }
+            Self.scrollToTop(Self.firstScrollView(in: self.host))
+            Self.focusSearchField(in: panel, root: self.host)
+        }
+        apply()
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                apply()
+                DispatchQueue.main.async { MainActor.assumeIsolated { apply() } }
+            }
+        }
+    }
+
+    /// Scrolls to the first row whether or not the document view is flipped.
+    static func scrollToTop(_ scroll: NSScrollView?) {
+        guard let scroll, let doc = scroll.documentView else { return }
         let clip = scroll.contentView
         let top = doc.isFlipped ? 0 : max(doc.frame.height - clip.bounds.height, 0)
+        guard clip.bounds.origin.y != top else { return }
         clip.setBoundsOrigin(NSPoint(x: clip.bounds.origin.x, y: top))
         scroll.reflectScrolledClipView(clip)
     }
 
-    private static func firstScrollView(in view: NSView?) -> NSScrollView? {
+    /// Makes the search field first responder (it then hosts the field editor).
+    /// Falls back to the hosting view when search is hidden in Settings.
+    static func focusSearchField(in window: NSWindow, root: NSView?) {
+        if let field = firstEditableTextField(in: root) {
+            if let editor = window.firstResponder as? NSTextView, editor.delegate === field { return }
+            window.makeFirstResponder(field)
+        } else if let root, window.firstResponder !== root {
+            window.makeFirstResponder(root)
+        }
+    }
+
+    static func firstEditableTextField(in view: NSView?) -> NSTextField? {
+        guard let view else { return nil }
+        if let field = view as? NSTextField, field.isEditable, !field.isHidden { return field }
+        for sub in view.subviews {
+            if let hit = firstEditableTextField(in: sub) { return hit }
+        }
+        return nil
+    }
+
+    static func firstScrollView(in view: NSView?) -> NSScrollView? {
         guard let view else { return nil }
         if let scroll = view as? NSScrollView { return scroll }
         for sub in view.subviews {
@@ -145,6 +186,7 @@ final class ClipboardHistoryPanelController {
         }
         return nil
     }
+
     private var hideGeneration: UInt64 = 0
 
     /// `animated: false` is for picks: the panel must be gone before the paste.

@@ -132,6 +132,33 @@ enum SessionClipboard {
         return true
     }
 
+    /// Pastes a mixed history item back as one pasteboard item with every type:
+    /// PNG and TIFF for image targets, plain text for text fields, and RTFD (image
+    /// then text) for rich editors unless "paste without formatting" is on.
+    @discardableResult
+    static func writeMixed(text: String, png: Data, plainOnly: Bool, to board: NSPasteboard) -> Bool {
+        if board === NSPasteboard.general {
+            MainActor.assumeIsolated { ClipboardHistoryStore.shared.beginOwnWrite() }
+        }
+        defer {
+            if board === NSPasteboard.general {
+                MainActor.assumeIsolated { ClipboardHistoryStore.shared.endOwnWrite() }
+            }
+        }
+        board.clearContents()
+        let item = NSPasteboardItem()
+        item.setData(png, forType: .png)
+        let image = NSImage(data: png)
+        if let tiff = image?.tiffRepresentation {
+            item.setData(tiff, forType: .tiff)
+        }
+        item.setString(text, forType: .string)
+        if !plainOnly, let image, let rtfd = rtfdData(image: image, text: text) {
+            item.setData(rtfd, forType: .rtfd)
+        }
+        return board.writeObjects([item])
+    }
+
     @discardableResult
     static func writeTranscript(_ text: String, to board: NSPasteboard) -> Bool {
         writeClipboardText(text, plainOnly: true, to: board)

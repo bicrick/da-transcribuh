@@ -198,6 +198,17 @@ struct ClipboardHistoryView: View {
         switch item.kind {
         case .image:
             ClipboardThumbnail(store: store, item: item, maxHeight: imageMaxHeight)
+        case .text where item.isMixed:
+            // Text and image from one copy: a small thumbnail keeps the row height.
+            HStack(spacing: 6) {
+                ClipboardThumbnail(store: store, item: item, maxHeight: rowHeight - 4)
+                    .frame(maxWidth: 40, alignment: .leading)
+                Text(middleTruncated(item.previewLine))
+                    .font(Ink.mono(12))
+                    .foregroundStyle(foreground)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         case .text, .fileURL:
             Text(middleTruncated(item.previewLine))
                 .font(Ink.mono(12))
@@ -403,9 +414,24 @@ private struct SelectionRevealAnchor: NSViewRepresentable {
 struct ClipboardPreviewPopover: View {
     var item: ClipboardItem
     var image: NSImage?
+    /// Final visual height chosen by the panel. Nil while measuring. When set, the
+    /// card is exactly this tall and clips its content inside the border, so the
+    /// 2pt stroke shows on all four sides even when the body is long.
+    var height: CGFloat? = nil
 
     /// Preview width. 280 truncated copy times ("Oct 22, 2026 at 4:34:4…").
     static let width: CGFloat = 320
+    /// Panel caps on the visual card (without the bevel gutter).
+    static let minHeight: CGFloat = 120
+    static let maxHeight: CGFloat = 520
+    /// Image box inside the padding. Mixed items leave room for their text.
+    static var contentWidth: CGFloat { width - 2 * Ink.space3 }
+    static let imageMaxHeight: CGFloat = 240
+    static let mixedImageMaxHeight: CGFloat = 160
+    static let textLineLimit = 22
+    static let mixedTextLineLimit = 8
+    /// Long bodies are cut before layout; the preview shows a few lines anyway.
+    static let textCharacterLimit = 2_000
 
     /// Localized date + time with seconds, e.g. "Oct 22, 2026 at 4:34:42 PM".
     private static let stamp: DateFormatter = {
@@ -422,6 +448,9 @@ struct ClipboardPreviewPopover: View {
             metaRow("First copy time:", Self.stamp.string(from: item.firstCopiedAt))
             metaRow("Last copy time:", Self.stamp.string(from: item.lastCopiedAt))
             metaRow("Number of copies:", "\(item.copyCount)")
+            if item.isMixed {
+                metaRow("Contents:", "text + image")
+            }
             if let w = item.imageWidth, let h = item.imageHeight {
                 metaRow("Dimensions:", "\(w) × \(h)")
             }
@@ -431,7 +460,8 @@ struct ClipboardPreviewPopover: View {
             InkGlyphString(text: "Press ⌥⌫ to delete.", size: 10, color: Ink.secondary)
         }
         .padding(Ink.space3)
-        .frame(width: Self.width, alignment: .leading)
+        .frame(width: Self.width, height: height, alignment: .topLeading)
+        .clipped()
         .background(Ink.front)
         .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
         .background(
@@ -439,26 +469,65 @@ struct ClipboardPreviewPopover: View {
                 .fill(Ink.bevel)
                 .offset(x: Ink.bevelOffset, y: Ink.bevelOffset)
         )
+        // Fill the window (card + bevel gutter) from the top-left, so the bevel
+        // lands in the gutter instead of the card being centered and cropped.
+        .frame(
+            width: Self.width + Ink.bevelOffset,
+            height: height.map { $0 + Ink.bevelOffset },
+            alignment: .topLeading
+        )
     }
 
     @ViewBuilder
     private var previewBody: some View {
-        switch item.kind {
-        case .image:
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: Self.width - 2 * Ink.space3, maxHeight: 180)
-                    .frame(maxWidth: .infinity)
-            }
-        case .text, .fileURL:
-            Text(item.text ?? item.previewLine)
+        if item.hasImage {
+            imageBody
+        }
+        if item.kind != .image, let text = previewText {
+            Text(text)
                 .font(Ink.mono(11))
                 .foregroundStyle(Ink.label)
+                .lineLimit(item.isMixed ? Self.mixedTextLineLimit : Self.textLineLimit)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
         }
+    }
+
+    /// Explicit point size: a `maxWidth`/`maxHeight` frame around a resizable image
+    /// left `fittingSize` blind to the image, so the window was sized for the meta
+    /// rows only and the picture was cropped away.
+    @ViewBuilder
+    private var imageBody: some View {
+        let box = CGSize(
+            width: Self.contentWidth,
+            height: item.isMixed ? Self.mixedImageMaxHeight : Self.imageMaxHeight
+        )
+        let fitted = image.map { ClipboardPreviewLayout.fit($0.size, in: box) } ?? .zero
+        if let image, fitted.width > 0, fitted.height > 0 {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: fitted.width, height: fitted.height)
+                .overlay(Rectangle().strokeBorder(Ink.hairline, lineWidth: 1))
+                .frame(maxWidth: .infinity, alignment: .center)
+        } else {
+            Text("Image file is missing.")
+                .font(Ink.mono(11))
+                .foregroundStyle(Ink.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var previewText: String? {
+        let raw = item.text ?? item.previewLine
+        guard !raw.isEmpty else { return nil }
+        if raw.count > Self.textCharacterLimit {
+            return String(raw.prefix(Self.textCharacterLimit)) + "…"
+        }
+        return raw
     }
 
     private func metaRow(_ label: String, _ value: String) -> some View {
@@ -474,6 +543,24 @@ struct ClipboardPreviewPopover: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+/// Pure sizing for previews (unit tested).
+enum ClipboardPreviewLayout {
+    /// Aspect-fit `natural` into `box`, never upscaling, in whole points.
+    static func fit(_ natural: CGSize, in box: CGSize) -> CGSize {
+        guard natural.width > 0, natural.height > 0, box.width > 0, box.height > 0 else { return .zero }
+        let scale = min(box.width / natural.width, box.height / natural.height, 1)
+        return CGSize(
+            width: max(1, (natural.width * scale).rounded()),
+            height: max(1, (natural.height * scale).rounded())
+        )
+    }
+
+    /// Visual card height from the measured height, inside the panel caps.
+    static func cardHeight(measured: CGFloat) -> CGFloat {
+        min(max(measured.rounded(.up), ClipboardPreviewPopover.minHeight), ClipboardPreviewPopover.maxHeight)
     }
 }
 

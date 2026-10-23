@@ -109,17 +109,10 @@ final class ClipboardWatcher {
     }
 
     /// PNG bytes for the board's image. Screenshots and most apps already offer
-    /// public.png, so those bytes are stored as-is. The old path always decoded to
-    /// NSImage, re-encoded TIFF, then re-encoded PNG on the main thread (~120 ms for
-    /// a 3456x2234 screenshot). Only TIFF-only boards still pay for the conversion.
+    /// public.png, so those bytes are stored as-is. Only TIFF-only (or PDF-only)
+    /// boards pay for a conversion.
     static func pngData(from board: NSPasteboard) -> Data? {
-        if let png = board.data(forType: .png), png.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
-            return png
-        }
-        guard let image = NSImage(pasteboard: board),
-              let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return nil }
-        return rep.representation(using: .png, properties: [:])
+        ClipboardCapture.anyImagePNG(from: board)
     }
 
     func capture(from board: NSPasteboard) {
@@ -131,70 +124,140 @@ final class ClipboardWatcher {
             return
         }
 
-        if settings.clipboardSaveFiles,
+        guard let payload = ClipboardCapture.payload(
+            from: board,
+            saveFiles: settings.clipboardSaveFiles,
+            saveImages: settings.clipboardSaveImages,
+            saveText: settings.clipboardSaveText
+        ) else { return }
+        _ = store.ingest(
+            payload: payload,
+            source: .pasteboard,
+            applicationName: NSWorkspace.shared.frontmostApplication?.localizedName
+        )
+    }
+}
+
+/// What one pasteboard change is stored as.
+enum ClipboardCapturePayload: Equatable {
+    case files([String])
+    case image(png: Data)
+    case text(String)
+    /// One copy that offered both text and a bitmap (web page, Notes, Excel).
+    case mixed(text: String, png: Data)
+}
+
+/// Reads a pasteboard into a payload. Pure apart from the board, so tests drive it
+/// with a private `NSPasteboard(name:)`.
+///
+/// Before mixed items, an image on the board returned early and any text that came
+/// with it was dropped. A text copy from Pages or Keynote (which adds a PDF) was
+/// even stored as a picture of the text. Now:
+/// - files win, as before;
+/// - text plus a real bitmap (public.png, public.tiff, or an image inside RTFD)
+///   is one mixed item;
+/// - text plus only a PDF rendering is text;
+/// - an image with no text is an image (PDF-only still converts, as before).
+enum ClipboardCapture {
+    static let pngMagic: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+
+    static func payload(
+        from board: NSPasteboard,
+        saveFiles: Bool,
+        saveImages: Bool,
+        saveText: Bool
+    ) -> ClipboardCapturePayload? {
+        if saveFiles,
            let urls = board.readObjects(forClasses: [NSURL.self], options: [
             .urlReadingFileURLsOnly: true
            ]) as? [URL], !urls.isEmpty {
-            let paths = urls.map(\.path)
-            _ = store.ingest(
-                kind: .fileURL,
-                source: .pasteboard,
-                text: paths.joined(separator: "\n"),
-                imagePNG: nil,
-                filePaths: paths,
-                fingerprint: ClipboardFingerprint.files(paths),
-                applicationName: NSWorkspace.shared.frontmostApplication?.localizedName
-            )
-            return
+            return .files(urls.map(\.path))
         }
-
-        if settings.clipboardSaveImages, let png = Self.pngData(from: board) {
-            _ = store.ingest(
-                kind: .image,
-                source: .pasteboard,
-                text: nil,
-                imagePNG: png,
-                filePaths: nil,
-                fingerprint: ClipboardFingerprint.image(png),
-                applicationName: NSWorkspace.shared.frontmostApplication?.localizedName
-            )
-            return
+        let text = saveText ? plainText(from: board) : nil
+        if saveImages {
+            if let text {
+                if let png = bitmapPNG(from: board) { return .mixed(text: text, png: png) }
+            } else if let png = anyImagePNG(from: board) {
+                return .image(png: png)
+            }
         }
+        if let text { return .text(text) }
+        return nil
+    }
 
-        guard settings.clipboardSaveText else { return }
-
-        if let str = board.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !str.isEmpty {
-            _ = store.ingest(
-                kind: .text,
-                source: .pasteboard,
-                text: str,
-                imagePNG: nil,
-                filePaths: nil,
-                fingerprint: ClipboardFingerprint.text(str),
-                applicationName: NSWorkspace.shared.frontmostApplication?.localizedName
-            )
-            return
-        }
-
-        // RTF → plain
+    /// Plain text from the board: the string type, else RTF, else RTFD (minus the
+    /// attachment placeholder characters). Trimmed; nil when empty.
+    static func plainText(from board: NSPasteboard) -> String? {
+        if let str = board.string(forType: .string).flatMap(trimmed) { return str }
         if let rtf = board.data(forType: .rtf),
            let attr = try? NSAttributedString(
             data: rtf,
             options: [.documentType: NSAttributedString.DocumentType.rtf],
             documentAttributes: nil
-           ) {
-            let str = attr.string.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !str.isEmpty else { return }
-            _ = store.ingest(
-                kind: .text,
-                source: .pasteboard,
-                text: str,
-                imagePNG: nil,
-                filePaths: nil,
-                fingerprint: ClipboardFingerprint.text(str),
-                applicationName: NSWorkspace.shared.frontmostApplication?.localizedName
-            )
+           ),
+           let str = trimmed(attr.string) {
+            return str
         }
+        if let rtfd = board.data(forType: .rtfd),
+           let attr = NSAttributedString(rtfd: rtfd, documentAttributes: nil),
+           let str = trimmed(attr.string.replacingOccurrences(of: "\u{FFFC}", with: "")) {
+            return str
+        }
+        return nil
+    }
+
+    /// A real bitmap on the board as PNG: public.png as-is, other bytes under the
+    /// PNG type decoded, TIFF converted, else the first image attached in RTFD.
+    /// Ignores PDF, which text apps add as a rendering of the words.
+    static func bitmapPNG(from board: NSPasteboard) -> Data? {
+        if let raw = board.data(forType: .png) {
+            if raw.starts(with: pngMagic) { return raw }
+            if let png = png(fromImageData: raw) { return png }
+        }
+        if let tiff = board.data(forType: .tiff), let png = png(fromImageData: tiff) {
+            return png
+        }
+        if let rtfd = board.data(forType: .rtfd), let png = firstAttachmentPNG(rtfd: rtfd) {
+            return png
+        }
+        return nil
+    }
+
+    /// Any image on the board as PNG, including what `NSImage(pasteboard:)` can
+    /// read (PDF). Used when the copy has no text.
+    static func anyImagePNG(from board: NSPasteboard) -> Data? {
+        if let png = bitmapPNG(from: board) { return png }
+        guard let image = NSImage(pasteboard: board),
+              let tiff = image.tiffRepresentation else { return nil }
+        return png(fromImageData: tiff)
+    }
+
+    static func png(fromImageData data: Data) -> Data? {
+        if data.starts(with: pngMagic) { return data }
+        guard let rep = NSBitmapImageRep(data: data) else { return nil }
+        return rep.representation(using: .png, properties: [:])
+    }
+
+    /// First bitmap attachment in flat RTFD (TextEdit, Notes, Mail copies).
+    static func firstAttachmentPNG(rtfd: Data) -> Data? {
+        guard let attr = NSAttributedString(rtfd: rtfd, documentAttributes: nil),
+              attr.length > 0 else { return nil }
+        var found: Data?
+        attr.enumerateAttribute(.attachment, in: NSRange(location: 0, length: attr.length)) { value, _, stop in
+            guard let attachment = value as? NSTextAttachment else { return }
+            if let contents = attachment.fileWrapper?.regularFileContents ?? attachment.contents,
+               let png = png(fromImageData: contents) {
+                found = png
+            } else if let tiff = attachment.image?.tiffRepresentation, let png = png(fromImageData: tiff) {
+                found = png
+            }
+            if found != nil { stop.pointee = true }
+        }
+        return found
+    }
+
+    private static func trimmed(_ string: String) -> String? {
+        let out = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        return out.isEmpty ? nil : out
     }
 }
