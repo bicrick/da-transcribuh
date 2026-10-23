@@ -343,6 +343,7 @@ final class ClipboardHistoryStore: ObservableObject {
     // MARK: - Persistence
 
     private func load() {
+        Self.flushPendingWrites()
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let data = try? Data(contentsOf: indexURL),
@@ -354,13 +355,29 @@ final class ClipboardHistoryStore: ObservableObject {
         sortPinnedFirst()
     }
 
+    /// One serial queue for every store, so writes land in order and a store that
+    /// loads the same folder sees the last write (`load` waits on it).
+    nonisolated static let persistQueue = DispatchQueue(label: "clipboard.persist", qos: .utility)
+
+    /// Encodes and writes the index off the main thread. The pretty-printed,
+    /// sorted-keys encode of a 200-item index ran on main after every copy.
     private func persist() {
-        try? fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        guard let data = try? encoder.encode(items) else { return }
-        try? data.write(to: indexURL, options: .atomic)
+        let snapshot = items
+        let folder = folderURL
+        let index = indexURL
+        Self.persistQueue.async {
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            guard let data = try? encoder.encode(snapshot) else { return }
+            try? data.write(to: index, options: .atomic)
+        }
+    }
+
+    /// Blocks until queued index writes are on disk (quit, tests).
+    nonisolated static func flushPendingWrites() {
+        persistQueue.sync {}
     }
 
     private func trimToLimit() {

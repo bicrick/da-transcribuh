@@ -84,6 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        defer { ClipboardHistoryStore.flushPendingWrites() }
         HotkeyCenter.shared.remove()
         MainActor.assumeIsolated {
             if AppSettings.shared.clipboardClearOnQuit {
