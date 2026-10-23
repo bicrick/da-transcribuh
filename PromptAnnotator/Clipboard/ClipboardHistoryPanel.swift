@@ -57,6 +57,7 @@ final class ClipboardHistoryPanelController {
                 }
             },
             onClose: { [weak self] in self?.hide() },
+            openGeneration: showGeneration,
             onOpenPreferences: { [weak self] in
                 self?.hide()
                 SettingsPresenter.shared.show(page: .clipboard)
@@ -103,6 +104,7 @@ final class ClipboardHistoryPanelController {
         } else {
             place(panel: panel, size: chrome, visual: size)
             restingFrame = panel.frame
+            if !wasOnScreen { scrollListToTop() }
         }
         // Nonactivating panel can still be key so arrows/Enter work with search off.
         // Focus first, motion second: nothing waits on the animation.
@@ -123,6 +125,26 @@ final class ClipboardHistoryPanelController {
     }
 
     private static let restingAlpha: CGFloat = 0.95
+
+    /// The hosting view is reused across opens, so the list keeps its old scroll offset.
+    /// Reset it so the preselected first row is on screen.
+    private func scrollListToTop() {
+        guard let scroll = Self.firstScrollView(in: host),
+              let doc = scroll.documentView else { return }
+        let clip = scroll.contentView
+        let top = doc.isFlipped ? 0 : max(doc.frame.height - clip.bounds.height, 0)
+        clip.setBoundsOrigin(NSPoint(x: clip.bounds.origin.x, y: top))
+        scroll.reflectScrolledClipView(clip)
+    }
+
+    private static func firstScrollView(in view: NSView?) -> NSScrollView? {
+        guard let view else { return nil }
+        if let scroll = view as? NSScrollView { return scroll }
+        for sub in view.subviews {
+            if let hit = firstScrollView(in: sub) { return hit }
+        }
+        return nil
+    }
     private var hideGeneration: UInt64 = 0
 
     /// `animated: false` is for picks: the panel must be gone before the paste.
@@ -245,11 +267,8 @@ final class ClipboardHistoryPanelController {
         case .cursor:
             let mouse = NSEvent.mouseLocation
             let mouseScreen = ScreenGeometry.screen(containingAppKitPoint: mouse) ?? screen
-            let vis = mouseScreen.visibleFrame
-            origin = NSPoint(x: mouse.x - visual.width / 2, y: mouse.y - visual.height - 12)
-            origin.x = min(max(origin.x, vis.minX + 8), vis.maxX - size.width - 8)
-            origin.y = min(max(origin.y, vis.minY + 8), vis.maxY - size.height - 8)
-            panel.adopt(frame: NSRect(origin: origin, size: size), animated: false)
+            let frame = ClipboardCursorPlacement.frame(mouse: mouse, size: size, visible: mouseScreen.visibleFrame)
+            panel.adopt(frame: frame, animated: false)
             return
         case .menuBar:
             origin = NSPoint(
@@ -265,5 +284,58 @@ final class ClipboardHistoryPanelController {
         origin.x = min(max(origin.x, visible.minX + 8), visible.maxX - size.width - 8)
         origin.y = min(max(origin.y, visible.minY + 8), visible.maxY - size.height - 8)
         panel.adopt(frame: NSRect(origin: origin, size: size), animated: false)
+    }
+}
+
+/// "At cursor" placement, Maccy style. The list opens just beside the pointer, never
+/// under it, so the click or hover that follows the hotkey can't land on a row.
+/// AppKit screen coordinates (origin bottom-left, y up).
+enum ClipboardCursorPlacement {
+    /// Space between the pointer and the panel edge.
+    static let gap: CGFloat = 6
+    /// Space kept between the panel and the visible-frame edge.
+    static let margin: CGFloat = 8
+
+    /// Prefers right of and below the pointer (top-left corner at `gap` right, `gap` down).
+    /// Flips left when the right side would run off screen, and up when below would.
+    /// When neither side fits it clamps to the visible frame. The pointer stays outside
+    /// whenever the panel fits beside it on either side.
+    static func frame(
+        mouse: CGPoint,
+        size: CGSize,
+        visible: CGRect,
+        gap: CGFloat = gap,
+        margin: CGFloat = margin
+    ) -> CGRect {
+        let minX = visible.minX + margin
+        let maxX = visible.maxX - margin
+        let minY = visible.minY + margin
+        let maxY = visible.maxY - margin
+
+        let right = mouse.x + gap
+        let left = mouse.x - gap - size.width
+        var x: CGFloat
+        if right + size.width <= maxX {
+            x = right
+        } else if left >= minX {
+            x = left
+        } else {
+            x = min(max(right, minX), maxX - size.width)
+        }
+        x = max(x, minX)
+
+        let below = mouse.y - gap - size.height
+        let above = mouse.y + gap
+        var y: CGFloat
+        if below >= minY {
+            y = below
+        } else if above + size.height <= maxY {
+            y = above
+        } else {
+            y = min(max(below, minY), maxY - size.height)
+        }
+        y = max(y, minY)
+
+        return CGRect(x: x, y: y, width: size.width, height: size.height)
     }
 }

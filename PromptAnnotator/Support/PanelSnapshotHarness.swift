@@ -13,6 +13,11 @@ enum PanelSnapshotHarness {
         }
         after(2500) {
             ClipboardHistoryPanelController.shared.show()
+            // Placement facts for marking the pointer on the render (AppKit points, y up).
+            let mouse = NSEvent.mouseLocation
+            let frame = ClipboardHistoryPanelController.shared.listFrame
+            let vis = ScreenGeometry.screen(containingAppKitPoint: mouse)?.visibleFrame ?? .zero
+            log("placement mouse=\(mouse.x),\(mouse.y) frame=\(frame.minX),\(frame.minY),\(frame.width),\(frame.height) visible=\(vis.minX),\(vis.minY),\(vis.width),\(vis.height) inside=\(frame.contains(mouse))")
             let wait = max(0, AppSettings.shared.clipboardPreviewDelayMs) + 700
             after(wait) {
                 write(ClipboardHistoryPanelController.shared.window, "\(dir)/clip-panel-top.png", log)

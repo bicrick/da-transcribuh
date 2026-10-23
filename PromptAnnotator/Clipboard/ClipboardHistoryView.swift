@@ -7,6 +7,9 @@ struct ClipboardHistoryView: View {
     @ObservedObject private var settings = AppSettings.shared
     var onPick: (ClipboardItem, Bool) -> Void
     var onClose: () -> Void
+    /// Bumped by the panel on every open. The hosting view is reused, so `onAppear`
+    /// does not fire again; this resets search and preselects the first row.
+    var openGeneration: UInt64 = 0
     var onOpenPreferences: () -> Void = {
         ClipboardHistoryPanelController.shared.hide()
         SettingsPresenter.shared.show(page: .clipboard)
@@ -22,6 +25,9 @@ struct ClipboardHistoryView: View {
     @State private var revealToken = 0
     @State private var revealOnSelect = false
     @FocusState private var searchFocused: Bool
+    /// Pointer location at open. Hover only takes the selection once the pointer has
+    /// moved, so a panel (or a scroll) sliding under a still pointer can't steal it.
+    @State private var openMouse: CGPoint?
 
     /// Maccy Popup-ish width; Paint chrome around it.
     static let preferredSize = CGSize(width: 450, height: 480)
@@ -49,11 +55,8 @@ struct ClipboardHistoryView: View {
         .frame(width: Self.preferredSize.width, height: Self.preferredSize.height)
         .background(Ink.front.opacity(0.95))
         .inkDoublePane(cornerRadius: 0, fill: Ink.front.opacity(0.95))
-        .onAppear {
-            searchFocused = true
-            selection = rows.first?.id
-            schedulePreview(for: selection)
-        }
+        .onAppear { resetForOpen() }
+        .onChange(of: openGeneration) { _, _ in resetForOpen() }
         .onChange(of: filter) { _, _ in
             PerfProbe.endAfterDisplay("type")
             selection = rows.first?.id
@@ -180,6 +183,7 @@ struct ClipboardHistoryView: View {
         }
         .onHover { isHovering in
             if isHovering {
+                guard pointerMovedSinceOpen() else { return }
                 hovered = item.id
                 revealOnSelect = false
                 selection = item.id
@@ -267,6 +271,28 @@ struct ClipboardHistoryView: View {
         let head = limit / 2 - 1
         let tail = limit - head - 1
         return String(text.prefix(head)) + "…" + String(text.suffix(tail))
+    }
+
+    private func resetForOpen() {
+        openMouse = NSEvent.mouseLocation
+        hovered = nil
+        revealOnSelect = false
+        searchFocused = true
+        let wasFiltered = !filter.isEmpty
+        filter = ""
+        selection = rows.first?.id
+        // A filter change reselects and schedules the preview itself.
+        if !wasFiltered {
+            schedulePreview(for: selection)
+        }
+    }
+
+    private func pointerMovedSinceOpen() -> Bool {
+        guard let start = openMouse else { return true }
+        let now = NSEvent.mouseLocation
+        if hypot(now.x - start.x, now.y - start.y) < 2 { return false }
+        openMouse = nil
+        return true
     }
 
     private func moveSelection(_ delta: Int) {
