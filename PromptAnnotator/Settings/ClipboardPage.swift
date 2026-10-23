@@ -91,7 +91,7 @@ struct ClipboardPage: View {
                 InkDivider(leading: 0)
                 InkToggleRow(
                     title: "Paste automatically",
-                    detail: "Selecting a row pastes into the frontmost app.",
+                    detail: "Off: choosing a row copies it and closes the panel. On: it also pastes into the frontmost app.",
                     isOn: Binding(
                         get: { settings.clipboardPasteAutomatically },
                         set: { settings.setClipboardPasteAutomatically($0) }

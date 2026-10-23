@@ -141,6 +141,19 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
         }
     }
 
+    /// One copy that carried both text and an image (web page, Notes, Excel).
+    /// Stored as kind `.text` plus `imageFileName`, so the index schema is
+    /// unchanged: legacy items decode as before, and an older build reading a
+    /// newer index still lists and pastes the text.
+    var isMixed: Bool {
+        kind == .text && imageFileName != nil && !(text ?? "").isEmpty
+    }
+
+    /// Has an image file to preview (image items and mixed items).
+    var hasImage: Bool {
+        kind != .fileURL && imageFileName != nil
+    }
+
     var displayApplication: String {
         if let applicationName, !applicationName.isEmpty { return applicationName }
         switch source {

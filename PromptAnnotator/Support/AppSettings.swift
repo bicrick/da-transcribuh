@@ -79,7 +79,7 @@ final class AppSettings: ObservableObject {
     @Published var clipboardHistoryEnabled: Bool
     @Published var clipboardChord: HotkeyChord
     @Published var clipboardHistoryLimit: Int
-    @Published var clipboardPasteAutomatically: Bool = true
+    @Published var clipboardPasteAutomatically: Bool = false
     @Published var clipboardPasteWithoutFormatting: Bool = false
     @Published var clipboardSaveFiles: Bool = true
     @Published var clipboardSaveImages: Bool = true

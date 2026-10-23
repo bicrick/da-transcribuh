@@ -26,12 +26,25 @@ final class ClipboardPreviewPanelController {
     var isKeyWindow: Bool { panel?.isKeyWindow == true }
 
     func show(item: ClipboardItem, image: NSImage?, beside listFrame: NSRect) {
-        let root = ClipboardPreviewPopover(item: item, image: image)
+        // Measure the free-height card off-window, then pin it to the capped height.
+        // The hosting view inside the panel reports the size it already has
+        // (sizingOptions are off), so measuring it kept every preview at its first
+        // size and cropped the image and both horizontal borders. The pinned card
+        // clips inside its own border, so long text cannot push the strokes out.
+        let size = CGSize(
+            width: ClipboardPreviewPopover.width,
+            height: ClipboardPreviewLayout.cardHeight(
+                measured: measure(ClipboardPreviewPopover(item: item, image: image))
+            )
+        )
+        let root = ClipboardPreviewPopover(item: item, image: image, height: size.height)
         let wasShowing = isShowing && panel?.isVisible == true
         let midHide = !isShowing && panel?.isVisible == true
         if panel == nil {
             let panel = ChromePanel(radius: 0)
             panel.resignKeyOnMouseUp = false
+            // Capturable in screenshots, like the list (ChromePanel defaults to hidden).
+            panel.sharingType = .readOnly
             panel.isOpaque = false
             panel.backgroundColor = .clear
             panel.animationBehavior = .none
@@ -55,20 +68,21 @@ final class ClipboardPreviewPanelController {
             host?.rootView = root
         }
         guard let panel, let host else { return }
-        let fitting = host.fittingSize
-        let size = CGSize(
-            width: max(ClipboardPreviewPopover.width, min(fitting.width, 420)),
-            height: max(160, min(fitting.height, 520))
-        )
-        host.frame = NSRect(origin: .zero, size: size)
         let chrome = CGSize(width: size.width + Ink.bevelOffset, height: size.height + Ink.bevelOffset)
+        host.frame = NSRect(origin: .zero, size: chrome)
         let target = place(size: chrome, visual: size, beside: listFrame)
         isShowing = true
         hideGeneration &+= 1
         if wasShowing {
             // Content change only: land on the new size at once, top edge fixed.
-            panel.setFrame(target, display: true)
-            panel.alphaValue = Self.restingAlpha
+            // Through the animator with zero duration, so a swap during the open
+            // slide replaces the slide's target instead of being undone by it
+            // (the window kept the first item's size around the new content).
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                panel.animator().setFrame(target, display: true)
+                panel.animator().alphaValue = Self.restingAlpha
+            }
             AnimSampler.mark("preview-swap", panel)
             return
         }
@@ -105,6 +119,15 @@ final class ClipboardPreviewPanelController {
             panel.orderOut(nil)
         }
         AnimSampler.sample("preview-close", panel)
+    }
+
+    private var measurer: NSHostingView<ClipboardPreviewPopover>?
+
+    private func measure(_ root: ClipboardPreviewPopover) -> CGFloat {
+        let measurer = self.measurer ?? NSHostingView(rootView: root)
+        self.measurer = measurer
+        measurer.rootView = root
+        return measurer.fittingSize.height
     }
 
     private func place(size: CGSize, visual: CGSize, beside listFrame: NSRect) -> NSRect {

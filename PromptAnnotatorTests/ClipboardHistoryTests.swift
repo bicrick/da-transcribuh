@@ -188,3 +188,101 @@ final class ClipboardHistoryTests: XCTestCase {
         XCTAssertNotEqual(ClipboardHistoryController.carbonHotKeyID, 3)
     }
 }
+
+/// "At cursor" placement math. The pointer must stay outside the panel, so the hotkey's
+/// follow-up click or hover can't land on a row.
+final class ClipboardCursorPlacementTests: XCTestCase {
+    private let size = CGSize(width: 458, height: 488)
+    private let laptop = CGRect(x: 0, y: 0, width: 1512, height: 944)
+
+    private func place(_ mouse: CGPoint, in visible: CGRect) -> CGRect {
+        ClipboardCursorPlacement.frame(mouse: mouse, size: size, visible: visible)
+    }
+
+    private func assertFits(_ frame: CGRect, in visible: CGRect, file: StaticString = #filePath, line: UInt = #line) {
+        let inset = visible.insetBy(dx: ClipboardCursorPlacement.margin, dy: ClipboardCursorPlacement.margin)
+        XCTAssertTrue(inset.contains(frame), "\(frame) not inside \(inset)", file: file, line: line)
+    }
+
+    /// The pointer is outside, not on the edge either (hover tracking counts the edge).
+    private func assertPointerOutside(_ frame: CGRect, _ mouse: CGPoint, file: StaticString = #filePath, line: UInt = #line) {
+        let grown = frame.insetBy(dx: -1, dy: -1)
+        XCTAssertFalse(grown.contains(mouse), "pointer \(mouse) touches \(frame)", file: file, line: line)
+    }
+
+    func testOpensRightOfAndBelowThePointer() {
+        let mouse = CGPoint(x: 400, y: 700)
+        let frame = place(mouse, in: laptop)
+        let gap = ClipboardCursorPlacement.gap
+        XCTAssertEqual(frame.minX, mouse.x + gap)
+        XCTAssertEqual(frame.maxY, mouse.y - gap)
+        XCTAssertEqual(frame.size, size)
+        assertPointerOutside(frame, mouse)
+        assertFits(frame, in: laptop)
+    }
+
+    func testFlipsLeftAtTheRightEdge() {
+        let mouse = CGPoint(x: 1400, y: 700)
+        let frame = place(mouse, in: laptop)
+        XCTAssertEqual(frame.maxX, mouse.x - ClipboardCursorPlacement.gap)
+        XCTAssertEqual(frame.maxY, mouse.y - ClipboardCursorPlacement.gap)
+        assertPointerOutside(frame, mouse)
+        assertFits(frame, in: laptop)
+    }
+
+    func testFlipsUpAtTheBottomEdge() {
+        let mouse = CGPoint(x: 400, y: 120)
+        let frame = place(mouse, in: laptop)
+        XCTAssertEqual(frame.minX, mouse.x + ClipboardCursorPlacement.gap)
+        XCTAssertEqual(frame.minY, mouse.y + ClipboardCursorPlacement.gap)
+        assertPointerOutside(frame, mouse)
+        assertFits(frame, in: laptop)
+    }
+
+    func testFlipsBothWaysInTheBottomRightCorner() {
+        let mouse = CGPoint(x: 1500, y: 10)
+        let frame = place(mouse, in: laptop)
+        XCTAssertEqual(frame.maxX, mouse.x - ClipboardCursorPlacement.gap)
+        XCTAssertEqual(frame.minY, mouse.y + ClipboardCursorPlacement.gap)
+        assertPointerOutside(frame, mouse)
+        assertFits(frame, in: laptop)
+    }
+
+    func testTopLeftCornerStaysBesideThePointer() {
+        let mouse = CGPoint(x: 2, y: 940)
+        let frame = place(mouse, in: laptop)
+        assertPointerOutside(frame, mouse)
+        assertFits(frame, in: laptop)
+    }
+
+    func testShortScreenClampsVerticallyButKeepsThePointerOutside() {
+        // Neither above nor below fits, so y clamps. The side offset still keeps the pointer out.
+        let short = CGRect(x: 0, y: 0, width: 1512, height: 600)
+        let mouse = CGPoint(x: 300, y: 300)
+        let frame = place(mouse, in: short)
+        assertFits(frame, in: short)
+        assertPointerOutside(frame, mouse)
+        XCTAssertEqual(frame.minX, mouse.x + ClipboardCursorPlacement.gap)
+    }
+
+    func testSecondaryScreenLeftOfThePrimary() {
+        // External display to the left: negative x, taller, menu bar inset at the top.
+        let external = CGRect(x: -1920, y: -136, width: 1920, height: 1055)
+        for mouse in [CGPoint(x: -1900, y: 900), CGPoint(x: -5, y: 900), CGPoint(x: -5, y: -130), CGPoint(x: -960, y: 400)] {
+            let frame = place(mouse, in: external)
+            assertPointerOutside(frame, mouse)
+            assertFits(frame, in: external)
+        }
+    }
+
+    func testPointerNeverInsideAcrossTheWholeScreen() {
+        for x in stride(from: laptop.minX, through: laptop.maxX - 1, by: 37) {
+            for y in stride(from: laptop.minY, through: laptop.maxY - 1, by: 29) {
+                let mouse = CGPoint(x: x, y: y)
+                let frame = place(mouse, in: laptop)
+                assertPointerOutside(frame, mouse)
+                assertFits(frame, in: laptop)
+            }
+        }
+    }
+}

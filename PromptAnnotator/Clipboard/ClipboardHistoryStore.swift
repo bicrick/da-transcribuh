@@ -151,6 +151,32 @@ final class ClipboardHistoryStore: ObservableObject {
         return item
     }
 
+    /// Ingests one captured pasteboard payload. Mixed copies become one row that
+    /// keeps both the text and the image.
+    @discardableResult
+    func ingest(
+        payload: ClipboardCapturePayload,
+        source: ClipboardItemSource,
+        applicationName: String?
+    ) -> ClipboardItem? {
+        switch payload {
+        case let .files(paths):
+            return ingest(kind: .fileURL, source: source, text: paths.joined(separator: "\n"),
+                          imagePNG: nil, filePaths: paths, fingerprint: ClipboardFingerprint.files(paths),
+                          applicationName: applicationName)
+        case let .image(png):
+            return ingest(kind: .image, source: source, text: nil, imagePNG: png, filePaths: nil,
+                          fingerprint: ClipboardFingerprint.image(png), applicationName: applicationName)
+        case let .text(text):
+            return ingest(kind: .text, source: source, text: text, imagePNG: nil, filePaths: nil,
+                          fingerprint: ClipboardFingerprint.text(text), applicationName: applicationName)
+        case let .mixed(text, png):
+            return ingest(kind: .text, source: source, text: text, imagePNG: png, filePaths: nil,
+                          fingerprint: ClipboardFingerprint.mixed(text: text, png: png),
+                          applicationName: applicationName)
+        }
+    }
+
     func togglePin(_ id: UUID) {
         guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
         items[idx].pinned.toggle()
@@ -225,6 +251,12 @@ final class ClipboardHistoryStore: ObservableObject {
         guard let image = NSImage(contentsOf: imagesURL.appendingPathComponent(name)) else { return nil }
         imageCache.setObject(image, forKey: key)
         return image
+    }
+
+    /// The stored PNG bytes, for paste-back without a decode and re-encode.
+    func imagePNGData(for item: ClipboardItem) -> Data? {
+        guard let name = item.imageFileName else { return nil }
+        return try? Data(contentsOf: imagesURL.appendingPathComponent(name))
     }
 
     // Row thumbnails are downsampled once with ImageIO to `maxHeight` points at 2x,
@@ -414,6 +446,12 @@ enum ClipboardFingerprint {
 
     static func image(_ data: Data) -> String {
         "image:" + sha256(data)
+    }
+
+    /// Text and image from one copy. Differs from either part alone, so a later
+    /// text-only copy of the same words is its own row.
+    static func mixed(text: String, png: Data) -> String {
+        "mixed:" + sha256(text) + ":" + sha256(png)
     }
 
     static func files(_ paths: [String]) -> String {

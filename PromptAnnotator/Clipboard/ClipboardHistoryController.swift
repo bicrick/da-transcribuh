@@ -99,33 +99,44 @@ final class ClipboardHistoryController {
         store.beginOwnWrite()
         defer { store.endOwnWrite() }
 
-        var wrote = false
-        switch item.kind {
-        case .text:
-            let text = item.text ?? ""
-            wrote = SessionClipboard.writeClipboardText(
-                text,
-                plainOnly: settings.clipboardPasteWithoutFormatting,
-                to: .general
-            )
-        case .image:
-            if let image = store.image(for: item),
-               let tiff = image.tiffRepresentation,
-               let rep = NSBitmapImageRep(data: tiff),
-               let png = rep.representation(using: .png, properties: [:]) {
-                wrote = SessionClipboard.writeImage(png: png, tiff: tiff, to: .general)
-            }
-        case .fileURL:
-            let urls = (item.filePaths ?? []).map { URL(fileURLWithPath: $0) as NSURL }
-            let board = NSPasteboard.general
-            board.clearContents()
-            wrote = board.writeObjects(urls)
-        }
+        let wrote = Self.write(
+            item,
+            store: store,
+            plainOnly: settings.clipboardPasteWithoutFormatting,
+            to: .general
+        )
 
         if shouldPaste, wrote {
             PasteFollowUp.shared.simulateCommandV()
         }
         return wrote
+    }
+
+    /// Puts a history item on `board`. Mixed items write image and text together.
+    @discardableResult
+    static func write(
+        _ item: ClipboardItem,
+        store: ClipboardHistoryStore,
+        plainOnly: Bool,
+        to board: NSPasteboard
+    ) -> Bool {
+        switch item.kind {
+        case .text:
+            let text = item.text ?? ""
+            if item.isMixed, let png = store.imagePNGData(for: item) {
+                return SessionClipboard.writeMixed(text: text, png: png, plainOnly: plainOnly, to: board)
+            }
+            return SessionClipboard.writeClipboardText(text, plainOnly: plainOnly, to: board)
+        case .image:
+            // Stored bytes are already PNG: no decode and re-encode on main.
+            guard let png = store.imagePNGData(for: item) else { return false }
+            let tiff = NSImage(data: png)?.tiffRepresentation
+            return SessionClipboard.writeImage(png: png, tiff: tiff, to: board)
+        case .fileURL:
+            let urls = (item.filePaths ?? []).map { URL(fileURLWithPath: $0) as NSURL }
+            board.clearContents()
+            return board.writeObjects(urls)
+        }
     }
 
     /// Session transcript / screenshot ingest (tagged). Skips empty quiet takes.

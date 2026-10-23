@@ -9,7 +9,7 @@ final class ClipboardSettingsTests: XCTestCase {
         defaults.removePersistentDomain(forName: name)
         let settings = AppSettings(defaults: defaults)
 
-        settings.setClipboardPasteAutomatically(false)
+        settings.setClipboardPasteAutomatically(true)
         settings.setClipboardSaveImages(false)
         settings.setClipboardSortMode(.copyCount)
         settings.setClipboardPopupPosition(.screenCenter)
@@ -22,7 +22,7 @@ final class ClipboardSettingsTests: XCTestCase {
         settings.addClipboardIgnoredApp("com.example.vault")
 
         let again = AppSettings(defaults: defaults)
-        XCTAssertFalse(again.clipboardPasteAutomatically)
+        XCTAssertTrue(again.clipboardPasteAutomatically)
         XCTAssertFalse(again.clipboardSaveImages)
         XCTAssertEqual(again.clipboardSortMode, .copyCount)
         XCTAssertEqual(again.clipboardPopupPosition, .screenCenter)
@@ -35,6 +35,20 @@ final class ClipboardSettingsTests: XCTestCase {
         XCTAssertEqual(again.clipboardIgnoredApps, ["com.example.vault"])
 
         defaults.removePersistentDomain(forName: name)
+    }
+
+    func testPasteAutomaticallyIsOffUnlessChosen() {
+        let name = "clipboard-autopaste-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.removePersistentDomain(forName: name)
+        XCTAssertFalse(AppSettings(defaults: defaults).clipboardPasteAutomatically)
+
+        // An explicit choice already saved wins over the default.
+        defaults.set(true, forKey: AppSettings.ClipboardKeys.pasteAutomatically)
+        XCTAssertTrue(AppSettings(defaults: defaults).clipboardPasteAutomatically)
+        defaults.set(false, forKey: AppSettings.ClipboardKeys.pasteAutomatically)
+        XCTAssertFalse(AppSettings(defaults: defaults).clipboardPasteAutomatically)
     }
 
     func testSortModesAndPinEdgeAffectOrdering() throws {

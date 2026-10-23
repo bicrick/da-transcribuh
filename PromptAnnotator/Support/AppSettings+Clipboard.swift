@@ -24,7 +24,8 @@ extension AppSettings {
     }
 
     func loadClipboardPreferences() {
-        clipboardPasteAutomatically = defaults.object(forKey: ClipboardKeys.pasteAutomatically) as? Bool ?? true
+        // Off unless the user turned it on: choosing a row only copies (Maccy's default).
+        clipboardPasteAutomatically = defaults.object(forKey: ClipboardKeys.pasteAutomatically) as? Bool ?? false
         clipboardPasteWithoutFormatting = defaults.bool(forKey: ClipboardKeys.pasteWithoutFormatting)
         clipboardSaveFiles = defaults.object(forKey: ClipboardKeys.saveFiles) as? Bool ?? true
         clipboardSaveImages = defaults.object(forKey: ClipboardKeys.saveImages) as? Bool ?? true
