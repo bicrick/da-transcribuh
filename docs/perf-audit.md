@@ -37,7 +37,7 @@ Labels: **measured** (from the harness logs), **inferred** (reasoned from code p
 | Warm launch to Settings visible | 370 ms | not changed | | measured, 5 runs |
 | Model ready after launch | 1.9 to 2.2 s | not changed | | measured |
 | Idle CPU, Settings open or closed | 0.03% | not changed | | measured, 30 s windows |
-| Idle wakeups (idlew/s), Settings closed | 2.9 to 5.2 | not changed | | measured |
+| Idle wakeups (idlew/s), Settings closed | 2.9 to 5.2 (misread, see Round 2) | not changed | | corrected in Round 2 |
 | Record start to island visible | 85 ms | not changed | | measured, 5 runs |
 | CPU while recording, live decode | 19 to 21% | not changed | | measured |
 | Level meter frame pacing | p50 16.7 ms, p95 19 to 20 ms | not changed | | measured |
@@ -125,3 +125,97 @@ Not done in this round, for a follow-up run.
    encodes the pretty-printed JSON index and writes image files on main for every copy.
 9. **Single reload on Settings open** (minor). Reload runs twice per open (measured).
 10. **Tick timer** (minor). The 0.1 s recording tick allocates a `Task` per tick.
+
+## Round 2 (2026-10-22)
+
+Principles used. Measure before and after with alternating builds (A2 = `0311013`, B2 = scroll fix,
+C2 = all Round 2 changes). Fix root causes, not symptoms. Change one path per commit. Privacy over
+latency.
+
+| Metric | Before (A2) | After | Commit | Label |
+|---|---|---|---|---|
+| Clipboard panel first open (200 items) | 246 to 260 ms | 80 ms | `a472ce6` | measured, 2 runs each |
+| Panel scroll step p50 | 0.7 to 9.6 ms (bimodal) | 2.8 to 4.8 ms | `a472ce6` | measured, 6 x 60 steps each |
+| History tab switch (430 sessions) | 74 to 97 ms | 74 to 95 ms, now on the Ink rail | `a472ce6` | measured, 6 each |
+| CPU while recording, live decode | median about 21% (19 to 27) | median about 18% (16 to 22) | `7af503a` | measured, 8 recordings each |
+| CPU while recording, no decode | median about 17% (14 to 18) | median about 12% (11 to 12) | `7af503a` | measured, 8 recordings each (first run excluded) |
+| Level meter pace | 16.7 ms | 33.3 ms | `7af503a` | measured |
+| Idle CPU, Settings closed | 0.03% | 0.01% | `f40da69` | measured, 4 x 30 s each |
+| Idle wakeups, Settings closed | 0 to 0.08/s | 0 to 0.12/s | `f40da69` | measured, 4 x 26 s each, no difference |
+| Clipboard text ingest on main | 1.1 to 2.2 ms | 0.5 to 1.7 ms | `df8af6b` | measured, 3 each |
+| Library loads per Settings first open | 2 | 1 | `39592ad` | measured |
+| Record begin | 62 to 76 ms (first 219 to 253) | 64 to 74 ms (first 218 to 231) | none | measured, unchanged |
+
+1. **DTScrollView lazy mode** (`a472ce6`). Root cause. The AppKit host sizes an `NSHostingView` to the
+   content's full fitting height, so a `LazyVStack` inside builds every row. `DTScrollView(lazy: true)`
+   hosts a native SwiftUI `ScrollView` with the system scroller hidden and feeds the same Ink rail from
+   the backing `NSScrollView` (clip bounds and document frame notifications). The gutter, full-height
+   track, live thumb and drag are unchanged. The harness confirmed the rail follows programmatic
+   scrolls (railOffset 2400 after 60 x 40 pt steps, measured). History and the clipboard panel use it.
+   Other pages keep the AppKit host because their content is not a long lazy list.
+2. **Recording timers** (`7af503a`). The level meter runs at 30 Hz. Smoothing is delta-based, so the
+   motion keeps the same time constants (inferred from `FrequencyBands.smooth`). The 0.1 s clock tick is
+   a main-run-loop timer that runs inline instead of spawning a `Task` per tick.
+3. **Idle wakeups** (`f40da69`). The Round 1 figure of 2.9 to 5.2 per second was a misread. `top`
+   reports IDLEW as a running total, and Round 1 averaged the totals. Recomputed from the same Round 1
+   files, the rate is 0 to 0.15 per second (measured). There was no wakeup problem. The watcher still
+   polled twice a second, so it now polls every 1.5 s while the pasteboard is quiet and every 0.5 s for
+   20 s after any change. It also samples at once on every app switch and when the panel opens, so a
+   copy is listed before the user can look for it (inferred). Two copies within one quiet interval in the
+   same app, with no app switch or panel open between them, now merge into the later one (inferred).
+   At 0.5 s that window was already there, only shorter.
+4. **Audio engine pre-warm** was skipped. Most of record begin is `engine.start()` plus the
+   `AVAudioRecorder` start (inferred from Round 1), and starting input IO is what lights the mic
+   indicator. Touching `engine.inputNode` and `prepare()` at idle would not light it (guess), but it
+   instantiates the input unit and can switch a Bluetooth headset to its call profile (guess). The
+   remaining gain is small (guess). Privacy wins.
+5. **Clipboard persistence** (`df8af6b`). The index is encoded and written on one serial background
+   queue. `load` and app quit flush the queue first, so order holds and nothing is lost at quit.
+   Image files are still written on main by the capture path.
+6. **Settings double reload** (`39592ad`). First open ran `onAppear` and the shown notification back to
+   back. The second reload is skipped when one ran in the last 0.5 s. The first open still pays the cold
+   decode of the library (180 to 200 ms at 430 sessions, measured).
+
+### Ideas for the live-transcript accuracy round (not done)
+
+- Seam overlap helped long clips (11.3% to 4.1% WER) and broke short ones. Gate it on clip length or
+  run it only after 10 s of audio.
+- Dedupe repeated words at seams with a timestamp check instead of overlap re-decode.
+- Gate leading filler ("you") on the speech gate's voiced-buffer count.
+- Build a WER regression test on the four fixture WAVs with a threshold per clip.
+
+## Live-accuracy and speed round (perf/live-accuracy, partial)
+
+Stopped early at Patrick's request. Live decode, `say` clips, `wer.py`, one app launch per variant.
+All numbers are measured unless labelled. Run counts are small (2 to 4 per clip), so treat medians as rough.
+
+| Clip | Baseline `ab953dd`, median WER (4 runs) | Seam echo dedupe `291ec8c`, median WER (4 runs) | Label |
+|---|---|---|---|
+| short (5 s) | 0% (max 5.3%) | 0% (max 10.5%) | measured |
+| short, -18 dB | 0% (max 10.5%) | 0% (max 0%) | measured |
+| long (30 s) | 10.3% (2.1 to 11.3%) | 6.2% (4.1 to 8.2%) | measured |
+| long, -18 dB | 6.2% (3.1 to 6.2%) | 4.1% (2.1 to 5.2%) | measured |
+| Doubled-word seams, long + long -18 dB | 4 in 8 runs | 0 in 8 runs | measured |
+| Stop to clipboard, median of all 16 stops | 352 ms | 352 ms | measured, unchanged |
+| CPU while recording, median of all 16 | 17.5% | 20.2% | measured, noisy (spread 15 to 31%), likely other load on the Mac (guess) |
+
+Why the number is what it is. Doubled words were the only seam error the dedupe targets, and they went
+to zero. The rest of the long-clip WER is the word at each seam being dropped or mangled
+("swap a greyed for" for "swap the gray background for") plus formatting the scorer counts as errors
+("PNG 1st" vs "first", "CMD" is normalized but "1st" is not). Those are not touched by the dedupe (inferred
+from the hypotheses). Final-only mode is unaffected by this change because nothing is confirmed before
+the single decode (inferred from code).
+
+**Rejected, decoder prompt with the last 12 confirmed words.** Catastrophic. Median WER short 52.6%,
+long 71.1%, long -18 dB 72.2% (measured, 1 to 2 runs before it was stopped). Whisper skipped whole
+phrases and looped ("c c c c", "you you"). Not committed.
+
+**Inconclusive, live preview every 2 s instead of every 1 s.** One clean run per clip before the batch
+was stopped: recording CPU 16.5 to 22.2% (baseline 15 to 23%), stop to clipboard 300 to 387 ms (baseline
+299 to 369 ms). No clear win, and the later runs of that batch were broken by the stop
+("audio.m4a couldn't be opened", empty transcripts), so they are not evidence either way. Not committed.
+
+Not done. Overlap gated on 10 s of audio, leading "you" filter, a WER regression test on the fixture WAVs,
+per-model-size WER, normalization on quiet clips, skipping live decodes when no new speech arrived,
+and a profile of where the ~350 ms stop-to-clipboard goes (the bimodal 550 ms stops look like stop waiting
+for an in-flight live decode, guess).
