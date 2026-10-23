@@ -23,7 +23,12 @@ struct HistoryPage: View {
     }
 
     private var selected: SessionSummary? {
-        let rows = matches
+        selected(in: matches)
+    }
+
+    /// Rows pass the filtered list in once; the old per-row `selected` refiltered
+    /// every session for every row (O(n²) per body).
+    private func selected(in rows: [SessionSummary]) -> SessionSummary? {
         if let selectedID, let match = rows.first(where: { $0.id == selectedID }) {
             return match
         }
@@ -100,21 +105,28 @@ struct HistoryPage: View {
     }
 
     private var logTable: some View {
-        VStack(spacing: 0) {
+        let rows = matches
+        let selectedRowID = selected(in: rows)?.id
+        return VStack(spacing: 0) {
             logHeader
-            if matches.isEmpty {
+            if rows.isEmpty {
                 Text("No matches")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
                     .padding(Ink.rowHPad)
             } else {
-                DTScrollView {
+                // Native ScrollView, not DTScrollView: DTScrollView hosts its content in an
+                // NSHostingView sized to its intrinsic height, so a LazyVStack inside it is
+                // measured in full and every row is built. At 430 sessions that made the
+                // History tab switch take 2.4 s. Here only the visible rows are built.
+                ScrollView(.vertical) {
                     LazyVStack(spacing: 0) {
-                        ForEach(matches) { session in
-                            logRow(session)
+                        ForEach(rows) { session in
+                            logRow(session, isSelected: session.id == selectedRowID)
                         }
                     }
+                    .padding(.trailing, Ink.scrollerGutter)
                 }
                 .frame(minHeight: 220, maxHeight: 320)
             }
@@ -159,9 +171,8 @@ struct HistoryPage: View {
             .padding(.leading, Ink.space2)
     }
 
-    private func logRow(_ session: SessionSummary) -> some View {
-        let isSelected = selected?.id == session.id
-        return HStack(spacing: 0) {
+    private func logRow(_ session: SessionSummary, isSelected: Bool) -> some View {
+        HStack(spacing: 0) {
             Button {
                 selectedID = session.id
             } label: {
