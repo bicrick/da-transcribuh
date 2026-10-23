@@ -8,6 +8,12 @@ struct HistoryPage: View {
     @Binding var focusSearch: Bool
     @Binding var selectedID: String?
     @FocusState private var searchFocused: Bool
+    /// The row showing its full transcript inline. Click it again to collapse.
+    @State private var expandedID: String?
+    /// Set while syncSelection picks a default row, so that pick does not expand it.
+    @State private var autoSelect = AutoSelectFlag()
+
+    private final class AutoSelectFlag { var active = false }
 
     /// Fixed terminal-log columns (Departure Mono digits align).
     private enum Col {
@@ -20,10 +26,6 @@ struct HistoryPage: View {
 
     private var matches: [SessionSummary] {
         HistorySearch.filter(sessions, query: query)
-    }
-
-    private var selected: SessionSummary? {
-        selected(in: matches)
     }
 
     /// Rows pass the filtered list in once; the old per-row `selected` refiltered
@@ -47,16 +49,30 @@ struct HistoryPage: View {
         // No reload here: SettingsRoot already loads on appear / show /
         // sessionsChanged, and a second decode of every session.json on each
         // tab switch was pure repeat work.
-        .onAppear { syncSelection() }
+        .onAppear {
+            syncSelection()
+            applySnapshotExpand()
+        }
         .onChange(of: query) { _, _ in syncSelection() }
-        .onChange(of: sessions.count) { _, _ in syncSelection() }
+        .onChange(of: sessions.count) { _, _ in
+            syncSelection()
+            applySnapshotExpand()
+        }
         .onChange(of: focusSearch) { _, wants in
             if wants {
                 searchFocused = true
                 focusSearch = false
             }
         }
-        .onChange(of: selectedID) { _, _ in syncSelection() }
+        .onChange(of: selectedID) { _, id in
+            // A selection from outside (a search hit) opens that row's transcript.
+            if autoSelect.active {
+                autoSelect.active = false
+            } else if let id {
+                expandedID = id
+            }
+            syncSelection()
+        }
     }
 
     private var emptyState: some View {
@@ -71,23 +87,34 @@ struct HistoryPage: View {
         }
     }
 
+    /// Header, search and the log. The page does not scroll; the log fills the
+    /// remaining height and scrolls on its own rail.
     private var populated: some View {
-        DTScrollView {
-            VStack(alignment: .leading, spacing: Ink.sectionGap) {
-                InkPageHeader(
-                    title: "History",
-                    subtitle: "\(sessions.count) session\(sessions.count == 1 ? "" : "s") on disk. Select a row to read the transcript."
-                )
-                searchField
+        VStack(alignment: .leading, spacing: Ink.sectionGap) {
+            InkPageHeader(
+                title: "History",
+                subtitle: "\(sessions.count) session\(sessions.count == 1 ? "" : "s") on disk. Click a row to read the full transcript."
+            )
+            searchField
+            // The reader takes the height the window offers. Without it the
+            // log's own minimum climbed to its last viewport and pinned the
+            // window's min content height (measured 1484 at 1040x700).
+            GeometryReader { proxy in
                 logTable
-                detailPane
+                    .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
             }
-            .padding(.top, Ink.pageTop)
-            .padding(.horizontal, Ink.pageSide)
-            .padding(.bottom, Ink.pageBottom)
-            .frame(maxWidth: Ink.maxContentWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(minHeight: 200)
         }
+        .padding(.top, Ink.pageTop)
+        .padding(.horizontal, Ink.pageSide)
+        .padding(.bottom, Ink.pageBottom)
+        .frame(maxWidth: Ink.maxContentWidth, maxHeight: .infinity, alignment: .topLeading)
+        // minHeight 0 is the size limit. Without it SwiftUI used the page's
+        // squeezed height as its minimum. The header text is fixedSize
+        // vertically, so at a near-zero width it wraps a word per line, and the
+        // settings host turned that into a window min height of 1496 at 1040x700
+        // (measured). Other pages sit in a scroll view, which hides this.
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .top)
     }
 
     private var searchField: some View {
@@ -113,7 +140,7 @@ struct HistoryPage: View {
                 Text("No matches")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(Ink.rowHPad)
             } else {
                 // Lazy DTScrollView: native SwiftUI scrolling underneath, so the
@@ -122,11 +149,18 @@ struct HistoryPage: View {
                 DTScrollView(lazy: true) {
                     LazyVStack(spacing: 0) {
                         ForEach(rows) { session in
-                            logRow(session, isSelected: session.id == selectedRowID)
+                            logRow(
+                                session,
+                                isSelected: session.id == selectedRowID,
+                                isExpanded: session.id == expandedID
+                            )
                         }
                     }
                 }
-                .frame(minHeight: 220, maxHeight: 320)
+                // A SwiftUI ScrollView reports its whole content as ideal height,
+                // and the settings host grows the window to the ideal size. Pin
+                // the ideal so the log takes the space the window has instead.
+                .frame(minHeight: 160, idealHeight: 320, maxHeight: .infinity)
             }
         }
         .overlay(
@@ -169,10 +203,29 @@ struct HistoryPage: View {
             .padding(.leading, Ink.space2)
     }
 
-    private func logRow(_ session: SessionSummary, isSelected: Bool) -> some View {
+    private func logRow(_ session: SessionSummary, isSelected: Bool, isExpanded: Bool) -> some View {
+        VStack(spacing: 0) {
+            rowLine(session, isExpanded: isExpanded)
+            if isExpanded {
+                expandedTranscript(session)
+            }
+        }
+        .padding(.vertical, Ink.space1)
+        .background(isSelected ? Ink.fill : Color.clear)
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(isSelected ? Ink.label : Color.clear)
+                .frame(width: 2)
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Ink.hairline).frame(height: 1)
+        }
+    }
+
+    private func rowLine(_ session: SessionSummary, isExpanded: Bool) -> some View {
         HStack(spacing: 0) {
             Button {
-                selectedID = session.id
+                toggle(session)
             } label: {
                 HStack(spacing: 0) {
                     Text(whenText(for: session))
@@ -225,73 +278,47 @@ struct HistoryPage: View {
             .padding(.trailing, Ink.space2)
         }
         .frame(minHeight: 36)
-        .padding(.vertical, Ink.space1)
-        .background(isSelected ? Ink.fill : Color.clear)
-        .overlay(alignment: .leading) {
-            Rectangle()
-                .fill(isSelected ? Ink.label : Color.clear)
-                .frame(width: 2)
-        }
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Ink.hairline).frame(height: 1)
-        }
-        .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
+        .accessibilityAddTraits(isExpanded ? [.isSelected, .isButton] : .isButton)
+        .accessibilityHint(isExpanded ? "Collapses the transcript" : "Shows the full transcript")
     }
 
-    private var detailPane: some View {
-        Group {
-            if let selected {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(alignment: .firstTextBaseline, spacing: Ink.space3) {
-                        Text(longTitle(for: selected))
-                            .font(Ink.labelFont)
-                            .foregroundStyle(Ink.label)
-                        Text(detail(for: selected))
-                            .font(Ink.captionFont)
-                            .foregroundStyle(Ink.secondary)
-                        Spacer(minLength: 0)
-                        HStack(spacing: Ink.space2) {
-                            Button("Copy") { copy(selected) }
-                                .buttonStyle(InkSecondaryButtonStyle())
-                            Button("Show in Finder") {
-                                NSWorkspace.shared.activateFileViewerSelecting([selected.url])
-                            }
-                            .buttonStyle(InkSecondaryButtonStyle())
-                        }
-                    }
-                    .padding(Ink.cardPad)
-                    .overlay(alignment: .bottom) {
-                        Rectangle().fill(Ink.label).frame(height: 1)
-                    }
+    /// The full transcript, wrapped and selectable, under its row.
+    private func expandedTranscript(_ session: SessionSummary) -> some View {
+        VStack(alignment: .leading, spacing: Ink.space2) {
+            Text("\(longTitle(for: session)) · \(detail(for: session))")
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
+            Text(session.transcript.isEmpty ? "No speech in this session." : session.transcript)
+                .font(Ink.bodyFont)
+                .foregroundStyle(session.transcript.isEmpty ? Ink.secondary : Ink.label)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .padding(.horizontal, Ink.space2)
+        .padding(.leading, Ink.space2)
+        .padding(.top, Ink.space2)
+        .padding(.bottom, Ink.space3)
+        .padding(.trailing, Col.actions)
+    }
 
-                    DTScrollView {
-                        Text(selected.transcript.isEmpty ? "No speech in this session." : selected.transcript)
-                            .font(Ink.bodyFont)
-                            .foregroundStyle(selected.transcript.isEmpty ? Ink.secondary : Ink.label)
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
-                            .padding(Ink.cardPad)
-                    }
-                    .frame(minHeight: 160, maxHeight: 280)
-                }
-                .overlay(
-                    Rectangle()
-                        .strokeBorder(Ink.label, lineWidth: Ink.stroke)
-                )
-            } else {
-                InkDashedEmpty(
-                    title: "Select a session",
-                    detail: "Pick a row in the log to read the transcript."
-                )
-            }
+    /// Click opens a row; clicking the open row, or opening another, collapses it.
+    private func toggle(_ session: SessionSummary) {
+        expandedID = HistoryRowExpansion.next(current: expandedID, tapped: session.id)
+        if selectedID != session.id {
+            autoSelect.active = true
+            selectedID = session.id
         }
     }
 
     private func syncSelection() {
         let ids = matches.map(\.id)
+        if let expandedID, !ids.contains(expandedID) { self.expandedID = nil }
         if let selectedID, ids.contains(selectedID) { return }
-        self.selectedID = ids.first
+        let next = ids.first
+        guard next != selectedID else { return }
+        autoSelect.active = true
+        self.selectedID = next
     }
 
     private func whenText(for session: SessionSummary) -> String {
@@ -320,5 +347,23 @@ struct HistoryPage: View {
     private func copy(_ session: SessionSummary) {
         let image = NSImage(contentsOf: session.url.appendingPathComponent("sheet.png"))
         SessionClipboard.copy(image: image, transcript: session.transcript)
+    }
+}
+
+/// Inline expansion rule for History rows: one open row at a time.
+extension HistoryPage {
+    /// `-DTSnapshotHistoryExpand N` opens row N (1-based) for renders. Sessions
+    /// can land after onAppear, so this also runs when the count changes.
+    fileprivate func applySnapshotExpand() {
+        guard expandedID == nil,
+              let n = UserDefaults.standard.string(forKey: "DTSnapshotHistoryExpand").flatMap(Int.init),
+              n >= 1, n <= matches.count else { return }
+        expandedID = matches[n - 1].id
+    }
+}
+
+enum HistoryRowExpansion {
+    static func next(current: String?, tapped: String) -> String? {
+        current == tapped ? nil : tapped
     }
 }
