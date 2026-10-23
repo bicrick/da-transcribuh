@@ -86,6 +86,51 @@ final class WhisperModelLocatorTests: XCTestCase {
 }
 
 final class LiveWordBufferTests: XCTestCase {
+    func testSeamEchoWithShiftedTimestampIsDropped() {
+        // Long-clip live run: "and make sure" came back as "and make make sure".
+        let existing = [
+            TimedWord(text: " and", start: 10.0, end: 10.2),
+            TimedWord(text: " make", start: 10.2, end: 10.5),
+        ]
+        let incoming = [
+            TimedWord(text: " Make", start: 10.62, end: 10.9),
+            TimedWord(text: " sure", start: 10.9, end: 11.2),
+        ]
+        let update = LiveWordBuffer.appending(existing, incoming, confirmedEnd: 10.5)
+        XCTAssertEqual(update.words.map { LiveWordBuffer.key($0.text) }, ["and", "make", "sure"])
+    }
+
+    func testTwoWordSeamEchoIsDropped() {
+        let existing = [
+            TimedWord(text: "the", start: 4.0, end: 4.1),
+            TimedWord(text: "export", start: 4.1, end: 4.5),
+        ]
+        let incoming = [
+            TimedWord(text: "the", start: 4.5, end: 4.6),
+            TimedWord(text: "export,", start: 4.6, end: 4.9),
+            TimedWord(text: "menu", start: 4.9, end: 5.2),
+        ]
+        let update = LiveWordBuffer.appending(existing, incoming, confirmedEnd: 4.5)
+        XCTAssertEqual(update.words.map { LiveWordBuffer.key($0.text) }, ["the", "export", "menu"])
+    }
+
+    func testRepeatAfterAPauseIsKept() {
+        let existing = [TimedWord(text: "no", start: 1.0, end: 1.2)]
+        let incoming = [TimedWord(text: "no", start: 2.0, end: 2.2)]
+        let update = LiveWordBuffer.appending(existing, incoming, confirmedEnd: 1.2)
+        XCTAssertEqual(update.words.map(\.text), ["no", "no"])
+    }
+
+    func testRepeatInsideTheDecodeIsKept() {
+        let existing = [TimedWord(text: "so", start: 1.0, end: 1.2)]
+        let incoming = [
+            TimedWord(text: "very", start: 1.3, end: 1.5),
+            TimedWord(text: "very", start: 1.5, end: 1.7),
+        ]
+        let update = LiveWordBuffer.appending(existing, incoming, confirmedEnd: 1.2)
+        XCTAssertEqual(update.words.map(\.text), ["so", "very", "very"])
+    }
+
     func testAppendingKeepsLaterWordsAndSkipsTheBoundaryRepeat() {
         let existing = [TimedWord(text: "hello", start: 0.2, end: 0.6)]
         let incoming = [
