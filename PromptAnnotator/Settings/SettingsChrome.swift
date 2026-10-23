@@ -97,13 +97,37 @@ struct SettingsPageStack<Content: View>: View {
                 InkPageHeader(title: title, subtitle: subtitle)
                 content()
             }
+            .inkPageColumn()
+        }
+        .inkPageChrome()
+    }
+}
+
+extension View {
+    /// The one page column every Settings page and onboarding step uses: pageTop,
+    /// pageSide and pageBottom padding, capped at maxContentWidth, centred.
+    ///
+    /// Inside a DTScrollView the column is centred in the area left of the
+    /// scroller gutter. A page that does not scroll as a whole (History's log)
+    /// passes `reservesScrollerGutter` so its column lands on the same x as the
+    /// scrolling pages instead of half a gutter to the right (measured +7pt).
+    /// `fillsHeight` is for pages whose content takes the window's height.
+    func inkPageColumn(fillsHeight: Bool = false, reservesScrollerGutter: Bool = false) -> some View {
+        self
             .padding(.top, Ink.pageTop)
             .padding(.horizontal, Ink.pageSide)
             .padding(.bottom, Ink.pageBottom)
-            .frame(maxWidth: Ink.maxContentWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .inkPageChrome()
+            .frame(maxWidth: Ink.maxContentWidth, maxHeight: fillsHeight ? .infinity : nil, alignment: .topLeading)
+            .padding(.trailing, reservesScrollerGutter ? Ink.scrollerGutter : 0)
+            // minHeight 0 keeps a fill-height page from turning its squeezed
+            // height into the window's minimum (see HistoryPage).
+            .frame(
+                minWidth: 0,
+                maxWidth: .infinity,
+                minHeight: fillsHeight ? 0 : nil,
+                maxHeight: fillsHeight ? .infinity : nil,
+                alignment: .top
+            )
     }
 }
 

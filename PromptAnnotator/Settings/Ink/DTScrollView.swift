@@ -197,6 +197,40 @@ enum DTCheckerTile {
 
 // MARK: - AppKit scroll host
 
+/// Width the hosted page lays out at. Published by the scroll host from the
+/// clip width.
+@MainActor
+final class DTHostedWidth: ObservableObject {
+    @Published var value: CGFloat?
+
+    /// Last clip width any host saw. A tab switch builds a fresh host, and
+    /// seeding it here lets the first frame lay out at the right width
+    /// instead of drawing one unwrapped frame.
+    static var lastKnown: CGFloat?
+
+    init() { value = Self.lastKnown }
+}
+
+/// Pins the hosted root to the clip width.
+///
+/// Root cause of pages drawing too high (Models 21pt, General and Perf 14pt
+/// in the 1040x700 audit): `sizingOptions = [.intrinsicContentSize]` makes
+/// the hosting view report SwiftUI's ideal size, and the ideal size is
+/// measured at an unconstrained width. Text there does not wrap, so the
+/// document came out shorter than the wrapped page. The hosting view then
+/// centred the taller page in the short frame, which pushed the title up and
+/// clipped the bottom by half the overflow each. Pinning the width makes the
+/// ideal height the real height. Onboarding hit the same bug and fixed it
+/// with a fixed page width. This fixes it once for every page.
+private struct DTWidthPinnedRoot<Content: View>: View {
+    @ObservedObject var width: DTHostedWidth
+    var content: Content
+
+    var body: some View {
+        content.frame(width: width.value, alignment: .topLeading)
+    }
+}
+
 private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
     var bottomInset: CGFloat
     var chrome: DTScrollChrome
@@ -233,6 +267,7 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
         /// observed state during a SwiftUI view update.
         var inViewUpdate = false
         private var hosting: NSHostingView<AnyView>?
+        private let hostedWidth = DTHostedWidth()
         private weak var document: DTFlippedDocumentView?
         private weak var observedClip: NSClipView?
         private weak var observedDoc: NSView?
@@ -248,8 +283,7 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
         }
 
         func install(in host: DTScrollHostView) {
-            // A nested hosting view starts a fresh environment; repeat the no-ring rule.
-            let root = AnyView(parent.content().padding(.bottom, parent.bottomInset).focusEffectDisabled())
+            let root = rootView(parent.content(), bottomInset: parent.bottomInset)
             let hosting = NSHostingView(rootView: root)
             // Without this, the document collapses to the clip height and the
             // thumb never travels (contentHeight == viewportHeight).
@@ -281,10 +315,15 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
         }
 
         func updateContent(_ content: Content, bottomInset: CGFloat) {
-            hosting?.rootView = AnyView(content.padding(.bottom, bottomInset))
+            hosting?.rootView = rootView(content, bottomInset: bottomInset)
             hosting?.invalidateIntrinsicContentSize()
             guard let scroll = hosting?.enclosingScrollView else { return }
             scheduleRelayout(from: scroll)
+        }
+
+        private func rootView(_ content: Content, bottomInset: CGFloat) -> AnyView {
+            // A nested hosting view starts a fresh environment; repeat the no-ring rule.
+            AnyView(DTWidthPinnedRoot(width: hostedWidth, content: content.padding(.bottom, bottomInset).focusEffectDisabled()))
         }
 
         private var relayoutScheduled = false
@@ -317,12 +356,25 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
                         name: NSView.boundsDidChangeNotification,
                         object: previous
                     )
+                    NotificationCenter.default.removeObserver(
+                        self,
+                        name: NSView.frameDidChangeNotification,
+                        object: previous
+                    )
                 }
                 clip.postsBoundsChangedNotifications = true
                 NotificationCenter.default.addObserver(
                     self,
                     selector: #selector(clipBoundsChanged(_:)),
                     name: NSView.boundsDidChangeNotification,
+                    object: clip
+                )
+                // A new clip width rewraps the page, so the height must follow.
+                clip.postsFrameChangedNotifications = true
+                NotificationCenter.default.addObserver(
+                    self,
+                    selector: #selector(clipFrameChanged(_:)),
+                    name: NSView.frameDidChangeNotification,
                     object: clip
                 )
                 observedClip = clip
@@ -352,6 +404,14 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
             publish(from: scroll)
         }
 
+        @objc private func clipFrameChanged(_ note: Notification) {
+            guard let clip = note.object as? NSClipView,
+                  let scroll = clip.enclosingScrollView else { return }
+            let width = clip.bounds.width
+            guard width > 0, abs((hostedWidth.value ?? -1) - width) > 0.5 else { return }
+            scheduleRelayout(from: scroll)
+        }
+
         @objc private func documentFrameChanged(_ note: Notification) {
             guard let doc = note.object as? NSView,
                   let scroll = doc.enclosingScrollView else { return }
@@ -361,6 +421,17 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
         private func relayoutAndPublish(from scroll: NSScrollView) {
             // One pass from the top covers document and hosting view too.
             scroll.layoutSubtreeIfNeeded()
+            // Lay the page out at the clip width first. A new width re-renders
+            // the hosted root, so measure on the next turn, not now.
+            let clipWidth = scroll.contentView.bounds.width
+            if clipWidth > 0, abs((hostedWidth.value ?? -1) - clipWidth) > 0.5 {
+                hostedWidth.value = clipWidth
+                DTHostedWidth.lastKnown = clipWidth
+                hosting?.invalidateIntrinsicContentSize()
+                scheduleRelayout(from: scroll)
+                publish(from: scroll)
+                return
+            }
             // Apply intrinsic height so frame matches content (AL can still
             // leave the document at clip height without an explicit size).
             if let hosting, let document {

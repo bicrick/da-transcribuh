@@ -82,25 +82,24 @@ struct PerformancePage: View {
     }
 
     private func memoryTile(title: String, value: String, detail: String, fraction: Double) -> some View {
-        VStack(alignment: .leading, spacing: Ink.space2) {
-            Text(title.uppercased())
-                .font(Ink.headingFont)
-                .foregroundStyle(Ink.secondary)
-            Text(value)
-                .font(Ink.statValueFont)
-                .monospacedDigit()
-                .foregroundStyle(Ink.label)
-            Text(detail)
-                .font(Ink.captionFont)
-                .foregroundStyle(Ink.secondary)
-            InkSegmentMeter(label: "Load", fraction: max(0.05, min(1, fraction)), emphasized: true)
+        // Same tile as Models, Sound and Appearance (card fill, radius, cardPad,
+        // bevel gutter) instead of a bare 1pt rectangle with space3 padding.
+        InkTile {
+            VStack(alignment: .leading, spacing: Ink.space2) {
+                Text(title.uppercased())
+                    .font(Ink.headingFont)
+                    .foregroundStyle(Ink.secondary)
+                Text(value)
+                    .font(Ink.statValueFont)
+                    .monospacedDigit()
+                    .foregroundStyle(Ink.label)
+                Text(detail)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                InkSegmentMeter(label: "Load", fraction: max(0.05, min(1, fraction)), emphasized: true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
         }
-        .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
-        .padding(Ink.space3)
-        .overlay(
-            Rectangle()
-                .strokeBorder(Ink.label, lineWidth: Ink.stroke)
-        )
     }
 
     private func refresh(forceModelBytes: Bool) {
