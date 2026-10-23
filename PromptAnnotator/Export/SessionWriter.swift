@@ -80,6 +80,11 @@ struct SessionMarkdown {
         sections.contains { !spoken(in: $0).isEmpty }
     }
 
+    /// Plain transcript used when the session folder couldn't be written.
+    static func rescuedPasteText(words: [TimedWord]) -> String {
+        Aligner.spokenText(words).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     static func pasteText(
         sections: [Section],
         transcript: [TimedWord],

@@ -20,7 +20,7 @@ final class UserFacingErrorTests: XCTestCase {
         )
         XCTAssertEqual(
             UserFacingError.transcription(ExportError("Error Domain=WhisperKit Code=-1 \"boom\"")),
-            "Transcription failed. Try another session, or check the error log in Configuration."
+            "Transcription failed. Try another session, or check the error log in General settings."
         )
         XCTAssertEqual(
             UserFacingError.transcription(ExportError("Cancelled by user")),
@@ -71,5 +71,32 @@ final class UserFacingErrorTests: XCTestCase {
         case .idle:
             return "pencil.tip.crop.circle"
         }
+    }
+
+    func testStructuralDiskFullAndOfflineErrorsMap() {
+        let outOfSpace = NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError, userInfo: [
+            NSLocalizedDescriptionKey: "Le fichier n’a pas pu être enregistré.",
+        ])
+        XCTAssertEqual(
+            UserFacingError.sessionWrite(outOfSpace),
+            "Couldn't save the session because the disk is full. Free some space and try again."
+        )
+        let wrapped = NSError(domain: "WhisperKit", code: 1, userInfo: [
+            NSLocalizedDescriptionKey: "Download failed",
+            NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC)),
+        ])
+        XCTAssertEqual(
+            UserFacingError.modelDownload(wrapped),
+            "Couldn't save the speech model. Free some disk space and try again."
+        )
+        let offline = NSError(domain: "HubApi", code: 2, userInfo: [
+            NSLocalizedDescriptionKey: "Request failed",
+            NSUnderlyingErrorKey: NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotFindHost),
+        ])
+        XCTAssertEqual(
+            UserFacingError.modelDownload(offline),
+            "Couldn't download the speech model. Check the network and try again."
+        )
+        XCTAssertFalse(UserFacingError.isDiskFull(NSError(domain: NSCocoaErrorDomain, code: NSFileWriteNoPermissionError)))
     }
 }

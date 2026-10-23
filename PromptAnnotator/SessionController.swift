@@ -765,8 +765,12 @@ final class SessionController: ObservableObject {
             return
         }
 
+        // Only this attempt's folder may be removed on failure. `directory` still points at
+        // the previous saved session until the new start succeeds.
+        var createdFolder: URL?
         do {
             let folder = try SessionPaths.makeSessionDirectory(at: Date())
+            createdFolder = folder
             let audioFile = folder.appendingPathComponent("audio.m4a")
             startedAt = Date()
             let preferences = AppSettings.shared
@@ -826,8 +830,8 @@ final class SessionController: ObservableObject {
             monitor.stop()
             audio.stop()
             AudioInputs.endSession()
-            if let directory {
-                try? FileManager.default.removeItem(at: directory)
+            if let createdFolder {
+                try? FileManager.default.removeItem(at: createdFolder)
             }
             directory = nil
             let message = UserFacingError.sessionStart(error)
@@ -1017,11 +1021,24 @@ final class SessionController: ObservableObject {
             PerfSuite.stopMark("notified")
             setPhase(.idle)
         } catch {
-            skipNextPaste = false
-            let message = UserFacingError.sessionWrite(error)
-            lastError = message
+            var message = UserFacingError.sessionWrite(error)
             ErrorLog.record("Couldn't write the session: \(error.localizedDescription)")
-            presentError("Couldn't write the session", message)
+            // The words are already in memory. A failed write (disk full, permissions)
+            // must not throw them away, so they still go to the clipboard and paste.
+            // No modal in that case: activating an alert would steal the pending paste.
+            let rescued = SessionWriter.rescuedPasteText(words: spoken)
+            if rescued.isEmpty {
+                skipNextPaste = false
+                lastError = message
+                presentError("Couldn't write the session", message)
+            } else {
+                pasteText = rescued
+                sheetURL = nil
+                copyToClipboard()
+                deliverIfRequested()
+                message += " Your words were still copied to the clipboard."
+                lastError = message
+            }
             lastSessionURL = directory
             setPhase(.idle)
         }
