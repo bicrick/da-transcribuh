@@ -33,21 +33,77 @@ enum SessionLibrary {
     }
 
     static func summaries(in root: URL) -> [SessionSummary] {
+        let keys: [URLResourceKey] = [.isDirectoryKey]
         let folders = (try? FileManager.default.contentsOfDirectory(
             at: root,
-            includingPropertiesForKeys: [.isDirectoryKey],
+            includingPropertiesForKeys: keys,
             options: [.skipsHiddenFiles]
         )) ?? []
 
-        return folders.compactMap { url in
-            var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue else {
-                return nil
-            }
-            return summary(at: url)
+        let dirs = folders.filter {
+            (try? $0.resourceValues(forKeys: Set(keys)).isDirectory) == true
         }
-        .sorted { lhs, rhs in
-            (lhs.started ?? .distantPast) > (rhs.started ?? .distantPast)
+        return summaryCache.summaries(for: dirs) { url in summary(at: url) }
+            .sorted { lhs, rhs in
+                (lhs.started ?? .distantPast) > (rhs.started ?? .distantPast)
+            }
+    }
+
+    /// Settings reloads on every show and every finished take. Re-decoding every
+    /// session.json each time cost ~0.45 ms per session on the main thread
+    /// (191 ms at 430 sessions, run twice on first open). Only folders whose
+    /// session.json changed (mtime or size) are decoded again.
+    static let summaryCache = SummaryCache()
+
+    final class SummaryCache: @unchecked Sendable {
+        private struct Entry {
+            var stamp: FileStamp
+            var summary: SessionSummary
+        }
+
+        private struct FileStamp: Equatable {
+            var modified: Date?
+            var size: Int?
+        }
+
+        private let lock = NSLock()
+        private var entries: [String: Entry] = [:]
+
+        func summaries(for dirs: [URL], decode: (URL) -> SessionSummary) -> [SessionSummary] {
+            let stamped = dirs.map { url -> (URL, FileStamp) in
+                let json = url.appendingPathComponent("session.json")
+                let values = try? json.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+                return (url, FileStamp(modified: values?.contentModificationDate, size: values?.fileSize))
+            }
+            lock.lock()
+            let known = entries
+            lock.unlock()
+
+            var next: [String: Entry] = [:]
+            next.reserveCapacity(stamped.count)
+            var result: [SessionSummary] = []
+            result.reserveCapacity(stamped.count)
+            for (url, stamp) in stamped {
+                let key = url.standardizedFileURL.path
+                if let hit = known[key], hit.stamp == stamp, hit.stamp.modified != nil {
+                    next[key] = hit
+                    result.append(hit.summary)
+                } else {
+                    let summary = decode(url)
+                    next[key] = Entry(stamp: stamp, summary: summary)
+                    result.append(summary)
+                }
+            }
+            lock.lock()
+            entries = next
+            lock.unlock()
+            return result
+        }
+
+        func removeAll() {
+            lock.lock()
+            entries.removeAll()
+            lock.unlock()
         }
     }
 
