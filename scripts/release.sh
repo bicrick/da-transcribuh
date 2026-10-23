@@ -35,12 +35,18 @@ done
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-BUILD_NUMBER="${BUILD_NUMBER:-$(git rev-list --count HEAD)}"
+# Version and build come from project.pbxproj (bump them in the release PR).
+PROJECT_VERSION="$(grep -m1 -oE 'MARKETING_VERSION = [^;]+' PromptAnnotator.xcodeproj/project.pbxproj | awk '{print $3}')"
+PROJECT_BUILD="$(grep -m1 -oE 'CURRENT_PROJECT_VERSION = [0-9]+' PromptAnnotator.xcodeproj/project.pbxproj | awk '{print $3}')"
+BUILD_NUMBER="${BUILD_NUMBER:-$PROJECT_BUILD}"
+[[ "$VERSION" == "$PROJECT_VERSION" ]] || echo "warning: building $VERSION but project.pbxproj says $PROJECT_VERSION" >&2
 OUT="$ROOT/build/release/$VERSION"
 ARCHIVE="$OUT/$APP_NAME.xcarchive"
 EXPORT="$OUT/export"
 APP="$EXPORT/$APP_NAME.app"
-DMG="$OUT/da-transcribuh-$VERSION.dmg"
+DMG="$OUT/$APP_NAME $VERSION.dmg"          # "da transcribuh 0.9.1.dmg"
+DMG_ALIAS="da-transcribuh.dmg"              # URL-safe copy for GitHub (see docs/releasing.md)
+DMG_BG="$ROOT/Config/dmg/background.tiff"   # 600x400 + 1200x800, from Config/dmg/render-background.swift
 ENTITLEMENTS="$ROOT/Config/Release.entitlements"
 
 # ---- preflight: fail before the slow build, not after ----
@@ -69,6 +75,8 @@ if (( PUBLISH == 1 )); then
   gh auth status >/dev/null 2>&1 || die "gh is not logged in; run: gh auth login"
   gh release view "v$VERSION" -R "$REPO" >/dev/null 2>&1 && die "release v$VERSION already exists"
 fi
+[[ -f "$DMG_BG" ]] || die "missing $DMG_BG (run: swift Config/dmg/render-background.swift Config/dmg)"
+[[ ! -d "/Volumes/$APP_NAME" ]] || die "/Volumes/$APP_NAME is mounted; eject it first"
 echo "version $VERSION (build $BUILD_NUMBER), identity: $IDENTITY"
 rm -rf "$OUT"; mkdir -p "$OUT"
 
@@ -134,14 +142,76 @@ if (( SKIP_NOTARIZE == 0 )); then
   spctl -a -vvv -t exec "$APP"
 fi
 
-# ---- 4b. DMG ----
+# ---- 4b. DMG: drag-to-install window ----
+# 600x400 window, no toolbar or status bar, 128pt icons. The app sits on the left card
+# of the background, an /Applications link on the right. Finder lays it out once while
+# the image is writable, so a Finder window opens briefly during this step.
+WIN_W=600; WIN_H=400; ICON=128; APP_X=150; APPS_X=450; ICON_Y=190
+
+dmg_with_create_dmg() {
+  create-dmg \
+    --volname "$APP_NAME" \
+    --background "$DMG_BG" \
+    --window-pos 200 120 --window-size "$WIN_W" "$WIN_H" \
+    --icon-size "$ICON" --text-size 12 \
+    --icon "$APP_NAME.app" "$APP_X" "$ICON_Y" --hide-extension "$APP_NAME.app" \
+    --app-drop-link "$APPS_X" "$ICON_Y" \
+    --filesystem HFS+ --format UDZO --hdiutil-quiet \
+    "$DMG" "$STAGE"
+}
+
+dmg_with_hdiutil() {
+  local rw="$OUT/rw.dmg" dev mnt
+  mkdir -p "$STAGE/.background"
+  cp "$DMG_BG" "$STAGE/.background/background.tiff"
+  ln -s /Applications "$STAGE/Applications"
+  hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -fs HFS+ -format UDRW -ov "$rw" >/dev/null
+  dev="$(hdiutil attach -readwrite -noverify -noautoopen "$rw" | awk '/Apple_HFS/ {print $1}')"
+  mnt="/Volumes/$APP_NAME"
+  osascript <<OSA
+tell application "Finder"
+  tell disk "$APP_NAME"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set the bounds of container window to {200, 120, $((200 + WIN_W)), $((120 + WIN_H))}
+    set opts to the icon view options of container window
+    set arrangement of opts to not arranged
+    set icon size of opts to $ICON
+    set text size of opts to 12
+    set background picture of opts to file ".background:background.tiff"
+    set position of item "$APP_NAME.app" of container window to {$APP_X, $ICON_Y}
+    set position of item "Applications" of container window to {$APPS_X, $ICON_Y}
+    close
+    open
+    update without registering applications
+    delay 2
+    close
+  end tell
+end tell
+OSA
+  SetFile -a V "$mnt/.background" 2>/dev/null || true
+  sync
+  hdiutil detach "$dev" -quiet || hdiutil detach "$dev" -force -quiet
+  hdiutil convert "$rw" -format UDZO -imagekey zlib-level=9 -ov -o "$DMG" >/dev/null
+  rm -f "$rw"
+}
+
 step "build DMG"
 STAGE="$OUT/dmg"
-mkdir -p "$STAGE"
+rm -rf "$STAGE"; mkdir -p "$STAGE"
 ditto "$APP" "$STAGE/$APP_NAME.app"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG" >/dev/null
+rm -f "$DMG"
+if command -v create-dmg >/dev/null; then
+  echo "using $(create-dmg --version)"
+  dmg_with_create_dmg
+else
+  echo "create-dmg not found; using hdiutil + Finder AppleScript"
+  dmg_with_hdiutil
+fi
 rm -rf "$STAGE"
+[[ -f "$DMG" ]] || die "DMG was not created"
 
 # ---- 5. sign DMG ----
 step "sign DMG"
@@ -162,12 +232,25 @@ fi
 # ---- 8. publish ----
 if (( PUBLISH == 1 )); then
   step "publish GitHub release v$VERSION"
-  # README links to releases/latest and da-transcribuh.dmg, so attach an unversioned copy too.
-  cp "$DMG" "$OUT/da-transcribuh.dmg"
+  # GitHub turns spaces in asset names into dots, so the proper-named DMG shows up as
+  # "da.transcribuh.<version>.dmg". The URL-safe alias keeps a stable
+  # releases/latest/download/da-transcribuh.dmg link for the README.
+  cp "$DMG" "$OUT/$DMG_ALIAS"
   gh release create "v$VERSION" -R "$REPO" \
-    --title "da transcribuh $VERSION" --generate-notes --target "$(git rev-parse HEAD)" \
-    "$DMG" "$OUT/da-transcribuh.dmg"
+    --title "da transcribuh $VERSION beta" --generate-notes --prerelease --target "$(git rev-parse HEAD)" \
+    "$DMG" "$OUT/$DMG_ALIAS"
 fi
+
+# ---- 9. leave no second app on disk ----
+# The archive and export each hold a full .app. Spotlight and LaunchServices would offer
+# them next to /Applications, so keep the archive as a zip (dSYMs included) and drop both.
+step "tidy app copies"
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+ditto -c -k --keepParent "$ARCHIVE" "$OUT/$APP_NAME $VERSION.xcarchive.zip"
+for copy in "$APP" "$ARCHIVE/Products/Applications/$APP_NAME.app"; do
+  [[ -d "$copy" ]] && { "$LSREGISTER" -u "$copy" 2>/dev/null || true; }
+done
+rm -rf "$EXPORT" "$ARCHIVE"
 
 step "done"
 shasum -a 256 "$DMG"
