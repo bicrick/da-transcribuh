@@ -233,6 +233,25 @@ final class ClipboardMixedItemTests: XCTestCase {
         XCTAssertGreaterThan(host.fittingSize.height, fitted.height + 100)
     }
 
+    func testPreviewWindowResizesToEachItem() throws {
+        // Root cause: the window was sized from its own hosting view, which reports
+        // the size it already has, so every preview stayed at the first size.
+        let small = try XCTUnwrap(store.ingest(payload: .text("short"), source: .pasteboard, applicationName: nil))
+        let picture = try XCTUnwrap(store.ingest(
+            payload: .image(png: PerfSuite.syntheticPNG(width: 1200, height: 760, seed: 2)),
+            source: .pasteboard, applicationName: nil
+        ))
+        let preview = ClipboardPreviewPanelController()
+        defer { preview.hide(animated: false) }
+        let list = NSRect(x: 200, y: 200, width: 450, height: 480)
+        preview.show(item: small, image: nil, beside: list)
+        let shortHeight = try XCTUnwrap(preview.window?.frame.height)
+        preview.show(item: picture, image: store.image(for: picture), beside: list)
+        let imageHeight = try XCTUnwrap(preview.window?.frame.height)
+        XCTAssertGreaterThan(imageHeight, shortHeight + 100)
+        XCTAssertEqual(preview.window?.contentView?.frame.height, imageHeight)
+    }
+
     func testPinnedCardHeightFillsTheWindowExactly() throws {
         let long = String(repeating: "a long line of copied text\n", count: 200)
         let item = try XCTUnwrap(store.ingest(payload: .text(long), source: .pasteboard, applicationName: nil))

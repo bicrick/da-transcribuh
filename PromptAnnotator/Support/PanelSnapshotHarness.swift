@@ -37,7 +37,7 @@ enum PanelSnapshotHarness {
                     // Reopen: must land at the top with the search field focused.
                     ClipboardHistoryPanelController.shared.hide(animated: false)
                     ClipboardHistoryPanelController.shared.show()
-                    after(500) {
+                    after(max(0, AppSettings.shared.clipboardPreviewDelayMs) + 700) {
                         logOpenState("reopen", log)
                         write(ClipboardHistoryPanelController.shared.window, "\(dir)/clip-panel-reopen.png", log)
                         renderPreviews(dir: dir, suffix: "light", log: log) {
@@ -74,7 +74,9 @@ enum PanelSnapshotHarness {
         let field = ClipboardHistoryPanelController.firstEditableTextField(in: window.contentView)
         let editor = window.firstResponder as? NSTextView
         let searchFocused = field != nil && editor?.delegate === field
-        log("\(label) scrollFromTop=\(fromTop) searchFocused=\(searchFocused) key=\(window.isKeyWindow)")
+        let mouse = NSEvent.mouseLocation
+        let inside = ClipboardHistoryPanelController.shared.listFrame.contains(mouse)
+        log("\(label) scrollFromTop=\(fromTop) searchFocused=\(searchFocused) key=\(window.isKeyWindow) mouse=\(Int(mouse.x)),\(Int(mouse.y)) mouseInside=\(inside)")
     }
 
     /// One preview per demo kind, rendered from the real preview window.
