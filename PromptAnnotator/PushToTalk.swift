@@ -49,6 +49,7 @@ final class PushToTalk {
     private func released(_ event: NSEvent) {
         guard armed, event.keyCode == keyCode else { return }
         armed = false
+        StopTrace.noteTrigger(uptime: event.timestamp)
         SessionController.shared.releasePushToTalk()
     }
 }

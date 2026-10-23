@@ -9,6 +9,9 @@ final class HotkeyCenter {
     static let shared = HotkeyCenter()
 
     var handler: (() -> Void)?
+    /// Carbon event time (seconds since boot, the `systemUptime` base) of the last
+    /// Start/Stop press. Feeds the stop-latency trace.
+    private(set) var lastPressUptime: TimeInterval = 0
     var cancelHandler: (() -> Void)?
 
     private var hotKey: EventHotKeyRef?
@@ -92,6 +95,7 @@ final class HotkeyCenter {
                     return OSStatus(eventNotHandledErr)
                 }
                 if pressed.id == center.hotKeyID {
+                    center.lastPressUptime = GetEventTime(event)
                     DispatchQueue.main.async {
                         center.handler?()
                     }

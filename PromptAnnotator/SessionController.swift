@@ -214,6 +214,9 @@ final class SessionController: ObservableObject {
     }
 
     func handleHotkey() {
+        if phase == .recording {
+            StopTrace.noteTrigger(uptime: HotkeyCenter.shared.lastPressUptime)
+        }
         if AppSettings.shared.pushToTalk {
             if phase == .recording {
                 PushToTalk.shared.disarm()
@@ -421,8 +424,12 @@ final class SessionController: ObservableObject {
     }
 
     private func deliverIfRequested() {
-        // Measurement runs never paste into whatever app is frontmost.
-        guard !PerfSuite.isolatesSession else { return }
+        // Measurement runs never paste into whatever app is frontmost
+        // (except `-DTPerfPaste`, which pastes into its own target window).
+        guard !PerfSuite.isolatesSession || PerfSuite.pasteMode else {
+            StopTrace.end("harness")
+            return
+        }
         let skipping = skipNextPaste
         if skipNextPaste {
             skipNextPaste = false
@@ -432,6 +439,7 @@ final class SessionController: ObservableObject {
             || !pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || sheetURL != nil
         let target = focusProbe.classifyFocusedElement()
+        StopTrace.mark("focusProbed")
         let action = FocusPasteDecision.action(
             target: target,
             pasteOnStop: settings.pasteOnStop,
@@ -442,12 +450,18 @@ final class SessionController: ObservableObject {
         switch action {
         case .skip:
             pasteReadyHint = nil
+            StopTrace.end("skip")
             return
         case .autoPaste:
             pasteReadyHint = nil
             let sendReturn = settings.returnOnShift && NSEvent.modifierFlags.contains(.shift)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            // Paste as soon as the stop chord's ⌘/⌥/⌃ are up (usually already), capped at
+            // 250 ms. This was a fixed 250 ms wait on every paste.
+            PasteModifierGate.run {
+                StopTrace.mark("modifiersUp")
                 PasteFollowUp.shared.pasteBoth()
+                StopTrace.mark("pastePosted")
+                StopTrace.end("paste")
                 guard sendReturn else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
                     ReturnKey.post()
@@ -458,6 +472,7 @@ final class SessionController: ObservableObject {
             let image = sheetURL.flatMap { NSImage(contentsOf: $0) }
             _ = SessionClipboard.stageCombined(image: image, transcript: pasteText)
             pasteReadyHint = PasteFollowUp.readyHint
+            StopTrace.end("hold")
         }
     }
 
@@ -845,6 +860,8 @@ final class SessionController: ObservableObject {
 
     private func finish() async {
         guard phase == .recording else { return }
+        StopTrace.begin()
+        StopTrace.note("audio", String(format: "%.1f", Double(audio.sampleCount()) / 16_000))
         PushToTalk.shared.disarm()
         pushToTalkReleasedWhileStarting = false
         let heardSpeech = audio.heardSpeech()
@@ -898,19 +915,23 @@ final class SessionController: ObservableObject {
             }
         }
         keepTranscribing = false
-        PerfSuite.stopMark("captures")
-        // Wake the follow loop out of its 250 ms sleep at once, but never cancel an
-        // in-flight live decode: cancelling it threw away that chunk (a longer final
-        // pass) and let a cut-short decode leak filler words ("you you you").
-        if !speechDecoding {
+        StopTrace.mark("captures")
+        // Wake the follow loop out of its 250 ms sleep at once. An in-flight live decode
+        // is asked to stop at its next token and its words are dropped (a cut-short
+        // decode leaked filler words, "you you you"); the tail decode below covers that
+        // audio. Waiting it out instead added 100 to 300 ms to some stops.
+        StopTrace.note("liveInFlight", speechDecoding ? "1" : "0")
+        if speechDecoding {
+            transcriber.abandonLiveDecode()
+        } else {
             speechTask?.cancel()
         }
         await speechTask?.value
         speechTask = nil
-        PerfSuite.stopMark("liveDrained")
+        StopTrace.mark("liveDrained")
         audio.stop()
         AudioInputs.endSession()
-        PerfSuite.stopMark("audioStopped")
+        StopTrace.mark("audioStopped")
         // When the live PCM buffer was trimmed, prefer the AAC file so the dropped prefix is not lost.
         let speechBuffer = audio.copySpeechBuffer()
         let spokenSamples: [Float]
@@ -927,6 +948,7 @@ final class SessionController: ObservableObject {
         guard let directory else {
             skipNextPaste = false
             lastError = "The session folder is missing."
+            StopTrace.end("error")
             setPhase(.idle)
             return
         }
@@ -961,7 +983,7 @@ final class SessionController: ObservableObject {
                 }
                 spoken = transcript.words
                 model = transcript.model
-                PerfSuite.stopMark("transcribed")
+                StopTrace.mark("transcribed")
             } catch {
                 let message = UserFacingError.transcription(error)
                 transcriptionError = message
@@ -977,6 +999,7 @@ final class SessionController: ObservableObject {
             tileCount: groups.count,
             transcriptionError: transcriptionError
         ) {
+            StopTrace.end("empty")
             discardEmptyTake(directory: directory)
             return
         }
@@ -1001,7 +1024,7 @@ final class SessionController: ObservableObject {
                 model: model,
                 transcriptionError: transcriptionError
             )
-            PerfSuite.stopMark("written")
+            StopTrace.mark("written")
             pasteText = saved.pasteText
             sheetURL = saved.sheetURL
             lastSessionURL = directory
@@ -1013,10 +1036,10 @@ final class SessionController: ObservableObject {
                 lastError = "No speech detected"
             }
             copyToClipboard()
-            PerfSuite.stopMark("copied")
+            StopTrace.mark("copied")
             deliverIfRequested()
             NotificationCenter.default.post(name: .promptAnnotatorSessionsChanged, object: nil)
-            PerfSuite.stopMark("notified")
+            StopTrace.mark("notified")
             setPhase(.idle)
         } catch {
             var message = UserFacingError.sessionWrite(error)
@@ -1038,6 +1061,7 @@ final class SessionController: ObservableObject {
                 lastError = message
             }
             lastSessionURL = directory
+            StopTrace.end("error")
             setPhase(.idle)
         }
     }

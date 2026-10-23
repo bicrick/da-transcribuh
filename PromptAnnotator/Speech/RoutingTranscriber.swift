@@ -25,6 +25,10 @@ actor RoutingTranscriber: Transcribing {
         // OpenAI has no live buffer.
     }
 
+    nonisolated func abandonLiveDecode() {
+        whisper.abandonLiveDecode()
+    }
+
     func prepare() async {
         if usesOpenAI {
             await openAI.prepare()
