@@ -13,6 +13,8 @@ enum PanelSnapshotHarness {
         func log(_ s: String) { FileHandle.standardError.write(Data("dtsnap \(s)\n".utf8)) }
         if UserDefaults.standard.bool(forKey: "DTSnapshotDemo") { seedDemoItems() }
         after(2500) {
+            // Pin the light pass so the renders do not follow the system's auto dark mode.
+            NSApp.appearance = NSAppearance(named: .aqua)
             ClipboardHistoryPanelController.shared.show()
             // Placement facts for marking the pointer on the render (AppKit points, y up).
             let mouse = NSEvent.mouseLocation
