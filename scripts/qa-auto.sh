@@ -37,7 +37,7 @@ for h in Versions/B/Autoupdate Versions/B/Updater.app Versions/B/XPCServices/Dow
   t=$(codesign -dvv "$SP/$h" 2>&1 | sed -n 's/^TeamIdentifier=//p')
   if [[ $t == $TEAM ]]; then ok "Sparkle ${h:t} team $TEAM"
   elif ((notarized)); then bad "Sparkle ${h:t} team '$t'"
-  else note "Sparkle ${h:t} team '$t' (xcodebuild dev builds leave helpers ad hoc; release.sh re-signs and checks)"; fi
+  else note "Sparkle ${h:t} team '$t' (xcodebuild dev builds leave helpers ad hoc; the release export signs them and release.sh checks)"; fi
 done
 key=$(defaults read "$PL" SUPublicEDKey 2>/dev/null)
 src=$(plutil -extract SUPublicEDKey raw "$ROOT/Config/Info.plist" 2>/dev/null)
