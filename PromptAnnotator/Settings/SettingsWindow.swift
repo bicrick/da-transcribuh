@@ -357,6 +357,10 @@ enum ReturnKey {
         guard let source = CGEventSource(stateID: .hidSystemState) else { return }
         let down = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: true)
         let up = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: false)
+        // Plain Return. Without explicit flags the event inherits whatever the system
+        // state reports as held, which turned it into ⌘Return after a paste.
+        down?.flags = []
+        up?.flags = []
         down?.post(tap: .cghidEventTap)
         up?.post(tap: .cghidEventTap)
     }

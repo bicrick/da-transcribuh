@@ -177,6 +177,11 @@ struct ExportError: LocalizedError {
 }
 
 enum SessionWriter {
+    /// Plain transcript used when the session folder couldn't be written.
+    static func rescuedPasteText(words: [TimedWord]) -> String {
+        Aligner.spokenText(words).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     struct Saved {
         var directory: URL
         var notes: String
