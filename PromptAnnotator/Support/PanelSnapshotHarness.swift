@@ -44,7 +44,7 @@ enum PanelSnapshotHarness {
                             NSApp.appearance = NSAppearance(named: .darkAqua)
                             ClipboardHistoryPanelController.shared.hide(animated: false)
                             ClipboardHistoryPanelController.shared.show()
-                            after(600) {
+                            after(max(0, AppSettings.shared.clipboardPreviewDelayMs) + 700) {
                                 write(ClipboardHistoryPanelController.shared.window, "\(dir)/clip-panel-dark.png", log)
                                 renderPreviews(dir: dir, suffix: "dark", log: log) {
                                     log("done")

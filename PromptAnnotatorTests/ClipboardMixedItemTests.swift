@@ -252,6 +252,28 @@ final class ClipboardMixedItemTests: XCTestCase {
         XCTAssertEqual(preview.window?.contentView?.frame.height, imageHeight)
     }
 
+    func testSwapDuringTheOpenSlideKeepsTheNewSize() throws {
+        let picture = try XCTUnwrap(store.ingest(
+            payload: .image(png: PerfSuite.syntheticPNG(width: 1200, height: 760, seed: 4)),
+            source: .pasteboard, applicationName: nil
+        ))
+        let small = try XCTUnwrap(store.ingest(payload: .text("short"), source: .pasteboard, applicationName: nil))
+        let preview = ClipboardPreviewPanelController()
+        defer { preview.hide(animated: false) }
+        let list = NSRect(x: 200, y: 200, width: 450, height: 480)
+        preview.show(item: picture, image: store.image(for: picture), beside: list)
+        // Swap at once, while the open slide is still running.
+        preview.show(item: small, image: nil, beside: list)
+        let settle = expectation(description: "slide finished")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { settle.fulfill() }
+        wait(for: [settle], timeout: 2)
+        let alone = ClipboardPreviewPanelController()
+        defer { alone.hide(animated: false) }
+        alone.show(item: small, image: nil, beside: list)
+        let expected = try XCTUnwrap(alone.window?.frame.height)
+        XCTAssertEqual(try XCTUnwrap(preview.window?.frame.height), expected, accuracy: 0.5)
+    }
+
     func testPinnedCardHeightFillsTheWindowExactly() throws {
         let long = String(repeating: "a long line of copied text\n", count: 200)
         let item = try XCTUnwrap(store.ingest(payload: .text(long), source: .pasteboard, applicationName: nil))

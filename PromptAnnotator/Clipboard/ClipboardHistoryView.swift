@@ -89,10 +89,10 @@ struct ClipboardHistoryView: View {
 
     private var header: some View {
         HStack(spacing: Ink.space2) {
-            Text("clipboard")
-                .font(Ink.mono(11))
-                .foregroundStyle(Ink.secondary)
-                .lineLimit(1)
+            // Same icon + label as the Clipboard folder tab in the main window.
+            SettingsPageLabel(page: .clipboard)
+                .foregroundStyle(Ink.label)
+                .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 4)
             HStack(spacing: 4) {
                 // Drawn — Departure Mono has no ⌕; tofu showed in dark mode.

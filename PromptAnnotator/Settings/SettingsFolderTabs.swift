@@ -71,14 +71,7 @@ struct SettingsFolderTabs: View {
         return Button {
             selection = page
         } label: {
-            HStack(spacing: Ink.space1 + 1) {
-                Image(systemName: page.symbol)
-                    .font(.system(size: 10, weight: .bold))
-                    .symbolRenderingMode(.monochrome)
-                Text(page.title)
-                    .font(Ink.folderTabFont)
-                    .lineLimit(1)
-            }
+            SettingsPageLabel(page: page)
             .foregroundStyle(selected ? Ink.label : Ink.secondary)
             .padding(.horizontal, Ink.space3)
             .frame(height: tabHeight)
@@ -116,6 +109,23 @@ struct SettingsFolderTabs: View {
         .accessibilityLabel(page.pageTitle)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
         .keyboardShortcut(page.keyboardDigit, modifiers: .command)
+    }
+}
+
+/// Icon + title of a settings page, as on its folder tab. The clipboard panel
+/// header uses the same label so both read as one place.
+struct SettingsPageLabel: View {
+    var page: SettingsPage
+
+    var body: some View {
+        HStack(spacing: Ink.space1 + 1) {
+            Image(systemName: page.symbol)
+                .font(.system(size: 10, weight: .bold))
+                .symbolRenderingMode(.monochrome)
+            Text(page.title)
+                .font(Ink.folderTabFont)
+                .lineLimit(1)
+        }
     }
 }
 

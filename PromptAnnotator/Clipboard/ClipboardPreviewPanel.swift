@@ -73,8 +73,14 @@ final class ClipboardPreviewPanelController {
         hideGeneration &+= 1
         if wasShowing {
             // Content change only: land on the new size at once, top edge fixed.
-            panel.setFrame(target, display: true)
-            panel.alphaValue = Self.restingAlpha
+            // Through the animator with zero duration, so a swap during the open
+            // slide replaces the slide's target instead of being undone by it
+            // (the window kept the first item's size around the new content).
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                panel.animator().setFrame(target, display: true)
+                panel.animator().alphaValue = Self.restingAlpha
+            }
             AnimSampler.mark("preview-swap", panel)
             return
         }

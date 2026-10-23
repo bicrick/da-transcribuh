@@ -50,8 +50,9 @@ final class ClipboardHistoryPanelController {
             store: store,
             onPick: { [weak self] item, paste in
                 let wrote = ClipboardHistoryController.shared.pick(item, paste: paste)
-                // Enter / click paste closes; ⌥Enter copy-only keeps the panel open.
-                // Instant: the synthesized ⌘V must land in the target app, not a fading panel.
+                // Enter / click closes (copy, plus ⌘V only with "Paste automatically" on);
+                // ⌥Enter copy-only keeps the panel open. Instant, so a synthesized ⌘V
+                // lands in the target app, not a fading panel.
                 if paste, wrote {
                     self?.hide(animated: false)
                 }
