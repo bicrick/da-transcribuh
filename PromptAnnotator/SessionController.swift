@@ -81,6 +81,8 @@ final class SessionController: ObservableObject {
     private var lastOfferedPermissions: String?
     private var keepTranscribing = false
     private var speechTask: Task<Void, Never>?
+    /// True while the follow loop is inside a live decode (finish must not cancel it).
+    private var speechDecoding = false
     private var lastSpeechCount = 0
     private var silenceWatch = SilenceWatch()
     private var stopQueued = false
@@ -467,7 +469,7 @@ final class SessionController: ObservableObject {
         // Stays on the main actor (SessionController is @MainActor). Cancel + throwing sleep
         // so a new follow cannot resurrect after cancel/finish.
         speechTask = Task { @MainActor in
-            while !Task.isCancelled {
+            while !Task.isCancelled, keepTranscribing {
                 do {
                     try await Task.sleep(nanoseconds: 250_000_000)
                 } catch {
@@ -478,6 +480,8 @@ final class SessionController: ObservableObject {
                 guard count >= lastSpeechCount + 16_000 else { continue }
                 let buffer = audio.copySpeechBuffer()
                 lastSpeechCount = buffer.absoluteCount
+                speechDecoding = true
+                defer { speechDecoding = false }
                 await transcriber.consume(
                     samples: buffer.samples,
                     bufferStart: buffer.timeOffset,
@@ -893,6 +897,12 @@ final class SessionController: ObservableObject {
         }
         keepTranscribing = false
         PerfSuite.stopMark("captures")
+        // Wake the follow loop out of its 250 ms sleep at once, but never cancel an
+        // in-flight live decode: cancelling it threw away that chunk (a longer final
+        // pass) and let a cut-short decode leak filler words ("you you you").
+        if !speechDecoding {
+            speechTask?.cancel()
+        }
         await speechTask?.value
         speechTask = nil
         PerfSuite.stopMark("liveDrained")
