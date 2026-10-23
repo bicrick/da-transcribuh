@@ -94,3 +94,19 @@ if a new feature needs another entitlement, add it to `Config/Release.entitlemen
 - `codesign --verify --deep --strict` passes, the runtime flag (`0x10000`) is set, team is `3BUPEZ2FJQ`, a secure timestamp is present
 - the signed entitlements include audio-input and do **not** include `get-task-allow` (notarization rejects it)
 - after notarizing: `stapler validate` and `spctl -a -vvv` report `source=Notarized Developer ID` for the app and the DMG
+
+## Dev install (keeps permissions)
+
+`scripts/install-dev.sh` builds a Developer ID-signed copy and replaces the single
+`/Applications/da transcribuh.app`. Same bundle ID and same signing requirement as a
+release, so Accessibility, Microphone and Input Monitoring grants carry over. It never
+runs `tccutil reset`, and it never installs a "Prompt Annotator Local" build.
+
+```
+scripts/install-dev.sh              # latest origin/main
+scripts/install-dev.sh <git-ref>    # any branch, tag or sha
+scripts/install-dev.sh --here       # current working tree
+```
+
+The installed version reads `<version>-dev+<shortsha>`. The build product is deleted
+after install so Spotlight sees one copy. Run it after every PR merge.
