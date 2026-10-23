@@ -242,6 +242,8 @@ final class ClipboardMixedItemTests: XCTestCase {
             source: .pasteboard, applicationName: nil
         ))
         let preview = ClipboardPreviewPanelController()
+        // Stands in for an open list; the real owner is the list panel.
+        preview.ownerAllowsShow = { true }
         defer { preview.hide(animated: false) }
         let list = NSRect(x: 200, y: 200, width: 450, height: 480)
         preview.show(item: small, image: nil, beside: list)
@@ -259,6 +261,8 @@ final class ClipboardMixedItemTests: XCTestCase {
         ))
         let small = try XCTUnwrap(store.ingest(payload: .text("short"), source: .pasteboard, applicationName: nil))
         let preview = ClipboardPreviewPanelController()
+        // Stands in for an open list; the real owner is the list panel.
+        preview.ownerAllowsShow = { true }
         defer { preview.hide(animated: false) }
         let list = NSRect(x: 200, y: 200, width: 450, height: 480)
         preview.show(item: picture, image: store.image(for: picture), beside: list)
@@ -268,10 +272,40 @@ final class ClipboardMixedItemTests: XCTestCase {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { settle.fulfill() }
         wait(for: [settle], timeout: 2)
         let alone = ClipboardPreviewPanelController()
+        alone.ownerAllowsShow = { true }
         defer { alone.hide(animated: false) }
         alone.show(item: small, image: nil, beside: list)
         let expected = try XCTUnwrap(alone.window?.frame.height)
         XCTAssertEqual(try XCTUnwrap(preview.window?.frame.height), expected, accuracy: 0.5)
+    }
+
+    func testPreviewRefusesToShowWithoutAnOpenList() throws {
+        let item = try XCTUnwrap(store.ingest(payload: .text("late"), source: .pasteboard, applicationName: nil))
+        let preview = ClipboardPreviewPanelController()
+        preview.ownerAllowsShow = { false }
+        defer { preview.hide(animated: false) }
+        // A hover debounce that fires after the list closed.
+        preview.show(item: item, image: nil, beside: NSRect(x: 200, y: 200, width: 450, height: 480))
+        XCTAssertFalse(preview.isShowing)
+        XCTAssertNil(preview.frame)
+        XCTAssertNotEqual(preview.window?.isVisible, true)
+    }
+
+    func testSecondHideDuringSlideBackStillOrdersOut() throws {
+        // Root cause of the stuck preview: a hide during the slide-back bumped the
+        // generation, so the running slide's completion skipped orderOut.
+        let item = try XCTUnwrap(store.ingest(payload: .text("stuck"), source: .pasteboard, applicationName: nil))
+        let preview = ClipboardPreviewPanelController()
+        preview.ownerAllowsShow = { true }
+        defer { preview.hide(animated: false) }
+        preview.show(item: item, image: nil, beside: NSRect(x: 200, y: 200, width: 450, height: 480))
+        XCTAssertEqual(preview.window?.isVisible, true)
+        preview.hide(animated: true)   // hover left the row
+        preview.hide(animated: true)   // then the list closed (Escape, click outside)
+        let settle = expectation(description: "slide-back finished")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { settle.fulfill() }
+        wait(for: [settle], timeout: 2)
+        XCTAssertEqual(preview.window?.isVisible, false)
     }
 
     func testPinnedCardHeightFillsTheWindowExactly() throws {

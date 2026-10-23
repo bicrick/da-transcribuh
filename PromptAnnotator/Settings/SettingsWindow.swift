@@ -313,6 +313,7 @@ final class SettingsPresenter {
         let root = SettingsRoot()
             .environmentObject(AppSettings.shared)
             .environmentObject(SessionController.shared)
+            .focusEffectDisabled()
         let host = NSHostingView(rootView: root)
         host.autoresizingMask = [.width, .height]
         let window = NSWindow(

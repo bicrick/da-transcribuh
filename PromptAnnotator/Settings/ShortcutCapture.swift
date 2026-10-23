@@ -22,6 +22,10 @@ struct ShortcutCapture: NSViewRepresentable {
         private var monitor: Any?
 
         override var acceptsFirstResponder: Bool { true }
+        override var focusRingType: NSFocusRingType {
+            get { .none }
+            set {}
+        }
 
         func setCapture(_ active: Bool) {
             capture = active
