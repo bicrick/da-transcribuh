@@ -25,7 +25,16 @@ enum SnapshotHarness {
             }
             for page in pages {
                 select(page)
-                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                // Re-apply per page: the first page may have no scroll view, so
+                // the pre-loop resize above can miss the window entirely.
+                if let size = UserDefaults.standard.string(forKey: "DTSnapshotContentSize")?
+                    .split(separator: "x").compactMap({ Double($0) }), size.count == 2,
+                   let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView.flatMap(pageScroll(in:)) != nil }) {
+                    window.setContentSize(NSSize(width: size[0], height: size[1]))
+                    FileHandle.standardError.write(Data("dtsize frame=\(window.frame.size) min=\(window.contentMinSize)\n".utf8))
+                }
+                try? await Task.sleep(nanoseconds: 900_000_000)
                 guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView.flatMap(pageScroll(in:)) != nil }),
                       let content = window.contentView,
                       let scroll = pageScroll(in: content),
