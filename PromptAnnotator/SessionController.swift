@@ -1374,11 +1374,16 @@ final class SessionController: ObservableObject {
 
     private func startTimer() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+        // Main-run-loop timer, so tick runs inline. The old block spawned a Task
+        // every 0.1 s just to hop back onto the main actor.
+        let clock = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
                 self?.tick()
             }
         }
+        clock.tolerance = 0.02
+        timer = clock
+        RunLoop.main.add(clock, forMode: .common)
         startLevelTimer()
     }
 
@@ -1391,12 +1396,14 @@ final class SessionController: ObservableObject {
     private func startLevelTimer() {
         levelsTimer?.invalidate()
         lastLevelTime = 0
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+        // 30 Hz meter. Smoothing is delta-based, so the motion is the same,
+        // with half the waveform renders while recording.
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.refreshLevels()
             }
         }
-        timer.tolerance = 1.0 / 240.0
+        timer.tolerance = 1.0 / 120.0
         levelsTimer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
@@ -1411,7 +1418,7 @@ final class SessionController: ObservableObject {
         guard phase == .recording else { return }
         PerfSuite.pace("levels")
         let now = CACurrentMediaTime()
-        let delta = lastLevelTime == 0 ? (1.0 / 60.0) : min(0.05, now - lastLevelTime)
+        let delta = lastLevelTime == 0 ? (1.0 / 30.0) : min(0.07, now - lastLevelTime)
         lastLevelTime = now
         waveform.set(audio.sampleLevels(delta: delta))
     }
