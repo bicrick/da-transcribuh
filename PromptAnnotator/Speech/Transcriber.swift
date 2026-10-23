@@ -16,6 +16,9 @@ struct Transcript: Sendable, Equatable {
 
 protocol Transcribing: Sendable {
     func resetLive()
+    /// Stop pressed while a live decode is running: end that decode early and drop its
+    /// words, so the final tail decode can start at once. The tail re-decodes the same audio.
+    func abandonLiveDecode()
     func prepare() async
     /// Live decode of PCM whose index 0 is `bufferStart` seconds into the session.
     /// `absoluteEndCount` is the session-absolute sample index after `samples` (avoids float drift).
@@ -39,6 +42,7 @@ actor WhisperKitTranscriber: Transcribing {
     private static let readyFlag = ReadyFlag()
     private let log = Logger(subsystem: "com.bicrick.PromptAnnotator", category: "speech")
     private let live = LiveWords()
+    private let liveAbandoned = ReadyFlag()
 
     private var pipe: WhisperKit?
     private var loadedFolder: String?
@@ -51,7 +55,12 @@ actor WhisperKitTranscriber: Transcribing {
     nonisolated static var isModelReady: Bool { readyFlag.isReady }
 
     nonisolated func resetLive() {
+        liveAbandoned.set(false)
         live.reset()
+    }
+
+    nonisolated func abandonLiveDecode() {
+        liveAbandoned.set(true)
     }
 
     /// Drops the resident pipe so the next prepare/transcribe picks up a new selection.
@@ -97,7 +106,7 @@ actor WhisperKitTranscriber: Transcribing {
         let shot = live.snapshot()
         let absoluteCount = max(absoluteEndCount, samples.count)
         guard samples.count >= WhisperKit.sampleRate, absoluteCount - shot.lastCount >= WhisperKit.sampleRate else { return }
-        guard !decodeInFlight, let pipe else { return }
+        guard !decodeInFlight, !liveAbandoned.isReady, let pipe else { return }
         decodeInFlight = true
         defer { decodeInFlight = false }
 
@@ -108,8 +117,12 @@ actor WhisperKitTranscriber: Transcribing {
                 pipe: pipe,
                 clipStart: shot.confirmedEnd,
                 workers: 2,
-                capWindow: true
+                capWindow: true,
+                abandon: liveAbandoned
             )
+            // Cut short by stop: the words may be truncated ("you you you"), so keep none.
+            // The final tail decode starts from the same confirmedEnd and covers this audio.
+            guard !liveAbandoned.isReady else { return }
             // Holdback is relative to the decode window end — not the full buffer tail.
             // After the live ~45 s head-cap, using buffer duration would mark the whole
             // window stable (including the trailing second meant for revision).
@@ -494,7 +507,8 @@ actor WhisperKitTranscriber: Transcribing {
         pipe: WhisperKit,
         clipStart: TimeInterval,
         workers: Int,
-        capWindow: Bool
+        capWindow: Bool,
+        abandon: ReadyFlag? = nil
     ) async throws -> (words: [TimedWord], windowEnd: TimeInterval) {
         let window = LiveSampleWindow.slice(
             samples: samples,
@@ -515,7 +529,15 @@ actor WhisperKitTranscriber: Transcribing {
         } else if window.samples.count > WhisperKit.sampleRate * 30 {
             options.chunkingStrategy = .vad
         }
-        let results = try await pipe.transcribe(audioArray: window.samples, decodeOptions: options)
+        // Returning false from the progress callback ends the decode at the next token.
+        let callback: TranscriptionCallback? = abandon.map { flag in
+            { _ in flag.isReady ? false : nil }
+        }
+        let results = try await pipe.transcribe(
+            audioArray: window.samples,
+            decodeOptions: options,
+            callback: callback
+        )
         let words = Self.words(from: results)
         guard window.timeOffset > 0.000_5 else { return (words, windowEnd) }
         let shifted = words.map {

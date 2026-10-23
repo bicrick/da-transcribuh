@@ -16,6 +16,8 @@ actor OpenAICompatibleTranscriber: Transcribing {
 
     nonisolated func resetLive() {}
 
+    nonisolated func abandonLiveDecode() {}
+
     func prepare() async {}
 
     func consume(samples: [Float], bufferStart: TimeInterval, absoluteEndCount: Int) async {}

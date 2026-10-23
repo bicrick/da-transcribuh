@@ -455,7 +455,10 @@ final class SessionController: ObservableObject {
         case .autoPaste:
             pasteReadyHint = nil
             let sendReturn = settings.returnOnShift && NSEvent.modifierFlags.contains(.shift)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            // Paste as soon as the stop chord's ⌘/⌥/⌃ are up (usually already), capped at
+            // 250 ms. This was a fixed 250 ms wait on every paste.
+            PasteModifierGate.run {
+                StopTrace.mark("modifiersUp")
                 PasteFollowUp.shared.pasteBoth()
                 StopTrace.mark("pastePosted")
                 StopTrace.end("paste")
@@ -911,11 +914,14 @@ final class SessionController: ObservableObject {
         }
         keepTranscribing = false
         StopTrace.mark("captures")
-        // Wake the follow loop out of its 250 ms sleep at once, but never cancel an
-        // in-flight live decode: cancelling it threw away that chunk (a longer final
-        // pass) and let a cut-short decode leak filler words ("you you you").
+        // Wake the follow loop out of its 250 ms sleep at once. An in-flight live decode
+        // is asked to stop at its next token and its words are dropped (a cut-short
+        // decode leaked filler words, "you you you"); the tail decode below covers that
+        // audio. Waiting it out instead added 100 to 300 ms to some stops.
         StopTrace.note("liveInFlight", speechDecoding ? "1" : "0")
-        if !speechDecoding {
+        if speechDecoding {
+            transcriber.abandonLiveDecode()
+        } else {
             speechTask?.cancel()
         }
         await speechTask?.value

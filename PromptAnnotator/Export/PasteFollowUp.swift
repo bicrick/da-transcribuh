@@ -272,13 +272,22 @@ final class PasteFollowUp {
     }
 
     private func postCommandV() {
+        // A full chord: ⌘ down, V down, V up, ⌘ up. Posting only V with the ⌘ flag left
+        // the HID system state reporting ⌘ held after every paste, so the next synthetic
+        // Return went out as ⌘Return and the modifier gate waited its full 250 ms.
         let source = CGEventSource(stateID: .hidSystemState)
+        let command = CGKeyCode(kVK_Command)
         let key = CGKeyCode(kVK_ANSI_V)
-        let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true)
-        let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false)
-        down?.flags = .maskCommand
-        up?.flags = .maskCommand
-        down?.post(tap: .cghidEventTap)
-        up?.post(tap: .cghidEventTap)
+        let events: [(CGKeyCode, Bool, CGEventFlags)] = [
+            (command, true, .maskCommand),
+            (key, true, .maskCommand),
+            (key, false, .maskCommand),
+            (command, false, []),
+        ]
+        for (code, isDown, flags) in events {
+            let event = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: isDown)
+            event?.flags = flags
+            event?.post(tap: .cghidEventTap)
+        }
     }
 }

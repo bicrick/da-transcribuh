@@ -320,8 +320,10 @@ enum PerfSuite {
                 stopPhases = []
                 let u0 = ProcessInfo.processInfo.systemUptime
                 var frontmost = ""
+                var flagsBefore: UInt64 = 0
                 if paste {
                     frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"
+                    flagsBefore = CGEventSource.flagsState(.hidSystemState).rawValue
                     StopTrace.noteTrigger(uptime: u0)
                 }
                 await session.perfFinish()
@@ -335,9 +337,10 @@ enum PerfSuite {
                     await sleep(ms: 600)
                     let landed = lastLanded(in: landedLog)
                     let landMs = landed > u0 ? (landed - u0) * 1000 : -1
-                    log(String(format: "paste %@ run=%d pad=%.0f front=%@ stop2paste=%.1f stop2land=%.1f",
+                    let flagsAfter = CGEventSource.flagsState(.hidSystemState).rawValue
+                    log(String(format: "paste %@ run=%d pad=%.0f front=%@ stop2paste=%.1f stop2land=%.1f flags=%llx>%llx",
                                url.deletingPathExtension().lastPathComponent, run, pad, frontmost,
-                               StopTrace.lastPasteMs ?? -1, landMs))
+                               StopTrace.lastPasteMs ?? -1, landMs, flagsBefore, flagsAfter))
                 }
                 if let summary = StopTrace.lastSummary {
                     log("stoptrace " + summary)
