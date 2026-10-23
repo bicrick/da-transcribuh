@@ -37,6 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Fonts before any chrome paints — Departure Mono for every wordmark / label.
         InkFontRegistrar.registerBundledFonts()
         guard !Runtime.isUnitTest else { return }
+        _ = DiagnosticsExporter.launchDate
+        AppLog.info("launch \(AppVersion.label) macOS \(ProcessInfo.processInfo.operatingSystemVersionString) at \(Bundle.main.bundlePath)")
         AppSettings.shared.appearance.applyToApp()
         HotkeyCenter.shared.handler = {
             SessionController.shared.handleHotkey()

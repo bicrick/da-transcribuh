@@ -2,21 +2,15 @@ import Foundation
 
 @MainActor
 enum ErrorLog {
+    /// errors.log rotates into errors.log.1 past this size, so it can no longer grow without bound.
+    static let maxBytes = 256 * 1024
+
     static func record(_ message: String) {
+        // The diagnostics log always gets the event; errors.log stays opt-in.
+        AppLog.error(message)
         guard AppSettings.shared.errorLogging else { return }
         let line = "\(Stamp.iso.string(from: Date())) \(message)\n"
-        let url = fileURL()
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if let data = line.data(using: .utf8) {
-            if FileManager.default.fileExists(atPath: url.path),
-               let handle = try? FileHandle(forWritingTo: url) {
-                defer { try? handle.close() }
-                _ = try? handle.seekToEnd()
-                try? handle.write(contentsOf: data)
-            } else {
-                try? data.write(to: url)
-            }
-        }
+        AppLog.append(line, to: fileURL(), maxBytes: maxBytes)
     }
 
     static func fileURL() -> URL {
