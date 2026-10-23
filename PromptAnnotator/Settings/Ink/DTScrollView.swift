@@ -248,7 +248,8 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
         }
 
         func install(in host: DTScrollHostView) {
-            let root = AnyView(parent.content().padding(.bottom, parent.bottomInset))
+            // A nested hosting view starts a fresh environment; repeat the no-ring rule.
+            let root = AnyView(parent.content().padding(.bottom, parent.bottomInset).focusEffectDisabled())
             let hosting = NSHostingView(rootView: root)
             // Without this, the document collapses to the clip height and the
             // thumb never travels (contentHeight == viewportHeight).

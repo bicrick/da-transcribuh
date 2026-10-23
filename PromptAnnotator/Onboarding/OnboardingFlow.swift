@@ -840,7 +840,7 @@ final class OnboardingPresenter {
             self.close()
             SettingsPresenter.shared.show()
         }
-        let host = NSHostingView(rootView: root)
+        let host = NSHostingView(rootView: root.focusEffectDisabled())
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: OnboardingMetrics.width, height: OnboardingMetrics.height),
             styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],

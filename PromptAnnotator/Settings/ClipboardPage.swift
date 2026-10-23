@@ -456,6 +456,10 @@ private struct KeyCaptureView: NSViewRepresentable {
 
     final class Monitor: NSView {
         var onEvent: ((NSEvent) -> Void)?
+        override var focusRingType: NSFocusRingType {
+            get { .none }
+            set {}
+        }
         private var monitor: Any?
 
         func setActive(_ active: Bool) {

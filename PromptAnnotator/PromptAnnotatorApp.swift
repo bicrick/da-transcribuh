@@ -15,6 +15,7 @@ struct PromptAnnotatorApp: App {
     var body: some Scene {
         MenuBarExtra {
             DTMenuBarPanel(session: session, settings: AppSettings.shared)
+                .focusEffectDisabled()
         } label: {
             // Template dt glyph (assets).
             Label {
