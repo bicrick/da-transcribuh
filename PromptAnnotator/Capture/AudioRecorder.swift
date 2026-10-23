@@ -41,6 +41,26 @@ final class AudioRecorder: @unchecked Sendable {
     /// Only compact when this far over the cap so `removeFirst` is rare on the audio queue.
     private static let retainSlack = 16_000 * 5
 
+    /// Harness only (`-DTPerfSpeech`): when set, `start` reads this file at real-time
+    /// pace through the same converter and capture path instead of the microphone.
+    nonisolated(unsafe) static var feedURL: URL?
+    private var feedTimer: DispatchSourceTimer?
+
+    private static let stampLock = NSLock()
+    nonisolated(unsafe) private static var firstBufferAt: CFTimeInterval = 0
+    /// Host time of the first converted buffer since the last reset (harness timing).
+    static func firstBufferStamp() -> CFTimeInterval {
+        stampLock.lock()
+        defer { stampLock.unlock() }
+        return firstBufferAt
+    }
+
+    static func resetFirstBufferStamp() {
+        stampLock.lock()
+        firstBufferAt = 0
+        stampLock.unlock()
+    }
+
     func start(url: URL) throws {
         sampleLock.lock()
         speechSamples = []
@@ -55,6 +75,11 @@ final class AudioRecorder: @unchecked Sendable {
         lastSpectrumAt = 0
         sampleLock.unlock()
 
+        if let feed = Self.feedURL {
+            try startFeed(feed)
+            usingEngine = true
+            return
+        }
         try startRecorder(url: url)
         do {
             try startSpeechTap()
@@ -182,7 +207,54 @@ final class AudioRecorder: @unchecked Sendable {
         try engine.start()
     }
 
+    private func startFeed(_ url: URL) throws {
+        let file = try AVAudioFile(forReading: url)
+        let format = file.processingFormat
+        guard let speechFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false
+        ), let converter = AVAudioConverter(from: format, to: speechFormat) else {
+            throw ExportError("Couldn't prepare the feed file.")
+        }
+        speechConverter = converter
+        self.speechFormat = speechFormat
+        // Same 1024-frame hop as the mic tap at 48 kHz (~21 ms).
+        let frames = AVAudioFrameCount(1024)
+        let interval = Double(frames) / format.sampleRate
+        let timer = DispatchSource.makeTimerSource(queue: captureQueue)
+        let begin = CACurrentMediaTime()
+        var fed = 0.0
+        timer.schedule(deadline: .now(), repeating: interval, leeway: .milliseconds(2))
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            // Catch up on lateness so the feed stays real time on average.
+            while fed <= CACurrentMediaTime() - begin {
+                guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else { return }
+                if file.framePosition < file.length {
+                    try? file.read(into: buffer, frameCount: frames)
+                }
+                if buffer.frameLength < frames {
+                    // Past the end: pad with silence like a quiet room.
+                    let start = Int(buffer.frameLength)
+                    buffer.frameLength = frames
+                    for channel in 0..<Int(format.channelCount) {
+                        if let data = buffer.floatChannelData?[channel] {
+                            (data + start).update(repeating: 0, count: Int(frames) - start)
+                        }
+                    }
+                }
+                self.capture(buffer)
+                fed += interval
+            }
+        }
+        feedTimer = timer
+        timer.resume()
+    }
+
     private func tearDownEngine() {
+        if let feedTimer {
+            feedTimer.cancel()
+            self.feedTimer = nil
+        }
         let touched = tapInstalled || engine.isRunning
         if tapInstalled {
             engine.inputNode.removeTap(onBus: 0)
@@ -207,6 +279,9 @@ final class AudioRecorder: @unchecked Sendable {
         let floats = Self.floats(from: speech)
         guard !floats.isEmpty else { return }
         let level = Self.unitLevel(floats)
+        Self.stampLock.lock()
+        if Self.firstBufferAt == 0 { Self.firstBufferAt = CACurrentMediaTime() }
+        Self.stampLock.unlock()
         sampleLock.lock()
         speechSamples.append(contentsOf: floats)
         Self.trimSpeechSamplesIfNeeded(

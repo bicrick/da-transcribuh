@@ -28,6 +28,10 @@ final class ClipboardHistoryController {
         }
     }
 
+    func checkPasteboardNow() {
+        watcher.checkNow()
+    }
+
     func remove() {
         watcher.stop()
         store.onOwnWriteEnded = nil
@@ -90,6 +94,8 @@ final class ClipboardHistoryController {
     /// Returns whether the pasteboard write succeeded (paste is skipped on failure).
     @discardableResult
     func pick(_ item: ClipboardItem, paste: Bool) -> Bool {
+        let settings = AppSettings.shared
+        let shouldPaste = paste && settings.clipboardPasteAutomatically
         store.beginOwnWrite()
         defer { store.endOwnWrite() }
 
@@ -97,7 +103,11 @@ final class ClipboardHistoryController {
         switch item.kind {
         case .text:
             let text = item.text ?? ""
-            wrote = SessionClipboard.writeTranscript(text, to: .general)
+            wrote = SessionClipboard.writeClipboardText(
+                text,
+                plainOnly: settings.clipboardPasteWithoutFormatting,
+                to: .general
+            )
         case .image:
             if let image = store.image(for: item),
                let tiff = image.tiffRepresentation,
@@ -112,7 +122,7 @@ final class ClipboardHistoryController {
             wrote = board.writeObjects(urls)
         }
 
-        if paste, wrote {
+        if shouldPaste, wrote {
             PasteFollowUp.shared.simulateCommandV()
         }
         return wrote

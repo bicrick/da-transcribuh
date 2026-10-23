@@ -23,7 +23,12 @@ struct HistoryPage: View {
     }
 
     private var selected: SessionSummary? {
-        let rows = matches
+        selected(in: matches)
+    }
+
+    /// Rows pass the filtered list in once; the old per-row `selected` refiltered
+    /// every session for every row (O(n²) per body).
+    private func selected(in rows: [SessionSummary]) -> SessionSummary? {
         if let selectedID, let match = rows.first(where: { $0.id == selectedID }) {
             return match
         }
@@ -39,10 +44,10 @@ struct HistoryPage: View {
             }
         }
         .inkPageChrome()
-        .onAppear {
-            reload()
-            syncSelection()
-        }
+        // No reload here: SettingsRoot already loads on appear / show /
+        // sessionsChanged, and a second decode of every session.json on each
+        // tab switch was pure repeat work.
+        .onAppear { syncSelection() }
         .onChange(of: query) { _, _ in syncSelection() }
         .onChange(of: sessions.count) { _, _ in syncSelection() }
         .onChange(of: focusSearch) { _, wants in
@@ -100,19 +105,24 @@ struct HistoryPage: View {
     }
 
     private var logTable: some View {
-        VStack(spacing: 0) {
+        let rows = matches
+        let selectedRowID = selected(in: rows)?.id
+        return VStack(spacing: 0) {
             logHeader
-            if matches.isEmpty {
+            if rows.isEmpty {
                 Text("No matches")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
                     .padding(Ink.rowHPad)
             } else {
-                DTScrollView {
+                // Lazy DTScrollView: native SwiftUI scrolling underneath, so the
+                // LazyVStack builds only visible rows (430 sessions took 2.4 s when
+                // every row was built), with the Ink rail in the reserved gutter.
+                DTScrollView(lazy: true) {
                     LazyVStack(spacing: 0) {
-                        ForEach(matches) { session in
-                            logRow(session)
+                        ForEach(rows) { session in
+                            logRow(session, isSelected: session.id == selectedRowID)
                         }
                     }
                 }
@@ -159,9 +169,8 @@ struct HistoryPage: View {
             .padding(.leading, Ink.space2)
     }
 
-    private func logRow(_ session: SessionSummary) -> some View {
-        let isSelected = selected?.id == session.id
-        return HStack(spacing: 0) {
+    private func logRow(_ session: SessionSummary, isSelected: Bool) -> some View {
+        HStack(spacing: 0) {
             Button {
                 selectedID = session.id
             } label: {
@@ -287,10 +296,15 @@ struct HistoryPage: View {
 
     private func whenText(for session: SessionSummary) -> String {
         guard let started = session.started else { return session.id }
+        return Self.whenFormatter.string(from: started)
+    }
+
+    /// One formatter for every row (creating one per row showed in traces).
+    private static let whenFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d HH:mm"
-        return formatter.string(from: started)
-    }
+        return formatter
+    }()
 
     private func longTitle(for session: SessionSummary) -> String {
         guard let started = session.started else { return session.id }

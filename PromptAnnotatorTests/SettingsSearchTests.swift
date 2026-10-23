@@ -5,7 +5,7 @@ final class SettingsSearchTests: XCTestCase {
     func testCatalogIncludesEveryPage() {
         let pages = Set(SettingsSearch.catalog.filter { $0.kind == .page }.map(\.page))
         XCTAssertEqual(pages, Set(SettingsPage.tabOrder))
-        XCTAssertEqual(SettingsPage.tabOrder.count, 7)
+        XCTAssertEqual(SettingsPage.tabOrder.count, 8)
     }
 
     func testSettingTitleJumpsToGeneral() {

@@ -4,6 +4,7 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
     case home
     case appearance
     case history
+    case clipboard
     case configuration
     case sound
     case model
@@ -16,6 +17,7 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         case .home: return "Home"
         case .appearance: return "Appearance"
         case .history: return "History"
+        case .clipboard: return "Clipboard"
         // Compact folder-tab label.
         case .configuration: return "General"
         case .sound: return "Sound"
@@ -38,6 +40,7 @@ enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         case .home: return "house"
         case .appearance: return "paintpalette"
         case .history: return "clock"
+        case .clipboard: return "doc.on.clipboard"
         case .configuration: return "gearshape"
         case .sound: return "speaker.wave.2"
         case .model: return "waveform"

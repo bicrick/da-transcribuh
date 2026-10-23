@@ -265,6 +265,8 @@ struct ModelPage: View {
                             .foregroundStyle(Ink.secondary)
                         SecureField("sk-…", text: $openAIKeyDraft)
                             .textFieldStyle(.plain)
+                            .font(Ink.optionFont)
+                            .foregroundStyle(Ink.label)
                             .inkFieldStyle()
                             .onChange(of: openAIKeyDraft) { _, value in
                                 settings.setOpenAIAPIKey(value)
@@ -322,6 +324,8 @@ struct ModelPage: View {
                 .foregroundStyle(Ink.secondary)
             TextField(prompt, text: text)
                 .textFieldStyle(.plain)
+                .font(Ink.optionFont)
+                .foregroundStyle(Ink.label)
                 .inkFieldStyle()
         }
         .frame(maxWidth: .infinity, alignment: .leading)

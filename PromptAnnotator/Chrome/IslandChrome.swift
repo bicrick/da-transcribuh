@@ -332,6 +332,7 @@ final class IslandChromeMotion: ObservableObject {
     }
 
     private func tick() {
+        PerfSuite.pace("islandSlots")
         let now = CACurrentMediaTime()
         let delta = lastTick == 0 ? (1.0 / 60.0) : min(0.05, now - lastTick)
         lastTick = now

@@ -16,67 +16,111 @@ struct DTScrollView<Content: View>: View {
     var axes: Axis.Set = .vertical
     var showsIndicators: Bool = true
     var bottomInset: CGFloat = 0
+    /// Lazy mode hosts the content in a native SwiftUI `ScrollView` (system
+    /// scroller hidden) so a `LazyVStack` inside builds only the visible rows.
+    /// The default AppKit host sizes an `NSHostingView` to the content's full
+    /// fitting height, which builds every row of a lazy stack. The Ink rail,
+    /// gutter and drag are the same in both modes.
+    var lazy: Bool = false
     @ViewBuilder var content: () -> Content
 
-    @State private var geometry = DTScrollGeometry(contentHeight: 0, viewportHeight: 0, offset: 0)
-    @State private var hovering = false
-    @State private var dragging = false
-    @State private var visible = false
-    @State private var fadeTask: Task<Void, Never>?
-    @State private var scrollView: NSScrollView?
+    /// Scroller chrome lives in a reference model that only the rail observes.
+    /// Root cause of slow tab switches and scroll jank: geometry / hover /
+    /// flash were `@State` here, so every scroll tick or hover re-ran this
+    /// body → `updateNSView` → replaced the hosted root view and forced a full
+    /// synchronous content layout. `@State` holding a class does not observe it.
+    @State private var chrome = DTScrollChrome()
 
     var body: some View {
         HStack(alignment: .top, spacing: showsIndicators ? Ink.scrollerGutterGap : 0) {
-            DTAppKitScrollHost(
-                bottomInset: bottomInset,
-                geometry: $geometry,
-                scrollView: $scrollView,
-                onScroll: { flash() }
-            ) {
-                content()
+            Group {
+                if lazy {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        content()
+                            .padding(.bottom, bottomInset)
+                            .background(DTNativeScrollProbe(chrome: chrome))
+                    }
+                } else {
+                    DTAppKitScrollHost(
+                        bottomInset: bottomInset,
+                        chrome: chrome
+                    ) {
+                        content()
+                    }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if showsIndicators {
-                ZStack {
-                    Color.clear
-                    if geometry.needsScroller {
-                        // Track is full height of the scroll area (flush with
-                        // container top/bottom). Do not pad — scrollerInset gaps
-                        // were the root cause of short tracks after #24.
-                        DTScrollerRail(
-                            geometry: geometry,
-                            scrollView: scrollView,
-                            onDragging: { active in
-                                dragging = active
-                                if active { visible = true }
-                                else { flash() }
-                            }
-                        )
-                        .opacity((visible || hovering || dragging) ? 1 : 0.55)
-                        .animation(.easeOut(duration: 0.18), value: visible || hovering || dragging)
-                    }
-                }
-                .frame(width: Ink.scrollerWidth)
-                .frame(maxHeight: .infinity)
+                DTScrollerColumn(chrome: chrome)
             }
         }
         .onHover { isHovering in
-            hovering = isHovering
-            if isHovering { flash() }
+            chrome.setHovering(isHovering)
+        }
+    }
+}
+
+/// Scroll geometry + scroller visibility. Mutations re-render the rail only.
+@MainActor
+final class DTScrollChrome: ObservableObject {
+    @Published var geometry = DTScrollGeometry(contentHeight: 0, viewportHeight: 0, offset: 0)
+    @Published var visible = false
+    @Published private(set) var hovering = false
+    @Published private(set) var dragging = false
+    weak var scrollView: NSScrollView?
+    private var fadeTask: Task<Void, Never>?
+
+    var emphasized: Bool { visible || hovering || dragging }
+
+    func setHovering(_ value: Bool) {
+        if hovering != value { hovering = value }
+        if value { flash() }
+    }
+
+    func setDragging(_ active: Bool) {
+        if dragging != active { dragging = active }
+        if active {
+            if !visible { visible = true }
+        } else {
+            flash()
         }
     }
 
-    private func flash() {
-        visible = true
+    func flash() {
+        if !visible { visible = true }
         fadeTask?.cancel()
-        fadeTask = Task { @MainActor in
+        fadeTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 900_000_000)
-            guard !Task.isCancelled, !hovering, !dragging else { return }
+            guard let self, !Task.isCancelled, !self.hovering, !self.dragging else { return }
             withAnimation(.easeOut(duration: 0.25)) {
-                visible = false
+                self.visible = false
             }
         }
+    }
+}
+
+private struct DTScrollerColumn: View {
+    @ObservedObject var chrome: DTScrollChrome
+
+    var body: some View {
+        ZStack {
+            Color.clear
+            if chrome.geometry.needsScroller {
+                // Track is full height of the scroll area (flush with
+                // container top/bottom). Do not pad — scrollerInset gaps
+                // were the root cause of short tracks after #24.
+                DTScrollerRail(
+                    geometry: chrome.geometry,
+                    scrollView: chrome.scrollView,
+                    onDragging: { [weak chrome] active in chrome?.setDragging(active) }
+                )
+                .opacity(chrome.emphasized ? 1 : 0.55)
+                .animation(.easeOut(duration: 0.18), value: chrome.emphasized)
+            }
+        }
+        .frame(width: Ink.scrollerWidth)
+        .frame(maxHeight: .infinity)
     }
 }
 
@@ -86,36 +130,30 @@ private struct DTScrollerRail: View {
     var geometry: DTScrollGeometry
     var scrollView: NSScrollView?
     var onDragging: (Bool) -> Void
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         GeometryReader { geo in
             let trackH = max(geo.size.height, 1)
-            let thumbH = geometry.thumbHeight(trackH: trackH, minH: Ink.scrollerThumbMin)
-            let thumbY = geometry.thumbY(trackH: trackH, minH: Ink.scrollerThumbMin)
+            // Whole points keep the 2pt checks on device pixels at 1x and 2x.
+            let thumbH = geometry.thumbHeight(trackH: trackH, minH: Ink.scrollerThumbMin).rounded()
+            let thumbY = geometry.thumbY(trackH: trackH, minH: Ink.scrollerThumbMin).rounded()
 
             ZStack(alignment: .top) {
+                // Track: flat Paint gray with the ink border.
                 Rectangle()
-                    .fill(Ink.window)
+                    .fill(Ink.scrollerTrack)
                     .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
-                    .overlay {
-                        DTDitherGrip()
-                            .opacity(0.28)
-                            .clipShape(Rectangle())
-                    }
                     .allowsHitTesting(false)
-
-                Rectangle()
-                    .fill(Ink.label)
-                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
+                // Thumb: "missing texture" checkerboard, one cached tile, tiled by the GPU.
+                Image(nsImage: DTCheckerTile.image(dark: scheme == .dark))
+                    .resizable(resizingMode: .tile)
+                    .interpolation(.none)
                     .frame(height: thumbH)
+                    .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
                     .offset(y: thumbY)
                     .allowsHitTesting(false)
-
-                DTScrollDragSurface(
-                    geometry: geometry,
-                    scrollView: scrollView,
-                    onDragging: onDragging
-                )
+                DTScrollDragSurface(geometry: geometry, scrollView: scrollView, onDragging: onDragging)
             }
         }
         .frame(width: Ink.scrollerWidth)
@@ -123,13 +161,45 @@ private struct DTScrollerRail: View {
     }
 }
 
+/// 2x2 checker tile (each check `Ink.scrollerCheck` pt) built once per appearance.
+/// Drawn with integer rects so it stays crisp at every backing scale.
+enum DTCheckerTile {
+    private static let light = make(a: Ink.scrollerCheckLightA, b: Ink.scrollerCheckLightB)
+    private static let dark = make(a: Ink.scrollerCheckDarkA, b: Ink.scrollerCheckDarkB)
+
+    static func image(dark isDark: Bool) -> NSImage { isDark ? dark : light }
+
+    private static func make(a: NSColor, b: NSColor) -> NSImage {
+        let c = Ink.scrollerCheck
+        let image = NSImage(size: NSSize(width: c * 2, height: c * 2))
+        // Explicit 1x and 2x bitmaps: no resampling, so checks land on whole pixels.
+        for scale in [1, 2] {
+            let px = Int(c) * 2 * scale
+            guard let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+            ) else { continue }
+            rep.size = image.size
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+            a.setFill()
+            NSRect(x: 0, y: 0, width: c * 2, height: c * 2).fill()
+            b.setFill()
+            NSRect(x: c, y: 0, width: c, height: c).fill()
+            NSRect(x: 0, y: c, width: c, height: c).fill()
+            NSGraphicsContext.restoreGraphicsState()
+            image.addRepresentation(rep)
+        }
+        return image
+    }
+}
+
 // MARK: - AppKit scroll host
 
 private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
     var bottomInset: CGFloat
-    @Binding var geometry: DTScrollGeometry
-    @Binding var scrollView: NSScrollView?
-    var onScroll: () -> Void
+    var chrome: DTScrollChrome
     @ViewBuilder var content: () -> Content
 
     func makeCoordinator() -> Coordinator {
@@ -138,22 +208,30 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
 
     func makeNSView(context: Context) -> DTScrollHostView {
         let host = DTScrollHostView()
+        context.coordinator.inViewUpdate = true
         context.coordinator.install(in: host)
+        context.coordinator.inViewUpdate = false
         // Synchronous — drag surface must see the scroll view on first paint.
-        scrollView = host.scrollView
+        chrome.scrollView = host.scrollView
         return host
     }
 
     func updateNSView(_ nsView: DTScrollHostView, context: Context) {
         context.coordinator.parent = self
+        context.coordinator.inViewUpdate = true
         context.coordinator.updateContent(content(), bottomInset: bottomInset)
-        if scrollView !== nsView.scrollView {
-            scrollView = nsView.scrollView
+        context.coordinator.inViewUpdate = false
+        if chrome.scrollView !== nsView.scrollView {
+            chrome.scrollView = nsView.scrollView
         }
     }
 
+    @MainActor
     final class Coordinator: NSObject {
         var parent: DTAppKitScrollHost
+        /// True inside make/updateNSView — publishing then would mutate
+        /// observed state during a SwiftUI view update.
+        var inViewUpdate = false
         private var hosting: NSHostingView<AnyView>?
         private weak var document: DTFlippedDocumentView?
         private weak var observedClip: NSClipView?
@@ -195,14 +273,38 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
                 document.widthAnchor.constraint(equalTo: clip.widthAnchor),
             ])
             attach(to: host.scrollView)
-            relayoutAndPublish(from: host.scrollView)
+            // Not laid out here: the host has no window and no width yet, so
+            // a synchronous pass measured the whole page at the wrong width
+            // and then again once it landed (do it later, not twice).
+            scheduleRelayout(from: host.scrollView)
         }
 
         func updateContent(_ content: Content, bottomInset: CGFloat) {
             hosting?.rootView = AnyView(content.padding(.bottom, bottomInset))
             hosting?.invalidateIntrinsicContentSize()
             guard let scroll = hosting?.enclosingScrollView else { return }
-            relayoutAndPublish(from: scroll)
+            scheduleRelayout(from: scroll)
+        }
+
+        private var relayoutScheduled = false
+
+        /// Coalesces relayouts to one per main-queue turn. A tab switch calls
+        /// updateNSView several times in a row and each one used to force a
+        /// full synchronous SwiftUI layout of the page.
+        private func scheduleRelayout(from scroll: NSScrollView) {
+            guard !relayoutScheduled else { return }
+            relayoutScheduled = true
+            DispatchQueue.main.async { [weak self, weak scroll] in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.relayoutScheduled = false
+                    // A page torn down by a tab switch still gets one last
+                    // updateNSView. Measuring it off-window was wasted work
+                    // billed to the next tab.
+                    guard let scroll, scroll.window != nil else { return }
+                    self.relayoutAndPublish(from: scroll)
+                }
+            }
         }
 
         func attach(to scroll: NSScrollView) {
@@ -256,11 +358,7 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
         }
 
         private func relayoutAndPublish(from scroll: NSScrollView) {
-            if let hosting {
-                hosting.invalidateIntrinsicContentSize()
-                hosting.layoutSubtreeIfNeeded()
-            }
-            document?.layoutSubtreeIfNeeded()
+            // One pass from the top covers document and hosting view too.
             scroll.layoutSubtreeIfNeeded()
             // Apply intrinsic height so frame matches content (AL can still
             // leave the document at clip height without an explicit size).
@@ -285,17 +383,15 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
             guard next != lastGeometry else { return }
             let scrolled = abs(next.offset - (lastGeometry?.offset ?? -1)) > 0.5
             lastGeometry = next
-            let apply = { [weak self] in
-                guard let self else { return }
-                self.parent.geometry = next
-                if scrolled {
-                    self.parent.onScroll()
-                }
+            let chrome = parent.chrome
+            let apply = {
+                chrome.geometry = next
+                if scrolled { chrome.flash() }
             }
-            if Thread.isMainThread {
-                apply()
-            } else {
+            if inViewUpdate || !Thread.isMainThread {
                 DispatchQueue.main.async(execute: apply)
+            } else {
+                apply()
             }
         }
 
@@ -416,8 +512,121 @@ private final class DTScrollDragNSView: NSView {
         let scrollable = geometry.scrollable
         let target = scrollable * fraction
         var bounds = clip.bounds
-        bounds.origin.y = target
+        // Lazy mode scrolls a SwiftUI-owned document. Handle an unflipped one too.
+        let flipped = scroll.documentView?.isFlipped ?? true
+        bounds.origin.y = flipped ? target : scrollable - target
         clip.setBoundsOrigin(bounds.origin)
         scroll.reflectScrolledClipView(clip)
     }
+}
+
+
+// MARK: - Lazy mode probe
+
+/// Sits behind the content of a native SwiftUI `ScrollView` and feeds the Ink
+/// rail from the backing `NSScrollView` (clip bounds for the offset, document
+/// frame for the content height). macOS 14 has no `onScrollGeometryChange`.
+private struct DTNativeScrollProbe: NSViewRepresentable {
+    let chrome: DTScrollChrome
+
+    func makeNSView(context: Context) -> ProbeView {
+        let view = ProbeView()
+        view.chrome = chrome
+        return view
+    }
+
+    func updateNSView(_ view: ProbeView, context: Context) {
+        view.chrome = chrome
+        view.bind()
+    }
+
+    final class ProbeView: NSView {
+        weak var chrome: DTScrollChrome?
+        private weak var observed: NSScrollView?
+        private var lastOffset: CGFloat = -1
+        private var pending = false
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            bind()
+        }
+
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            schedulePublish()
+        }
+
+        deinit { NotificationCenter.default.removeObserver(self) }
+
+        func bind() {
+            guard window != nil, let scroll = enclosingScrollView, scroll !== observed else { return }
+            NotificationCenter.default.removeObserver(self)
+            observed = scroll
+            scroll.hasVerticalScroller = false
+            scroll.hasHorizontalScroller = false
+            let clip = scroll.contentView
+            clip.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(boundsChanged(_:)),
+                name: NSView.boundsDidChangeNotification, object: clip
+            )
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(frameChanged(_:)),
+                name: NSView.frameDidChangeNotification, object: clip
+            )
+            if let doc = scroll.documentView {
+                doc.postsFrameChangedNotifications = true
+                NotificationCenter.default.addObserver(
+                    self, selector: #selector(frameChanged(_:)),
+                    name: NSView.frameDidChangeNotification, object: doc
+                )
+            }
+            chrome?.scrollView = scroll
+            schedulePublish()
+        }
+
+        @objc private func boundsChanged(_ note: Notification) { publish(scrolled: true) }
+        @objc private func frameChanged(_ note: Notification) { schedulePublish() }
+
+        /// Frame changes land inside SwiftUI layout. Publishing there would
+        /// mutate observed state during a view update, so hop once.
+        private func schedulePublish() {
+            guard !pending else { return }
+            pending = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.pending = false
+                self.publish(scrolled: false)
+            }
+        }
+
+        private func publish(scrolled: Bool) {
+            guard let scroll = observed, let chrome else { return }
+            let clip = scroll.contentView
+            let viewport = clip.bounds.height
+            let content = max(scroll.documentView?.frame.height ?? 0, frame.height)
+            let flipped = scroll.documentView?.isFlipped ?? true
+            let originY = flipped ? clip.bounds.origin.y : content - viewport - clip.bounds.origin.y
+            let geometry = DTScrollGeometry.fromFlippedClip(
+                contentHeight: content, viewportHeight: viewport, originY: originY
+            )
+            if geometry != chrome.geometry { chrome.geometry = geometry }
+            if chrome.scrollView !== scroll { chrome.scrollView = scroll }
+            if scrolled, abs(originY - lastOffset) > 0.5 { chrome.flash() }
+            lastOffset = originY
+            DTNativeScrollProbeStats.updates += 1
+            DTNativeScrollProbeStats.lastOffset = geometry.offset
+            DTNativeScrollProbeStats.lastContent = content
+        }
+    }
+}
+
+/// Read by PerfSuite to confirm the rail follows a lazy scroll.
+@MainActor
+enum DTNativeScrollProbeStats {
+    static var updates = 0
+    static var lastOffset: CGFloat = 0
+    static var lastContent: CGFloat = 0
 }

@@ -4,6 +4,7 @@ import SwiftUI
 extension Notification.Name {
     static let promptAnnotatorSettingsShown = Notification.Name("promptAnnotatorSettingsShown")
     static let promptAnnotatorSessionsChanged = Notification.Name("promptAnnotatorSessionsChanged")
+    static let promptAnnotatorSettingsSelectPage = Notification.Name("promptAnnotatorSettingsSelectPage")
 }
 
 struct SettingsRoot: View {
@@ -12,6 +13,8 @@ struct SettingsRoot: View {
     @StateObject private var permissions = PermissionModel()
     @State private var page: SettingsPage = .home
     @State private var sessions: [SessionSummary] = []
+    /// Reference box: stamping a reload must not re-render the window.
+    @State private var lastReloadAt = ReloadStamp()
     @State private var showPalette = false
     @State private var highlightTitle: String? = nil
     @State private var historyQuery = ""
@@ -19,11 +22,12 @@ struct SettingsRoot: View {
     @State private var selectHistoryID: String? = nil
 
     var body: some View {
+        let _ = PerfSuite.count("settingsRoot")
         ZStack {
             VStack(spacing: 0) {
                 DTTitleStrip()
 
-                SettingsFolderTabs(selection: $page) {
+                SettingsFolderTabs(selection: timedPage) {
                     showPalette = true
                 }
 
@@ -62,11 +66,24 @@ struct SettingsRoot: View {
             settings.appearance.applyToApp()
             SettingsPresenter.shared.applyChrome()
             reload()
+            if let pending = SettingsPresenter.shared.takePendingPage() {
+                page = pending
+            }
+            PerfHarness.runTabCycle { next in timedPage.wrappedValue = next }
+            SnapshotHarness.run { next in timedPage.wrappedValue = next }
         }
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSettingsShown)) { _ in
-            reload()
+            // First open fires onAppear and this notification back to back.
+            // Skip the second load (it decoded the library twice per open).
+            reloadUnlessRecent(0.5)
             permissions.refresh()
             SettingsPresenter.shared.applyChrome()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSettingsSelectPage)) { note in
+            _ = SettingsPresenter.shared.takePendingPage()
+            if let raw = note.object as? String, let next = SettingsPage(rawValue: raw) {
+                page = next
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSessionsChanged)) { _ in
             reload()
@@ -99,8 +116,27 @@ struct SettingsRoot: View {
         .accessibilityHidden(true)
     }
 
+    /// Tab selection that times each switch (PerfProbe "tab").
+    private var timedPage: Binding<SettingsPage> {
+        Binding(
+            get: { page },
+            set: { next in
+                guard next != page else { return }
+                PerfProbe.begin("tab", next.rawValue)
+                page = next
+            }
+        )
+    }
+
     @ViewBuilder
     private var detail: some View {
+        pageView
+            .onAppear { PerfProbe.endAfterCommit("tab") }
+            .id(page)
+    }
+
+    @ViewBuilder
+    private var pageView: some View {
         switch page {
         case .home:
             HomePage(
@@ -125,6 +161,8 @@ struct SettingsRoot: View {
             )
         case .appearance:
             AppearancePage(settings: settings, session: session)
+        case .clipboard:
+            ClipboardPage(settings: settings)
         case .configuration:
             ConfigurationPage(settings: settings)
         case .sound:
@@ -211,9 +249,23 @@ struct SettingsRoot: View {
         }
     }
 
-    private func reload() {
-        sessions = SessionLibrary.load()
+    private func reloadUnlessRecent(_ window: CFTimeInterval) {
+        if CACurrentMediaTime() - lastReloadAt.value < window { return }
+        reload()
     }
+
+    private func reload() {
+        let started = CACurrentMediaTime()
+        lastReloadAt.value = started
+        sessions = SessionLibrary.load()
+        if PerfHarness.isEnabled {
+            PerfSuite.log(String(format: "reload sessions=%d ms=%.1f", sessions.count, (CACurrentMediaTime() - started) * 1000))
+        }
+    }
+}
+
+final class ReloadStamp {
+    var value: CFTimeInterval = 0
 }
 
 @MainActor
@@ -240,6 +292,22 @@ final class SettingsPresenter {
         NotificationCenter.default.post(name: .promptAnnotatorSettingsShown, object: nil)
     }
 
+    /// Page requested before SettingsRoot exists. On a cold open the root
+    /// is not subscribed yet when the notification below posts, so it reads
+    /// this on appear instead (root cause of "Preferences… lands on Home").
+    private var pendingPage: SettingsPage?
+
+    func show(page: SettingsPage) {
+        pendingPage = page
+        show()
+        NotificationCenter.default.post(name: .promptAnnotatorSettingsSelectPage, object: page.rawValue)
+    }
+
+    func takePendingPage() -> SettingsPage? {
+        defer { pendingPage = nil }
+        return pendingPage
+    }
+
     private func ensure() -> NSWindow {
         if let window { return window }
         let root = SettingsRoot()
@@ -261,7 +329,7 @@ final class SettingsPresenter {
         window.backgroundColor = Ink.windowNSColor
         window.contentView = host
         window.setContentSize(NSSize(width: 1040, height: 700))
-        // Wide enough for all seven folder tabs without truncation.
+        // Wide enough for all eight folder tabs without truncation.
         window.minSize = NSSize(width: 980, height: 600)
         window.center()
         self.window = window

@@ -22,29 +22,39 @@ struct HomePage: View {
     private var isNarrow: Bool { HomeBentoLayout.isNarrow(contentWidth: contentWidth) }
 
     var body: some View {
-        DTScrollView {
-            VStack(alignment: .leading, spacing: Ink.sectionGap) {
-                hero
-                bentoBody
-            }
-            .padding(.top, Ink.pageTop)
-            .padding(.horizontal, Ink.pageSide)
-            .padding(.bottom, Ink.pageBottom)
-            // One content column: same max as other Settings pages so hero divider
-            // and bento edges share one alignment.
-            .frame(maxWidth: Ink.maxContentWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .background {
-                GeometryReader { geo in
-                    Color.clear.preference(
-                        key: HomeContentWidthKey.self,
-                        value: geo.size.width
-                    )
+        let _ = PerfSuite.count("homePage")
+        // Home is a one-screen dashboard. The page is sized to the visible
+        // viewport so the middle row (Recent + This Week) absorbs the spare
+        // height. Below `HomeFitLayout.minimumHeight` it falls back to scrolling.
+        // The Get Started checklist is taller, so it keeps its natural height.
+        GeometryReader { viewport in
+            let fitHeight = max(viewport.size.height, HomeFitLayout.minimumHeight)
+            DTScrollView {
+                VStack(alignment: .leading, spacing: HomeFitLayout.heroGap) {
+                    hero
+                    bentoBody
+                        .frame(maxHeight: showGetStarted ? nil : .infinity, alignment: .top)
                 }
-            }
-            .onPreferenceChange(HomeContentWidthKey.self) { width in
-                if width > 1, abs(width - contentWidth) > 0.5 {
-                    contentWidth = width
+                .padding(.top, HomeFitLayout.pageTop)
+                .padding(.horizontal, Ink.pageSide)
+                .padding(.bottom, HomeFitLayout.pageBottom)
+                // One content column: same max as other Settings pages so hero divider
+                // and bento edges share one alignment.
+                .frame(maxWidth: Ink.maxContentWidth, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .frame(height: showGetStarted ? nil : fitHeight, alignment: .top)
+                .background {
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: HomeContentWidthKey.self,
+                            value: geo.size.width
+                        )
+                    }
+                }
+                .onPreferenceChange(HomeContentWidthKey.self) { width in
+                    if width > 1, abs(width - contentWidth) > 0.5 {
+                        contentWidth = width
+                    }
                 }
             }
         }
@@ -70,55 +80,54 @@ struct HomePage: View {
         }
     }
 
-    // MARK: - Hero (unchanged)
+    // MARK: - Hero
 
+    /// One header row: mark + wordmark + live status on the left, the
+    /// shortcut and Start on the right. It used to be two rows split by a
+    /// divider (about 110pt); now it is one (about 48pt).
     private var hero: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: Ink.space4) {
-                AppLogo(side: 48)
-                DTWordmark(size: 20)
-                Spacer(minLength: 0)
-            }
-
-            HStack(alignment: .center, spacing: Ink.space3) {
-                HStack(spacing: Ink.space2) {
+        HStack(alignment: .center, spacing: Ink.space3) {
+            AppLogo(side: 36)
+            VStack(alignment: .leading, spacing: 3) {
+                DTWordmark(size: 18)
+                HStack(spacing: 6) {
                     Rectangle()
                         .fill(Ink.record)
                         .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
-                        .frame(width: 10, height: 10)
+                        .frame(width: 8, height: 8)
                     Text(startRowTitle)
-                        .font(Ink.labelFont)
-                        .foregroundStyle(Ink.label)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .lineLimit(1)
                 }
-                Spacer(minLength: Ink.space2)
-                HomeChordEditor(settings: settings)
-                Button {
-                    session.toggle()
-                } label: {
-                    HStack(spacing: Ink.space2) {
-                        Rectangle()
-                            .fill(Ink.record)
-                            .overlay(Rectangle().strokeBorder(Ink.onPrimary, lineWidth: Ink.stroke))
-                            .frame(width: 8, height: 8)
-                        Text(session.phase == .recording ? "Stop" : "Start")
-                            .font(Ink.buttonFont)
-                    }
-                }
-                .buttonStyle(InkPrimaryButtonStyle(large: true, enabled: !session.isBusy))
-                .background(
+            }
+            Spacer(minLength: Ink.space2)
+            HomeChordEditor(settings: settings)
+            Button {
+                session.toggle()
+            } label: {
+                HStack(spacing: Ink.space2) {
                     Rectangle()
-                        .fill(Ink.paintRed)
-                        .offset(x: Ink.bevelOffset, y: Ink.bevelOffset)
-                )
-                .disabled(session.isBusy)
-                .accessibilityLabel(session.phase == .recording ? "Stop session" : "Start session")
-                .accessibilityHint("Shortcut \(settings.chord.display)")
+                        .fill(Ink.record)
+                        .overlay(Rectangle().strokeBorder(Ink.onPrimary, lineWidth: Ink.stroke))
+                        .frame(width: 8, height: 8)
+                    Text(session.phase == .recording ? "Stop" : "Start")
+                        .font(Ink.buttonFont)
+                }
             }
-            .padding(.top, Ink.space5)
-            .overlay(alignment: .top) {
-                Rectangle().fill(Ink.hairline).frame(height: 1)
-                    .padding(.top, Ink.space4)
-            }
+            .buttonStyle(InkPrimaryButtonStyle(large: true, enabled: !session.isBusy))
+            .background(
+                Rectangle()
+                    .fill(Ink.paintRed)
+                    .offset(x: Ink.bevelOffset, y: Ink.bevelOffset)
+            )
+            .disabled(session.isBusy)
+            .accessibilityLabel(session.phase == .recording ? "Stop session" : "Start session")
+            .accessibilityHint("Shortcut \(settings.chord.display)")
+        }
+        .padding(.bottom, Ink.space3)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Ink.hairline).frame(height: 1)
         }
     }
 
@@ -127,14 +136,17 @@ struct HomePage: View {
     private var bentoBody: some View {
         VStack(alignment: .leading, spacing: cellGap) {
             statsRow
+                .fixedSize(horizontal: false, vertical: true)
             if showGetStarted {
                 HomeBentoCell(title: "GET STARTED") {
                     checklist
                 }
             } else {
                 recentAndWeekRow
+                    .frame(maxHeight: .infinity)
             }
             actionsAndStatusRow
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -175,13 +187,14 @@ struct HomePage: View {
 
     private func statCell(value: Int, label: String) -> some View {
         HomeBentoCell(title: label.uppercased(), compact: true) {
-            VStack(alignment: .leading, spacing: Ink.space2) {
+            HStack(alignment: .lastTextBaseline, spacing: Ink.space2) {
                 Text(value.formatted(.number.grouping(.automatic)))
-                    .font(Ink.numberFont)
+                    .font(HomeFitLayout.statFont)
                     .monospacedDigit()
                     .foregroundStyle(Ink.label)
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
+                Spacer(minLength: 0)
                 Rectangle()
                     .fill(Ink.statRule)
                     .frame(width: 28, height: 3)
@@ -211,14 +224,15 @@ struct HomePage: View {
                     thisWeekCell
                         .frame(minWidth: 220, maxWidth: 220, maxHeight: .infinity, alignment: .topLeading)
                 }
-                // Stretch both cells to the taller sibling (RECENT).
-                .fixedSize(horizontal: false, vertical: true)
+                // Both cells fill the height Home gives this row.
             }
         }
     }
 
+    /// Shows as many rows as fit the cell. At the default window that is 5;
+    /// a taller window shows more, up to `HomeFitLayout.recentMax`.
     private var recentCell: some View {
-        let rows = SessionLibrary.recent(sessions, limit: 4)
+        let rows = SessionLibrary.recent(sessions, limit: HomeFitLayout.recentMax)
         return HomeBentoCell(
             title: "RECENT",
             trailing: AnyView(
@@ -233,12 +247,21 @@ struct HomePage: View {
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .padding(.vertical, Ink.space2)
-            } else {
+            } else if isNarrow {
                 VStack(spacing: 0) {
-                    ForEach(rows) { summary in
-                        recentRow(summary)
+                    ForEach(rows.prefix(4)) { summary in recentRow(summary) }
+                }
+            } else {
+                GeometryReader { box in
+                    let fit = HomeFitLayout.recentRowsThatFit(height: box.size.height)
+                    let rowHeight = HomeFitLayout.recentRowHeight(
+                        height: box.size.height, fit: fit, available: rows.count
+                    )
+                    VStack(spacing: 0) {
+                        ForEach(rows.prefix(fit)) { summary in recentRow(summary, height: rowHeight) }
                     }
                 }
+                .frame(minHeight: HomeFitLayout.recentRowHeight * 2)
             }
         }
     }
@@ -301,7 +324,9 @@ struct HomePage: View {
         }
     }
 
-    /// Row 3: two action cells; status caption lives under the capture cell (least clutter).
+    /// Row 3: Capture and Folder as one-line strips. They were full cells
+    /// with a 48pt glyph and a paragraph (about 190pt tall) and were cut
+    /// off at the default window. The long capture copy moved to a tooltip.
     private var actionsAndStatusRow: some View {
         Group {
             if isNarrow {
@@ -316,53 +341,43 @@ struct HomePage: View {
                     folderActionCell
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
-                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
     private var captureActionCell: some View {
-        HomeBentoCell(title: "CAPTURE") {
-            VStack(alignment: .leading, spacing: Ink.space2) {
-                actionGlyph("viewfinder")
-                Text("Talk, or drag to capture")
-                    .font(Ink.labelFont)
-                    .foregroundStyle(Ink.label)
-                    .lineLimit(2)
-                Text("Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.")
-                    .font(Ink.captionFont)
-                    .foregroundStyle(Ink.secondary)
-                    .lineLimit(4)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .layoutPriority(-1)
-                statusCaption
-                    .padding(.top, Ink.space2)
-            }
+        HomeStripCell(title: "CAPTURE", glyph: actionGlyph("viewfinder")) {
+            Text("Talk, or hold Shift and drag")
+                .font(Ink.labelFont)
+                .foregroundStyle(Ink.label)
+                .lineLimit(1)
+            statusCaption
         }
+        .help("Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.")
     }
 
     private var folderActionCell: some View {
-        HomeBentoCell(title: "FOLDER") {
-            VStack(alignment: .leading, spacing: Ink.space2) {
-                actionGlyph("folder.fill")
-                Text("Sessions folder")
-                    .font(Ink.labelFont)
-                    .foregroundStyle(Ink.label)
-                    .lineLimit(1)
-                Text(SessionStore.displayPath())
-                    .font(Ink.captionFont)
-                    .foregroundStyle(Ink.secondary)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
-                    .layoutPriority(-1)
+        HomeStripCell(
+            title: "FOLDER",
+            glyph: actionGlyph("folder.fill"),
+            trailing: AnyView(
                 Button("Show") {
                     if let root = try? SessionPaths.sessionsRoot() {
                         NSWorkspace.shared.open(root)
                     }
                 }
                 .buttonStyle(InkSecondaryButtonStyle())
-                .padding(.top, Ink.space1)
-            }
+            )
+        ) {
+            Text("Sessions folder")
+                .font(Ink.labelFont)
+                .foregroundStyle(Ink.label)
+                .lineLimit(1)
+            Text(SessionStore.displayPath())
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
         }
     }
 
@@ -373,11 +388,11 @@ struct HomePage: View {
             Rectangle()
                 .strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke)
             Image(systemName: symbol)
-                .font(.system(size: Ink.tipSymbolPointSize, weight: .black))
+                .font(.system(size: 15, weight: .black))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(Ink.onTile)
         }
-        .frame(width: Ink.tipIconSize, height: Ink.tipIconSize)
+        .frame(width: HomeFitLayout.stripGlyph, height: HomeFitLayout.stripGlyph)
     }
 
     private var statusCaption: some View {
@@ -387,6 +402,7 @@ struct HomePage: View {
                     Circle()
                         .fill(Ink.paintRed)
                         .frame(width: 7, height: 7)
+                    // Two lines, never truncated. The strip grows and Recent gives up the space.
                     Text(issue.message)
                         .font(Ink.captionFont)
                         .foregroundStyle(Ink.label)
@@ -400,8 +416,7 @@ struct HomePage: View {
                 Text(homeStatusOK)
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.tertiary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
             }
         }
         .accessibilityElement(children: .combine)
@@ -409,7 +424,10 @@ struct HomePage: View {
 
     // MARK: - Recent row
 
-    private func recentRow(_ summary: SessionSummary) -> some View {
+    private func recentRow(
+        _ summary: SessionSummary,
+        height: CGFloat = HomeFitLayout.recentRowHeight
+    ) -> some View {
         let hovering = hoveredRecentID == summary.id
         return HStack(alignment: .center, spacing: Ink.space2) {
             Button {
@@ -448,7 +466,7 @@ struct HomePage: View {
 
             recentThumb(summary)
         }
-        .padding(.vertical, Ink.space2)
+        .frame(height: height)
         .onHover { over in
             if over {
                 hoveredRecentID = summary.id
@@ -468,7 +486,7 @@ struct HomePage: View {
     private func recentThumb(_ summary: SessionSummary) -> some View {
         let side: CGFloat = 28
         if let url = SessionLibrary.thumbnailURL(for: summary),
-           let image = NSImage(contentsOf: url) {
+           let image = HomeThumbCache.image(at: url) {
             Image(nsImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
@@ -744,6 +762,75 @@ enum HomeBentoLayout {
     }
 }
 
+/// Home's one-screen budget. Values are points.
+enum HomeFitLayout {
+    static let pageTop: CGFloat = 20
+    static let pageBottom: CGFloat = 20
+    static let heroGap: CGFloat = Ink.space4
+    static let statFont = Ink.mono(22)
+    static let stripGlyph: CGFloat = 32
+    static let recentRowHeight: CGFloat = 40
+    static let recentMax = 12
+    /// Below this the page scrolls instead of squeezing (hero, stats, strip,
+    /// and a Recent cell with two rows).
+    static let minimumHeight: CGFloat = 440
+
+    static func recentRowsThatFit(height: CGFloat) -> Int {
+        guard height.isFinite, height > 0 else { return 1 }
+        return min(recentMax, max(1, Int((height + 0.5) / recentRowHeight)))
+    }
+
+    /// When the list fills the cell, stretch rows to share the leftover height
+    /// so the last divider lands on the cell floor instead of leaving a gap.
+    static func recentRowHeight(height: CGFloat, fit: Int, available: Int) -> CGFloat {
+        guard available >= fit, fit > 0, height.isFinite, height > 0 else { return recentRowHeight }
+        return max(recentRowHeight, (height / CGFloat(fit)).rounded(.down))
+    }
+}
+
+/// One-line Paint strip: glyph, small title, two lines of copy, optional trailing control.
+private struct HomeStripCell<Content: View>: View {
+    var title: String
+    var glyph: AnyView
+    var trailing: AnyView? = nil
+    @ViewBuilder var content: () -> Content
+
+    init<G: View>(title: String, glyph: G, trailing: AnyView? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.glyph = AnyView(glyph)
+        self.trailing = trailing
+        self.content = content
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: Ink.space3) {
+            glyph
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(Ink.headingFont)
+                    .foregroundStyle(Ink.label)
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let trailing { trailing }
+        }
+        .padding(.horizontal, Ink.space3)
+        .padding(.vertical, Ink.space2 + 2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(Ink.front)
+        .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
+        .background(
+            Rectangle()
+                .fill(Ink.bevel)
+                .offset(x: Ink.bevelOffset, y: Ink.bevelOffset)
+        )
+        .padding(.trailing, Ink.bevelOffset)
+        .padding(.bottom, Ink.bevelOffset)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(title.capitalized)
+    }
+}
+
 /// Paint/Ink bordered cell: `Ink.front` face, 1pt label border, subtle bevel offset.
 private struct HomeBentoCell<Content: View>: View {
     var title: String
@@ -788,5 +875,23 @@ final class PermissionModel: ObservableObject {
 
     func refresh() {
         status = Permissions.current()
+    }
+}
+
+/// Recent-row thumbnails were decoded from disk in `body` on every render.
+/// Thumbnails are written once per session, so cache by path.
+@MainActor
+enum HomeThumbCache {
+    private static let cache: NSCache<NSURL, NSImage> = {
+        let cache = NSCache<NSURL, NSImage>()
+        cache.countLimit = 64
+        return cache
+    }()
+
+    static func image(at url: URL) -> NSImage? {
+        if let hit = cache.object(forKey: url as NSURL) { return hit }
+        guard let image = NSImage(contentsOf: url) else { return nil }
+        cache.setObject(image, forKey: url as NSURL)
+        return image
     }
 }

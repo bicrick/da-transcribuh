@@ -32,6 +32,7 @@ struct PromptAnnotatorApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        PerfSuite.launchMark("didFinishLaunching")
         // Fonts before any chrome paints — Departure Mono for every wordmark / label.
         InkFontRegistrar.registerBundledFonts()
         guard !Runtime.isUnitTest else { return }
@@ -44,6 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let settings = AppSettings.shared
         HotkeyCenter.shared.install(settings.chord)
+        PerfHarness.runPanelCycle()
+        VerifyNavHarness.run()
+        PanelSnapshotHarness.run()
         HotkeyCenter.shared.applyCancel(settings.cancelChord)
         settings.onAppChange = {
             SettingsPresenter.shared.applyChrome()
@@ -61,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             OnboardingPresenter.shared.show()
         }
+        PerfSuite.start()
         // Let the menu bar / welcome window paint before Core ML prewarm competes for CPU.
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 450_000_000)
@@ -79,8 +84,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        defer { ClipboardHistoryStore.flushPendingWrites() }
         HotkeyCenter.shared.remove()
         MainActor.assumeIsolated {
+            if AppSettings.shared.clipboardClearOnQuit {
+                ClipboardHistoryStore.shared.clearHistoryFully(
+                    clearSystem: AppSettings.shared.clipboardClearSystemClipboard
+                )
+            }
             PasteFollowUp.shared.remove()
             ClipboardHistoryController.shared.remove()
         }

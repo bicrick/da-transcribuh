@@ -15,7 +15,8 @@ struct PerformancePage: View {
             subtitle: "Memory this app is using right now, including the model after it loads."
         ) {
             LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: Ink.gridGap), GridItem(.flexible(), spacing: Ink.gridGap)],
+                // Three across so the dashboard fits the default window (2x2 overflowed by ~34pt).
+                columns: Array(repeating: GridItem(.flexible(), spacing: Ink.gridGap), count: 3),
                 spacing: Ink.gridGap
             ) {
                 memoryTile(

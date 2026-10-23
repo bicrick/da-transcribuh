@@ -79,6 +79,23 @@ final class AppSettings: ObservableObject {
     @Published var clipboardHistoryEnabled: Bool
     @Published var clipboardChord: HotkeyChord
     @Published var clipboardHistoryLimit: Int
+    @Published var clipboardPasteAutomatically: Bool = true
+    @Published var clipboardPasteWithoutFormatting: Bool = false
+    @Published var clipboardSaveFiles: Bool = true
+    @Published var clipboardSaveImages: Bool = true
+    @Published var clipboardSaveText: Bool = true
+    @Published var clipboardSortMode: ClipboardSortMode = .lastCopy
+    @Published var clipboardPopupPosition: ClipboardPopupPosition = .cursor
+    @Published var clipboardPinEdge: ClipboardPinEdge = .top
+    @Published var clipboardImageHeight: Double = 40
+    @Published var clipboardPreviewDelayMs: Int = 400
+    @Published var clipboardShowSearchField: Bool = true
+    @Published var clipboardShowFooter: Bool = true
+    @Published var clipboardIgnoredApps: [String] = []
+    @Published var clipboardIgnoreConcealed: Bool = true
+    @Published var clipboardCapturePaused: Bool = false
+    @Published var clipboardClearOnQuit: Bool = false
+    @Published var clipboardClearSystemClipboard: Bool = false
     @Published var pushToTalk: Bool
     @Published var islandStyle: IslandStyle
     @Published var soundEnabled: Bool
@@ -112,7 +129,7 @@ final class AppSettings: ObservableObject {
     /// Fired after the speech engine or model selection changes so the session can reload.
     var onSpeechSelectionChange: (() -> Void)?
 
-    private let defaults: UserDefaults
+    let defaults: UserDefaults
     private var isLoading = false
 
     var defaultColor: InkColor {
@@ -168,6 +185,7 @@ final class AppSettings: ObservableObject {
         openAIBaseURL = OpenAICompatibleTranscriber.storedBaseURL(defaults: defaults)
         openAIModel = OpenAICompatibleTranscriber.storedModel(defaults: defaults)
         loginItemNote = nil
+        loadClipboardPreferences()
         isLoading = false
         appearance.applyToApp()
     }
@@ -451,17 +469,17 @@ final class AppSettings: ObservableObject {
         persist(Keys.color, color.name)
     }
 
-    private func persist(_ key: String, _ value: String) {
+    func persist(_ key: String, _ value: String) {
         guard !isLoading else { return }
         defaults.set(value, forKey: key)
     }
 
-    private func persist(_ key: String, _ value: Bool) {
+    func persist(_ key: String, _ value: Bool) {
         guard !isLoading else { return }
         defaults.set(value, forKey: key)
     }
 
-    private func persist(_ key: String, _ value: Double) {
+    func persist(_ key: String, _ value: Double) {
         guard !isLoading else { return }
         defaults.set(value, forKey: key)
     }

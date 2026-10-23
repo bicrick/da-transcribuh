@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ImageIO
 
 /// Disk-backed clipboard history: JSON index + image files under Application Support.
 @MainActor
@@ -19,6 +20,16 @@ final class ClipboardHistoryStore: ObservableObject {
     var historyLimitOverride: Int?
 
     private let fileManager = FileManager.default
+    private let imageCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 6
+        return cache
+    }()
+    private let thumbnailCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 200
+        return cache
+    }()
     private var folderURL: URL
     private var indexURL: URL
     private var imagesURL: URL
@@ -33,11 +44,30 @@ final class ClipboardHistoryStore: ObservableObject {
     }
 
     static func defaultFolder() -> URL {
+        if let override = PerfSuite.clipboardRootOverride { return override }
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return support.appendingPathComponent("PromptAnnotator/ClipboardHistory", isDirectory: true)
     }
 
     func beginOwnWrite() { suppressWatcher += 1 }
+
+    /// Harness only (`-DTPerfSeedClipboard`, temp store): every third item is an image.
+    func perfSeed(count: Int) {
+        historyLimitOverride = max(count, historyLimit)
+        var index = items.count
+        while items.count < count {
+            index += 1
+            if index % 3 == 0 {
+                let png = PerfSuite.syntheticPNG(width: 1200, height: 760, seed: index)
+                ingest(kind: .image, source: .pasteboard, text: nil, imagePNG: png, filePaths: nil,
+                       fingerprint: ClipboardFingerprint.image(png), applicationName: "Perf")
+            } else {
+                let text = "item \(index) " + String(repeating: "the quick brown fox \(index % 17) ", count: 1 + index % 40)
+                ingest(kind: .text, source: .pasteboard, text: text, imagePNG: nil, filePaths: nil,
+                       fingerprint: ClipboardFingerprint.text(text), applicationName: "Perf")
+            }
+        }
+    }
 
     func endOwnWrite() {
         let previous = suppressWatcher
@@ -159,6 +189,7 @@ final class ClipboardHistoryStore: ObservableObject {
 
     func orderedForDisplay(filter: String) -> [ClipboardItem] {
         let q = filter.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let settings = AppSettings.shared
         let base = items
         let filtered: [ClipboardItem]
         if q.isEmpty {
@@ -168,22 +199,151 @@ final class ClipboardHistoryStore: ObservableObject {
                 $0.previewLine.lowercased().contains(q)
                     || ($0.text?.lowercased().contains(q) ?? false)
                     || ($0.applicationName?.lowercased().contains(q) ?? false)
+                    || ($0.pinTitle?.lowercased().contains(q) ?? false)
             }
         }
+        let pinFirst = settings.clipboardPinEdge == .top
+        let mode = settings.clipboardSortMode
         return filtered.sorted { lhs, rhs in
-            if lhs.pinned != rhs.pinned { return lhs.pinned && !rhs.pinned }
-            return lhs.lastCopiedAt > rhs.lastCopiedAt
+            if lhs.pinned != rhs.pinned {
+                return pinFirst ? (lhs.pinned && !rhs.pinned) : (!lhs.pinned && rhs.pinned)
+            }
+            switch mode {
+            case .lastCopy: return lhs.lastCopiedAt > rhs.lastCopiedAt
+            case .firstCopy: return lhs.firstCopiedAt > rhs.firstCopiedAt
+            case .copyCount: return lhs.copyCount > rhs.copyCount
+            }
         }
     }
 
+    /// Full-size image for the preview. Cached: the panel body asks again on every
+    /// selection change, and re-reading PNGs from disk per arrow press cost ~58ms.
     func image(for item: ClipboardItem) -> NSImage? {
         guard let name = item.imageFileName else { return nil }
-        return NSImage(contentsOf: imagesURL.appendingPathComponent(name))
+        let key = name as NSString
+        if let hit = imageCache.object(forKey: key) { return hit }
+        guard let image = NSImage(contentsOf: imagesURL.appendingPathComponent(name)) else { return nil }
+        imageCache.setObject(image, forKey: key)
+        return image
+    }
+
+    // Row thumbnails are downsampled once with ImageIO to `maxHeight` points at 2x,
+    // so list rows never decode or rescale a full screenshot while scrolling.
+
+    /// Cache-only lookup: never touches disk.
+    func cachedThumbnail(for item: ClipboardItem, maxHeight: CGFloat) -> NSImage? {
+        guard let name = item.imageFileName else { return nil }
+        return thumbnailCache.object(forKey: Self.thumbnailKey(name, maxHeight) as NSString)
+    }
+
+    /// Decodes off the main thread and caches. The panel builds every row on first
+    /// open (DTScrollView measures its LazyVStack in full), and decoding ~70
+    /// thumbnails synchronously there was most of a ~700 ms first open.
+    func loadThumbnail(for item: ClipboardItem, maxHeight: CGFloat) async -> NSImage? {
+        if let hit = cachedThumbnail(for: item, maxHeight: maxHeight) { return hit }
+        guard let request = thumbnailRequest(for: item, maxHeight: maxHeight) else { return nil }
+        let image = await Task.detached(priority: .userInitiated) {
+            Self.decodeThumbnail(request)
+        }.value
+        if let image {
+            thumbnailCache.setObject(image, forKey: request.key as NSString)
+        }
+        return image
+    }
+
+    struct ThumbnailRequest: Sendable {
+        var url: URL
+        var maxHeight: CGFloat
+        var key: String
+    }
+
+    private func thumbnailRequest(for item: ClipboardItem, maxHeight: CGFloat) -> ThumbnailRequest? {
+        guard let name = item.imageFileName else { return nil }
+        return ThumbnailRequest(
+            url: imagesURL.appendingPathComponent(name),
+            maxHeight: maxHeight,
+            key: Self.thumbnailKey(name, maxHeight)
+        )
+    }
+
+    private nonisolated static func thumbnailKey(_ name: String, _ maxHeight: CGFloat) -> String {
+        "\(name)@\(Int(maxHeight))"
+    }
+
+    nonisolated static func decodeThumbnail(_ request: ThumbnailRequest) -> NSImage? {
+        guard let source = CGImageSourceCreateWithURL(request.url as CFURL, nil) else { return nil }
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let pixelW = (props?[kCGImagePropertyPixelWidth] as? CGFloat) ?? 0
+        let pixelH = (props?[kCGImagePropertyPixelHeight] as? CGFloat) ?? 0
+        let scale = pixelH > 0 ? min(1, (request.maxHeight * 2) / pixelH) : 1
+        let maxPixel = max(1, max(pixelW, pixelH) * scale)
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return nil
+        }
+        return NSImage(cgImage: cg, size: NSSize(width: CGFloat(cg.width) / 2, height: CGFloat(cg.height) / 2))
+    }
+
+    /// History folder (index + images). Read-only for off-main measurement.
+    var storageFolder: URL { folderURL }
+
+    /// Approximate on-disk size of the history folder (index + images).
+    func diskUsageBytes() -> Int64 {
+        Self.diskUsageBytes(at: folderURL)
+    }
+
+    /// Directory walk; safe off the main actor (touches only the file system).
+    nonisolated static func diskUsageBytes(at folder: URL) -> Int64 {
+        let fileManager = FileManager.default
+        var total: Int64 = 0
+        let urls = (try? fileManager.contentsOfDirectory(
+            at: folder,
+            includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        for url in urls {
+            if let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey]),
+               values.isDirectory == true {
+                let nested = (try? fileManager.contentsOfDirectory(
+                    at: url,
+                    includingPropertiesForKeys: [.fileSizeKey],
+                    options: [.skipsHiddenFiles]
+                )) ?? []
+                for child in nested {
+                    if let size = try? child.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                        total += Int64(size)
+                    }
+                }
+            } else if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                total += Int64(size)
+            }
+        }
+        return total
+    }
+
+    func updatePinMetadata(id: UUID, title: String?, key: String?) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items[index].pinTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let trimmed = key?.trimmingCharacters(in: .whitespacesAndNewlines)
+        items[index].pinKey = trimmed.flatMap { $0.isEmpty ? nil : String($0.prefix(1)).uppercased() }
+        persist()
+    }
+
+    func clearHistoryFully(clearSystem: Bool) {
+        clearHistory(keepingPinned: false)
+        if clearSystem {
+            NSPasteboard.general.clearContents()
+        }
     }
 
     // MARK: - Persistence
 
     private func load() {
+        Self.flushPendingWrites()
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let data = try? Data(contentsOf: indexURL),
@@ -195,13 +355,29 @@ final class ClipboardHistoryStore: ObservableObject {
         sortPinnedFirst()
     }
 
+    /// One serial queue for every store, so writes land in order and a store that
+    /// loads the same folder sees the last write (`load` waits on it).
+    nonisolated static let persistQueue = DispatchQueue(label: "clipboard.persist", qos: .utility)
+
+    /// Encodes and writes the index off the main thread. The pretty-printed,
+    /// sorted-keys encode of a 200-item index ran on main after every copy.
     private func persist() {
-        try? fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        guard let data = try? encoder.encode(items) else { return }
-        try? data.write(to: indexURL, options: .atomic)
+        let snapshot = items
+        let folder = folderURL
+        let index = indexURL
+        Self.persistQueue.async {
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            guard let data = try? encoder.encode(snapshot) else { return }
+            try? data.write(to: index, options: .atomic)
+        }
+    }
+
+    /// Blocks until queued index writes are on disk (quit, tests).
+    nonisolated static func flushPendingWrites() {
+        persistQueue.sync {}
     }
 
     private func trimToLimit() {
@@ -223,6 +399,10 @@ final class ClipboardHistoryStore: ObservableObject {
             return lhs.lastCopiedAt > rhs.lastCopiedAt
         }
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
 // MARK: - Fingerprints (testable, pure)

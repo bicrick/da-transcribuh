@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // MARK: - Wordmark (lowercase name only — no trailing block cursor)
@@ -211,8 +212,7 @@ struct InkKeycap: View {
     var compact: Bool = false
 
     var body: some View {
-        Text(label)
-            .font(compact ? Ink.keycapCompactFont : Ink.keycapFont)
+        keycapLabel
             .foregroundStyle(Ink.label)
             .padding(.horizontal, compact ? 6 : 7)
             .frame(minWidth: compact ? 22 : 26, minHeight: compact ? 22 : 26)
@@ -226,6 +226,18 @@ struct InkKeycap: View {
                     .fill(Ink.bevel)
                     .offset(y: Ink.bevelOffset)
             )
+    }
+
+    @ViewBuilder
+    private var keycapLabel: some View {
+        let point: CGFloat = compact ? 11 : 13
+        if let glyph = InkMissingGlyph(label) {
+            InkMissingGlyphView(glyph: glyph)
+                .frame(width: point, height: point)
+        } else {
+            Text(label)
+                .font(compact ? Ink.keycapCompactFont : Ink.keycapFont)
+        }
     }
 }
 
@@ -435,15 +447,18 @@ struct InkProgressBar: View {
     }
 }
 
+/// Square Paint radio: 2pt ink box, solid square dot when selected.
 struct InkRadio: View {
     var selected: Bool
 
     var body: some View {
         ZStack {
-            Circle()
+            Rectangle()
+                .fill(Ink.field)
+            Rectangle()
                 .strokeBorder(Ink.label, lineWidth: Ink.stroke)
             if selected {
-                Circle()
+                Rectangle()
                     .fill(Ink.label)
                     .frame(width: 7, height: 7)
             }
@@ -565,6 +580,10 @@ struct InkSlider: View {
     @Binding var value: Double
     var range: ClosedRange<Double> = 0...1
     var enabled: Bool = true
+    /// Snap to this increment (nil = continuous).
+    var step: Double? = nil
+    /// VoiceOver value. Defaults to a percent of the range.
+    var accessibilityText: ((Double) -> String)? = nil
 
     var body: some View {
         GeometryReader { geo in
@@ -591,37 +610,61 @@ struct InkSlider: View {
                     .onChanged { drag in
                         guard enabled else { return }
                         let t = min(1, max(0, drag.location.x / width))
-                        value = range.lowerBound + Double(t) * (range.upperBound - range.lowerBound)
+                        set(range.lowerBound + Double(t) * (range.upperBound - range.lowerBound))
                     }
             )
         }
         .frame(height: 16)
         .opacity(enabled ? 1 : 0.45)
         .allowsHitTesting(enabled)
-        .accessibilityValue(Text("\(Int((value * 100).rounded())) percent"))
+        .accessibilityElement()
+        .accessibilityValue(Text(accessibilityValue))
+        .accessibilityAdjustableAction { direction in
+            let delta = step ?? (range.upperBound - range.lowerBound) / 20
+            switch direction {
+            case .increment: set(value + delta)
+            case .decrement: set(value - delta)
+            @unknown default: break
+            }
+        }
+    }
+
+    private var accessibilityValue: String {
+        if let accessibilityText { return accessibilityText(value) }
+        let fraction = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
+        return "\(Int((fraction * 100).rounded())) percent"
+    }
+
+    private func set(_ raw: Double) {
+        var next = min(range.upperBound, max(range.lowerBound, raw))
+        if let step, step > 0 {
+            next = range.lowerBound + ((next - range.lowerBound) / step).rounded() * step
+            next = min(range.upperBound, next)
+        }
+        if next != value { value = next }
     }
 }
 
 /// Menu-style picker with Ink chrome (avoids system Form / blue).
+///
+/// Opens an AppKit menu whose items carry Departure Mono attributed titles,
+/// so the open list matches the closed Paint button instead of the system font.
 struct InkMenuPicker<Selection: Hashable>: View {
     var title: String
     @Binding var selection: Selection
     var options: [(Selection, String)]
 
+    @State private var anchor = InkMenuAnchor()
+
     var body: some View {
-        Menu {
-            ForEach(options, id: \.0) { option in
-                Button {
-                    selection = option.0
-                } label: {
-                    HStack {
-                        Text(option.1)
-                        if selection == option.0 {
-                            Image(systemName: "checkmark")
-                        }
-                    }
+        Button {
+            anchor.popUp(
+                options: options.map { ($0.1, $0.0 == selection) },
+                onPick: { index in
+                    guard options.indices.contains(index) else { return }
+                    selection = options[index].0
                 }
-            }
+            )
         } label: {
             HStack(spacing: Ink.space2) {
                 Text(labelText)
@@ -639,14 +682,71 @@ struct InkMenuPicker<Selection: Hashable>: View {
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
                     .strokeBorder(Ink.label, lineWidth: Ink.stroke)
             )
+            .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
+        .buttonStyle(.plain)
+        .background(InkMenuAnchorView(anchor: anchor))
         .accessibilityLabel(title)
+        .accessibilityValue(labelText)
     }
 
     private var labelText: String {
         options.first(where: { $0.0 == selection })?.1 ?? title
     }
+}
+
+/// Holds the AppKit view the Paint menu pops up under.
+@MainActor
+final class InkMenuAnchor {
+    weak var view: NSView?
+
+    func popUp(options: [(String, Bool)], onPick: @escaping (Int) -> Void) {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let font = InkFontRegistrar.resolveNSFont(size: 12)
+        let target = InkMenuTarget(onPick: onPick)
+        for (index, option) in options.enumerated() {
+            let item = NSMenuItem(title: option.0, action: #selector(InkMenuTarget.pick(_:)), keyEquivalent: "")
+            item.attributedTitle = NSAttributedString(string: option.0, attributes: [.font: font])
+            item.target = target
+            item.tag = index
+            item.state = option.1 ? .on : .off
+            menu.addItem(item)
+        }
+        menu.minimumWidth = view?.bounds.width ?? 0
+        // `popUp` tracks synchronously, so `target` outlives the menu session.
+        if let view {
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.height + 4), in: view)
+        } else {
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        }
+        withExtendedLifetime(target) {}
+    }
+}
+
+private final class InkMenuTarget: NSObject {
+    let onPick: (Int) -> Void
+    init(onPick: @escaping (Int) -> Void) { self.onPick = onPick }
+    @objc func pick(_ sender: NSMenuItem) { onPick(sender.tag) }
+}
+
+private struct InkMenuAnchorView: NSViewRepresentable {
+    let anchor: InkMenuAnchor
+
+    func makeNSView(context: Context) -> NSView {
+        let view = InkFlippedAnchorNSView()
+        anchor.view = view
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        anchor.view = nsView
+    }
+}
+
+private final class InkFlippedAnchorNSView: NSView {
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// Title / detail / trailing control — shared settings row.

@@ -27,6 +27,9 @@ enum Ink {
     static let meter = label
     static let secondary = color(light: "#666666", dark: "#A8A8AD")
     static let tertiary = color(light: "#999999", dark: "#7A7A80")
+    /// Soft list selection (clipboard / future tables). Hard black/white stay on bevels only.
+    static let rowSelect = color(light: "#E6E6E6", dark: "#454548")
+    static let rowHover = color(light: "#F0F0F0", dark: "#3F3F42")
     /// Selected tab + content front pane (slightly above window).
     static let front = color(light: "#FFFFFF", dark: "#3A3A3D")
     /// Cards / raised panels.
@@ -167,6 +170,17 @@ enum Ink {
     /// Dedicated track width inside the reserved gutter (content never draws under it).
     static let scrollerWidth: CGFloat = 10
     static let scrollerThumbMin: CGFloat = 24
+    /// Checker size on the "missing texture" thumb. 2pt = 4px at 2x, so the 6pt
+    /// face inside the 2pt border holds exactly three checks across.
+    static let scrollerCheck: CGFloat = 2
+    /// Flat Paint gray track (light silver, darker graphite gray in dark).
+    static let scrollerTrack = color(light: "#C3C3C3", dark: "#66666B")
+    /// Thumb checks. Light: white + light gray under a black outline.
+    static let scrollerCheckLightA = nsColor(hex: "#FFFFFF")
+    static let scrollerCheckLightB = nsColor(hex: "#D4D4D4")
+    /// Dark: mid gray + graphite under a light outline.
+    static let scrollerCheckDarkA = nsColor(hex: "#8E8E93")
+    static let scrollerCheckDarkB = nsColor(hex: "#5C5C60")
     /// Gap between scroll content and the track.
     static let scrollerGutterGap: CGFloat = 4
     /// Total trailing gutter reserved beside content (`gap + track`).
@@ -201,6 +215,8 @@ enum Ink {
     static let wordmarkFont = mono(12)
     static let buttonFont = labelFont
     static let buttonSmallFont = mono(11)
+    /// Radio / stepper / slider value text.
+    static let optionFont = mono(12)
     static let keycapFont = labelFont
     static let keycapCompactFont = mono(11)
     static let badgeFont = mono(11)
@@ -215,7 +231,7 @@ enum Ink {
     /// Always wraps the upright `NSFont` so SwiftUI cannot re-apply a synthetic oblique face.
     static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         _ = weight
-        return Font(InkFontRegistrar.resolveNSFont(size: size))
+        return InkMonoCache.font(size: size)
     }
 
     static var monoIsRegistered: Bool {
@@ -256,5 +272,30 @@ enum Ink {
             let match = appearance.bestMatch(from: [.darkAqua, .aqua])
             return match == .darkAqua ? nsColor(hex: "#2C2C2E") : nsColor(hex: "#FFFFFF")
         })
+    }
+}
+
+/// `Ink.mono` is called from many view bodies. Resolving the descriptor +
+/// cascade list each time was redundant work, so cache per point size once
+/// Departure Mono is registered (fallbacks are not cached, so a late
+/// registration still wins).
+private enum InkMonoCache {
+    private static let lock = NSLock()
+    private static var fonts: [CGFloat: Font] = [:]
+
+    static func font(size: CGFloat) -> Font {
+        lock.lock()
+        if let hit = fonts[size] {
+            lock.unlock()
+            return hit
+        }
+        lock.unlock()
+        let font = Font(InkFontRegistrar.resolveNSFont(size: size))
+        if InkFontRegistrar.isDepartureAvailable {
+            lock.lock()
+            fonts[size] = font
+            lock.unlock()
+        }
+        return font
     }
 }

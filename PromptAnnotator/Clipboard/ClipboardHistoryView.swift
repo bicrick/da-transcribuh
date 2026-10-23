@@ -4,56 +4,58 @@ import SwiftUI
 /// Maccy-structured clipboard panel in Paint ink (Departure Mono, square, 2pt stroke).
 struct ClipboardHistoryView: View {
     @ObservedObject var store: ClipboardHistoryStore
+    @ObservedObject private var settings = AppSettings.shared
     var onPick: (ClipboardItem, Bool) -> Void
     var onClose: () -> Void
     var onOpenPreferences: () -> Void = {
         ClipboardHistoryPanelController.shared.hide()
-        SettingsPresenter.shared.show()
+        SettingsPresenter.shared.show(page: .clipboard)
     }
+    var onPreview: (ClipboardItem?) -> Void = { _ in }
 
     @State private var filter = ""
     @State private var selection: UUID?
     @State private var hovered: UUID?
-    @State private var previewItem: ClipboardItem?
     @State private var previewTask: Task<Void, Never>?
+    /// Bumped on each keyboard move so only that move scrolls the selection into view
+    /// (hover selection must never scroll the list under the pointer).
+    @State private var revealToken = 0
+    @State private var revealOnSelect = false
     @FocusState private var searchFocused: Bool
 
     /// Maccy Popup-ish width; Paint chrome around it.
     static let preferredSize = CGSize(width: 450, height: 480)
     private let rowHeight: CGFloat = 22
-    private let imageMaxHeight: CGFloat = 40
+    private var imageMaxHeight: CGFloat { CGFloat(settings.clipboardImageHeight) }
     private let hPad: CGFloat = 5
 
     private var rows: [ClipboardItem] {
         store.orderedForDisplay(filter: filter)
     }
 
-    private var pinnedRows: [ClipboardItem] { rows.filter(\.pinned) }
-    private var unpinnedRows: [ClipboardItem] { rows.filter { !$0.pinned } }
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            Rectangle().fill(Ink.label).frame(height: Ink.stroke)
+            if settings.clipboardShowSearchField {
+                header
+                Rectangle().fill(Ink.label).frame(height: Ink.stroke)
+            }
             listBody
-            Rectangle().fill(Ink.hairline).frame(height: 1)
-            footer
-        }
-        .frame(width: Self.preferredSize.width, height: Self.preferredSize.height)
-        .background(Ink.front)
-        .inkDoublePane(cornerRadius: 0, fill: Ink.front)
-        .overlay(alignment: .trailing) {
-            if let previewItem {
-                ClipboardPreviewPopover(item: previewItem, image: store.image(for: previewItem))
-                    .offset(x: Self.preferredSize.width / 2 + 8)
+            if settings.clipboardShowFooter {
+                Rectangle().fill(Ink.hairline).frame(height: 1)
+                footer
             }
         }
+        .frame(width: Self.preferredSize.width, height: Self.preferredSize.height)
+        .background(Ink.front.opacity(0.95))
+        .inkDoublePane(cornerRadius: 0, fill: Ink.front.opacity(0.95))
         .onAppear {
             searchFocused = true
             selection = rows.first?.id
             schedulePreview(for: selection)
         }
         .onChange(of: filter) { _, _ in
+            PerfProbe.endAfterDisplay("type")
             selection = rows.first?.id
             schedulePreview(for: selection)
         }
@@ -62,13 +64,14 @@ struct ClipboardHistoryView: View {
         }
         .onDisappear {
             previewTask?.cancel()
-            previewItem = nil
+            onPreview(nil)
         }
         .background(KeyboardMonitor(
             onMove: moveSelection,
             onReturn: { option in confirm(paste: !option) },
             onEscape: handleEscape,
             onDigit: pickDigit,
+            onPinKey: pickPinKey,
             onPin: pinSelected,
             onDelete: deleteSelected,
             onClear: { store.clearHistory(keepingPinned: true) },
@@ -120,7 +123,13 @@ struct ClipboardHistoryView: View {
                 .foregroundStyle(Ink.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            DTScrollView {
+            // Order once per body (was three sorts per selection change).
+            let all = rows
+            let pinnedRows = all.filter(\.pinned)
+            let unpinnedRows = all.filter { !$0.pinned }
+            // Lazy: only visible rows are built on open. Selection moves one row at a
+            // time, and LazyVStack keeps the next row built, so the reveal anchor exists.
+            DTScrollView(lazy: true) {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(pinnedRows.enumerated()), id: \.element.id) { index, item in
                         row(item, shortcutIndex: index)
@@ -142,32 +151,37 @@ struct ClipboardHistoryView: View {
 
     private func row(_ item: ClipboardItem, shortcutIndex: Int) -> some View {
         let selected = item.id == selection
-        let fg = selected ? Ink.window : Ink.label
-        let bg = selected ? Ink.label : Color.clear
-        // Click selects; double-click pastes (Enter / ⌘1–9 also paste) — Maccy plan.
+        let hovering = item.id == hovered
+        let bg: Color = selected ? Ink.rowSelect : (hovering ? Ink.rowHover : Color.clear)
+        // Click pastes + dismisses (Maccy). ⌥Enter keeps open via keyboard path.
         return HStack(spacing: 6) {
-            rowBody(item, foreground: fg)
+            rowBody(item, foreground: Ink.label)
             Spacer(minLength: 0)
             if shortcutIndex < 9 {
-                Text("⌘\(shortcutIndex + 1)")
+                Text(item.pinKey.map { "⌥\($0)" } ?? "⌘\(shortcutIndex + 1)")
                     .font(Ink.mono(10))
-                    .foregroundStyle(selected ? Ink.window.opacity(0.7) : Ink.secondary.opacity(0.7))
+                    .foregroundStyle(Ink.secondary.opacity(0.7))
             }
         }
         .padding(.horizontal, hPad + 4)
         .frame(height: item.kind == .image ? max(rowHeight, imageMaxHeight + 4) : rowHeight)
-        .background(bg)
+        // Short color ease so hover / arrow highlight glides instead of snapping.
+        // A color fade is not motion, so it stays on with Reduce Motion.
+        .background {
+            Rectangle()
+                .fill(bg)
+                .animation(.easeOut(duration: 0.09), value: bg)
+        }
+        .background(SelectionRevealAnchor(token: selected && revealOnSelect ? revealToken : nil))
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
+        .onTapGesture {
             selection = item.id
             onPick(item, true)
         }
-        .onTapGesture(count: 1) {
-            selection = item.id
-        }
-        .onHover { hovering in
-            if hovering {
+        .onHover { isHovering in
+            if isHovering {
                 hovered = item.id
+                revealOnSelect = false
                 selection = item.id
             } else if hovered == item.id {
                 hovered = nil
@@ -179,18 +193,7 @@ struct ClipboardHistoryView: View {
     private func rowBody(_ item: ClipboardItem, foreground: Color) -> some View {
         switch item.kind {
         case .image:
-            if let image = store.image(for: item) {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxHeight: imageMaxHeight)
-                    .frame(maxWidth: 120, alignment: .leading)
-            } else {
-                Rectangle()
-                    .fill(Ink.fill)
-                    .frame(width: 40, height: 28)
-                    .overlay(Rectangle().strokeBorder(foreground, lineWidth: 1))
-            }
+            ClipboardThumbnail(store: store, item: item, maxHeight: imageMaxHeight)
         case .text, .fileURL:
             Text(middleTruncated(item.previewLine))
                 .font(Ink.mono(12))
@@ -224,9 +227,7 @@ struct ClipboardHistoryView: View {
                     .font(Ink.mono(12))
                     .foregroundStyle(Ink.label)
                 Spacer(minLength: 0)
-                Text(shortcut)
-                    .font(Ink.mono(11))
-                    .foregroundStyle(Ink.secondary)
+                InkGlyphString(text: shortcut, size: 11, color: Ink.secondary)
             }
             .padding(.horizontal, Ink.space3)
             .padding(.vertical, 5)
@@ -239,12 +240,23 @@ struct ClipboardHistoryView: View {
 
     private func schedulePreview(for id: UUID?) {
         previewTask?.cancel()
-        previewItem = nil
-        guard let id, let item = rows.first(where: { $0.id == id }) else { return }
+        guard let id, let item = rows.first(where: { $0.id == id }) else {
+            onPreview(nil)
+            return
+        }
+        // Preview already up: swap its content in place. Hiding first made it
+        // re-slide on every arrow press.
+        if ClipboardPreviewPanelController.shared.isShowing {
+            onPreview(item)
+            return
+        }
+        let delay = UInt64(max(0, settings.clipboardPreviewDelayMs)) * 1_000_000
         previewTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 400_000_000)
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: delay)
+            }
             guard !Task.isCancelled, selection == id else { return }
-            previewItem = item
+            onPreview(item)
         }
     }
 
@@ -262,6 +274,8 @@ struct ClipboardHistoryView: View {
         let ids = rows.map(\.id)
         let idx = selection.flatMap { ids.firstIndex(of: $0) } ?? 0
         let next = min(max(idx + delta, 0), ids.count - 1)
+        revealOnSelect = true
+        revealToken &+= 1
         selection = ids[next]
     }
 
@@ -273,6 +287,16 @@ struct ClipboardHistoryView: View {
     private func pickDigit(_ n: Int) {
         guard n >= 1, n <= 9, rows.count >= n else { return }
         onPick(rows[n - 1], true)
+    }
+
+    /// ⌥{pinKey} pastes the pinned item that advertises that shortcut.
+    private func pickPinKey(_ key: String) -> Bool {
+        let needle = key.uppercased()
+        guard let item = rows.first(where: { $0.pinKey?.uppercased() == needle }) else {
+            return false
+        }
+        onPick(item, true)
+        return true
     }
 
     private func pinSelected() {
@@ -297,16 +321,70 @@ struct ClipboardHistoryView: View {
     }
 }
 
+// MARK: - Keyboard reveal
+
+/// Scrolls its row into view when `token` changes to a new non-nil value.
+/// Keyboard moves only. Eased 0.1s, instant with Reduce Motion.
+private struct SelectionRevealAnchor: NSViewRepresentable {
+    var token: Int?
+
+    func makeNSView(context: Context) -> AnchorView { AnchorView() }
+
+    func updateNSView(_ view: AnchorView, context: Context) {
+        guard let token, token != view.lastToken else { return }
+        view.lastToken = token
+        DispatchQueue.main.async { view.reveal() }
+    }
+
+    final class AnchorView: NSView {
+        var lastToken: Int?
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        func reveal() {
+            guard let scroll = enclosingScrollView, let doc = scroll.documentView else { return }
+            let clip = scroll.contentView
+            let row = convert(bounds, to: doc)
+            let visible = clip.bounds
+            let pad: CGFloat = 4
+            var y = visible.origin.y
+            if row.minY < visible.minY {
+                y = row.minY - pad
+            } else if row.maxY > visible.maxY {
+                y = row.maxY - visible.height + pad
+            } else {
+                return
+            }
+            let maxY = max(doc.frame.height - visible.height, 0)
+            let target = NSPoint(x: visible.origin.x, y: min(max(y, 0), maxY))
+            if PanelMotion.reduceMotion {
+                clip.setBoundsOrigin(target)
+                scroll.reflectScrolledClipView(clip)
+                return
+            }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.1
+                context.timingFunction = PanelMotion.easeOut
+                clip.animator().setBoundsOrigin(target)
+            }
+            scroll.reflectScrolledClipView(clip)
+        }
+    }
+}
+
 // MARK: - Preview popover
 
-private struct ClipboardPreviewPopover: View {
+struct ClipboardPreviewPopover: View {
     var item: ClipboardItem
     var image: NSImage?
 
+    /// Preview width. 280 truncated copy times ("Oct 22, 2026 at 4:34:4…").
+    static let width: CGFloat = 320
+
+    /// Localized date + time with seconds, e.g. "Oct 22, 2026 at 4:34:42 PM".
     private static let stamp: DateFormatter = {
         let f = DateFormatter()
-        f.dateStyle = .medium
-        f.timeStyle = .medium
+        f.setLocalizedDateFormatFromTemplate("yMMMdjmmss")
         return f
     }()
 
@@ -324,12 +402,10 @@ private struct ClipboardPreviewPopover: View {
             Text(item.pinned ? "Press ⌥P to unpin." : "Press ⌥P to pin.")
                 .font(Ink.mono(10))
                 .foregroundStyle(Ink.secondary)
-            Text("Press ⌥⌫ to delete.")
-                .font(Ink.mono(10))
-                .foregroundStyle(Ink.secondary)
+            InkGlyphString(text: "Press ⌥⌫ to delete.", size: 10, color: Ink.secondary)
         }
         .padding(Ink.space3)
-        .frame(width: 280, alignment: .leading)
+        .frame(width: Self.width, alignment: .leading)
         .background(Ink.front)
         .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: Ink.stroke))
         .background(
@@ -347,7 +423,7 @@ private struct ClipboardPreviewPopover: View {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: 248, maxHeight: 180)
+                    .frame(maxWidth: Self.width - 2 * Ink.space3, maxHeight: 180)
                     .frame(maxWidth: .infinity)
             }
         case .text, .fileURL:
@@ -364,10 +440,13 @@ private struct ClipboardPreviewPopover: View {
             Text(label)
                 .font(Ink.mono(10))
                 .foregroundStyle(Ink.secondary)
+                .fixedSize()
+            // Wrap instead of truncating if a value is still too long.
             Text(value)
                 .font(Ink.mono(10))
                 .foregroundStyle(Ink.label)
-                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -379,6 +458,8 @@ private struct KeyboardMonitor: NSViewRepresentable {
     var onReturn: (_ option: Bool) -> Void
     var onEscape: () -> Void
     var onDigit: (Int) -> Void
+    /// Returns true when an ⌥{char} pin shortcut was consumed.
+    var onPinKey: (String) -> Bool
     var onPin: () -> Void
     var onDelete: () -> Void
     var onClear: () -> Void
@@ -421,7 +502,16 @@ private struct KeyboardMonitor: NSViewRepresentable {
         }
 
         private func handle(_ event: NSEvent) -> Bool {
-            guard let handlers else { return false }
+            guard let handlers, let window else { return false }
+            // The local monitor is app-wide and outlives orderOut, so only act on
+            // keys aimed at the list or its preview. Otherwise Return in Settings
+            // could paste the hidden selection.
+            let target = event.window
+            let ours = target === window
+                || (target != nil && target === ClipboardPreviewPanelController.shared.window)
+            guard ours, window.isVisible else { return false }
+            // Swallow keys during the close fade so they cannot act on a closing list.
+            if ClipboardHistoryPanelController.shared.isClosing { return true }
             let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             // ⌃N / ⌃P
             if mods.contains(.control), !mods.contains(.command), !mods.contains(.option),
@@ -458,9 +548,19 @@ private struct KeyboardMonitor: NSViewRepresentable {
                 handlers.onDelete()
                 return true
             }
+            // Custom pin keys (⌥B etc.) after reserved ⌥P / ⌥⌫.
+            if mods.contains(.option), !mods.contains(.command),
+               let ch = event.charactersIgnoringModifiers, ch.count == 1,
+               handlers.onPinKey(ch) {
+                return true
+            }
             switch event.keyCode {
-            case 125: handlers.onMove(1); return true
-            case 126: handlers.onMove(-1); return true
+            case 125, 126:
+                // Arrow -> selection -> committed frame, logged as `dtperf move`.
+                PerfProbe.begin("move", event.keyCode == 125 ? "down" : "up")
+                handlers.onMove(event.keyCode == 125 ? 1 : -1)
+                PerfProbe.endAfterDisplay("move")
+                return true
             case 36, 76:
                 handlers.onReturn(mods.contains(.option))
                 return true
@@ -492,5 +592,33 @@ private struct ClipboardSearchGlyph: View {
             context.stroke(path, with: .foreground, lineWidth: stroke)
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// Row thumbnail: cache hit draws at once; a miss shows the placeholder and decodes off main.
+private struct ClipboardThumbnail: View {
+    let store: ClipboardHistoryStore
+    let item: ClipboardItem
+    let maxHeight: CGFloat
+    @State private var loaded: NSImage?
+
+    var body: some View {
+        if let image = loaded ?? store.cachedThumbnail(for: item, maxHeight: maxHeight) {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(height: maxHeight)
+                .frame(maxWidth: 120, alignment: .leading)
+                .clipped()
+        } else {
+            Rectangle()
+                .fill(Ink.fill)
+                .frame(width: 48, height: maxHeight)
+                .overlay(Rectangle().strokeBorder(Ink.hairline, lineWidth: 1))
+                .task(id: item.imageFileName) {
+                    loaded = await store.loadThumbnail(for: item, maxHeight: maxHeight)
+                }
+        }
     }
 }

@@ -81,6 +81,8 @@ final class SessionController: ObservableObject {
     private var lastOfferedPermissions: String?
     private var keepTranscribing = false
     private var speechTask: Task<Void, Never>?
+    /// True while the follow loop is inside a live decode (finish must not cancel it).
+    private var speechDecoding = false
     private var lastSpeechCount = 0
     private var silenceWatch = SilenceWatch()
     private var stopQueued = false
@@ -401,7 +403,8 @@ final class SessionController: ObservableObject {
             text = TranscriptText.leadingCapital(text)
         }
         pasteText = text
-        SessionClipboard.copy(image: image, transcript: text)
+        SessionClipboard.copy(image: image, transcript: text, to: PerfSuite.sessionPasteboard)
+        PerfSuite.markClipboardWritten()
     }
 
     /// Puts the last session back on the clipboard after something else overwrote it.
@@ -418,6 +421,8 @@ final class SessionController: ObservableObject {
     }
 
     private func deliverIfRequested() {
+        // Measurement runs never paste into whatever app is frontmost.
+        guard !PerfSuite.isolatesSession else { return }
         let skipping = skipNextPaste
         if skipNextPaste {
             skipNextPaste = false
@@ -459,10 +464,12 @@ final class SessionController: ObservableObject {
     private func startSpeechFollow() {
         speechTask?.cancel()
         keepTranscribing = true
+        // Ablation: `-DTPerfLive NO` decodes only at stop.
+        guard !PerfSuite.liveDecodeDisabled else { return }
         // Stays on the main actor (SessionController is @MainActor). Cancel + throwing sleep
         // so a new follow cannot resurrect after cancel/finish.
         speechTask = Task { @MainActor in
-            while !Task.isCancelled {
+            while !Task.isCancelled, keepTranscribing {
                 do {
                     try await Task.sleep(nanoseconds: 250_000_000)
                 } catch {
@@ -473,6 +480,8 @@ final class SessionController: ObservableObject {
                 guard count >= lastSpeechCount + 16_000 else { continue }
                 let buffer = audio.copySpeechBuffer()
                 lastSpeechCount = buffer.absoluteCount
+                speechDecoding = true
+                defer { speechDecoding = false }
                 await transcriber.consume(
                     samples: buffer.samples,
                     bufferStart: buffer.timeOffset,
@@ -761,7 +770,9 @@ final class SessionController: ObservableObject {
             let audioFile = folder.appendingPathComponent("audio.m4a")
             startedAt = Date()
             let preferences = AppSettings.shared
-            AudioInputs.beginSession(uid: preferences.inputDeviceUID, raiseVolume: preferences.raiseInputVolume)
+            if AudioRecorder.feedURL == nil {
+                AudioInputs.beginSession(uid: preferences.inputDeviceUID, raiseVolume: preferences.raiseInputVolume)
+            }
             try audio.start(url: audioFile)
             directory = folder
             audioURL = audioFile
@@ -826,6 +837,10 @@ final class SessionController: ObservableObject {
         }
     }
 
+    /// Harness entry points (`PerfSuite`).
+    func perfBegin() async { await begin() }
+    func perfFinish() async { await finish() }
+
     private func finish() async {
         guard phase == .recording else { return }
         PushToTalk.shared.disarm()
@@ -881,10 +896,19 @@ final class SessionController: ObservableObject {
             }
         }
         keepTranscribing = false
+        PerfSuite.stopMark("captures")
+        // Wake the follow loop out of its 250 ms sleep at once, but never cancel an
+        // in-flight live decode: cancelling it threw away that chunk (a longer final
+        // pass) and let a cut-short decode leak filler words ("you you you").
+        if !speechDecoding {
+            speechTask?.cancel()
+        }
         await speechTask?.value
         speechTask = nil
+        PerfSuite.stopMark("liveDrained")
         audio.stop()
         AudioInputs.endSession()
+        PerfSuite.stopMark("audioStopped")
         // When the live PCM buffer was trimmed, prefer the AAC file so the dropped prefix is not lost.
         let speechBuffer = audio.copySpeechBuffer()
         let spokenSamples: [Float]
@@ -935,6 +959,7 @@ final class SessionController: ObservableObject {
                 }
                 spoken = transcript.words
                 model = transcript.model
+                PerfSuite.stopMark("transcribed")
             } catch {
                 let message = UserFacingError.transcription(error)
                 transcriptionError = message
@@ -974,6 +999,7 @@ final class SessionController: ObservableObject {
                 model: model,
                 transcriptionError: transcriptionError
             )
+            PerfSuite.stopMark("written")
             pasteText = saved.pasteText
             sheetURL = saved.sheetURL
             lastSessionURL = directory
@@ -985,8 +1011,10 @@ final class SessionController: ObservableObject {
                 lastError = "No speech detected"
             }
             copyToClipboard()
+            PerfSuite.stopMark("copied")
             deliverIfRequested()
             NotificationCenter.default.post(name: .promptAnnotatorSessionsChanged, object: nil)
+            PerfSuite.stopMark("notified")
             setPhase(.idle)
         } catch {
             skipNextPaste = false
@@ -1331,6 +1359,7 @@ final class SessionController: ObservableObject {
 
     private func advanceProcessingMotion() {
         guard isBusy else { return }
+        PerfSuite.pace("processing")
         let elapsed = CACurrentMediaTime() - processingStartedAt
         let wave = WaveformMotion.loading(time: elapsed)
         let from = processingOrigin.isEmpty ? wave : processingOrigin
@@ -1345,11 +1374,16 @@ final class SessionController: ObservableObject {
 
     private func startTimer() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+        // Main-run-loop timer, so tick runs inline. The old block spawned a Task
+        // every 0.1 s just to hop back onto the main actor.
+        let clock = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
                 self?.tick()
             }
         }
+        clock.tolerance = 0.02
+        timer = clock
+        RunLoop.main.add(clock, forMode: .common)
         startLevelTimer()
     }
 
@@ -1362,12 +1396,14 @@ final class SessionController: ObservableObject {
     private func startLevelTimer() {
         levelsTimer?.invalidate()
         lastLevelTime = 0
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+        // 30 Hz meter. Smoothing is delta-based, so the motion is the same,
+        // with half the waveform renders while recording.
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.refreshLevels()
             }
         }
-        timer.tolerance = 1.0 / 240.0
+        timer.tolerance = 1.0 / 120.0
         levelsTimer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
@@ -1380,16 +1416,23 @@ final class SessionController: ObservableObject {
 
     private func refreshLevels() {
         guard phase == .recording else { return }
+        PerfSuite.pace("levels")
         let now = CACurrentMediaTime()
-        let delta = lastLevelTime == 0 ? (1.0 / 60.0) : min(0.05, now - lastLevelTime)
+        let delta = lastLevelTime == 0 ? (1.0 / 30.0) : min(0.07, now - lastLevelTime)
         lastLevelTime = now
         waveform.set(audio.sampleLevels(delta: delta))
     }
 
     private func tick() {
         guard phase == .recording else { return }
-        elapsed = Date().timeIntervalSince(startedAt)
-        let span = IslandMetrics.clockSpan(elapsed)
+        let now = Date().timeIntervalSince(startedAt)
+        // The clock shows whole seconds. Publishing every 0.1 s tick
+        // re-rendered every SessionController observer (island, menu bar,
+        // the whole Settings window) ten times a second while recording.
+        if Int(now) != Int(elapsed) || now < elapsed {
+            elapsed = now
+        }
+        let span = IslandMetrics.clockSpan(now)
         if span != clockSpan {
             clockSpan = span
             placeIsland(animated: false)
@@ -1401,7 +1444,7 @@ final class SessionController: ObservableObject {
             limit: settings.silenceStopSeconds,
             delta: 0.1
         )
-        if !stopQueued, quietLongEnough || SessionLimits.reachedMax(elapsed: elapsed, minutes: settings.maxSessionMinutes) {
+        if !stopQueued, quietLongEnough || SessionLimits.reachedMax(elapsed: now, minutes: settings.maxSessionMinutes) {
             stopQueued = true
             Task { await self.finish() }
         }

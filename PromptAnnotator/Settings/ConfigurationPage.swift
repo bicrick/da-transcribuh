@@ -27,9 +27,18 @@ struct ConfigurationPage: View {
             }
             SettingsSection(
                 title: "Clipboard history",
-                footer: "Maccy-style history. Uses Accessibility (already needed for paste). Default shortcut ⌘⇧C."
+                footer: "Full controls live on the Clipboard tab."
             ) {
-                clipboardCard
+                InkCard {
+                    InkSettingRow(
+                        title: "Clipboard tab",
+                        detail: "Enable, shortcut, storage, appearance, pins, ignore, and advanced."
+                    ) {
+                        Text("→")
+                            .font(Ink.mono(12))
+                            .foregroundStyle(Ink.secondary)
+                    }
+                }
             }
             SettingsSection(title: "Application") {
                 applicationCard
@@ -156,28 +165,29 @@ struct ConfigurationPage: View {
                 InkDivider(leading: 0)
                 InkSettingRow(
                     title: "History size",
-                    detail: "Keep up to \(settings.clipboardHistoryLimit) items (pinned survive Clear)."
+                    detail: "Pinned items survive Clear. More in the Clipboard tab."
                 ) {
-                    Stepper(
+                    InkStepper(
+                        title: "History size",
                         value: Binding(
                             get: { settings.clipboardHistoryLimit },
                             set: { settings.setClipboardHistoryLimit($0) }
                         ),
-                        in: 20...500,
-                        step: 20
-                    ) {
-                        Text("\(settings.clipboardHistoryLimit)")
-                            .font(Ink.mono(12))
-                            .monospacedDigit()
-                    }
+                        range: 20...500,
+                        step: 10,
+                        format: { "\($0) items" },
+                        valueWidth: 84
+                    )
                 }
                 HStack {
                     Spacer()
-                    Button("Reset to ⌘⇧C") {
+                    Button {
                         capture = nil
                         message = settings.setClipboardChord(.clipboardDefault)
                             ? nil
                             : "macOS would not register the default shortcut."
+                    } label: {
+                        InkGlyphString(text: "Reset to ⇧⌘C", size: 11)
                     }
                     .buttonStyle(InkSecondaryButtonStyle())
                     Button("Clear history") {

@@ -12,6 +12,7 @@ struct DTMenuBarPanel: View {
     private var shadow: CGFloat { Ink.bevelOffset }
 
     var body: some View {
+        let _ = PerfSuite.count("menuPanel")
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 DTWordmark(size: 11)
@@ -42,12 +43,16 @@ struct DTMenuBarPanel: View {
                 settings.cycleAppearance()
             }
 
+            hairline
             if settings.clipboardHistoryEnabled {
-                hairline
                 row("Clipboard history (\(settings.clipboardChord.display))") {
                     ClipboardHistoryController.shared.togglePanel()
                     dismiss()
                 }
+            }
+            // Always listed so a disabled clipboard can still be found and turned on.
+            row("Clipboard settings…") {
+                SettingsPresenter.shared.show(page: .clipboard)
             }
 
             hairline
@@ -197,9 +202,7 @@ private struct DTMenuRow: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(Ink.menuBarItemFont)
-                .foregroundStyle(rowForeground)
+            InkGlyphString(text: title, size: 13, color: rowForeground)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Ink.space3)
                 .padding(.vertical, Ink.space2)
