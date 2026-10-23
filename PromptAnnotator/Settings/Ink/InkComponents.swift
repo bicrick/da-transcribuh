@@ -894,7 +894,15 @@ struct InkPrimaryButtonStyle: ButtonStyle {
 
 struct InkSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+        configuration.label.inkSecondaryChrome(pressed: configuration.isPressed)
+    }
+}
+
+extension View {
+    /// The secondary button look, for labels that cannot be a Button (a footer
+    /// action inside a tile Button) and for InkSecondaryButtonStyle itself.
+    func inkSecondaryChrome(pressed: Bool = false) -> some View {
+        self
             .font(Ink.buttonSmallFont)
             .foregroundStyle(Ink.label)
             .padding(.horizontal, Ink.space3)
@@ -909,7 +917,7 @@ struct InkSecondaryButtonStyle: ButtonStyle {
                     .fill(Ink.bevel)
                     .offset(y: Ink.bevelOffset)
             )
-            .opacity(configuration.isPressed ? 0.85 : 1)
+            .opacity(pressed ? 0.85 : 1)
     }
 }
 

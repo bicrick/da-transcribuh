@@ -105,16 +105,14 @@ struct HistoryPage: View {
             }
             .frame(minHeight: 200)
         }
-        .padding(.top, Ink.pageTop)
-        .padding(.horizontal, Ink.pageSide)
-        .padding(.bottom, Ink.pageBottom)
-        .frame(maxWidth: Ink.maxContentWidth, maxHeight: .infinity, alignment: .topLeading)
-        // minHeight 0 is the size limit. Without it SwiftUI used the page's
+        // Same column as the scrolling pages. The page itself does not scroll,
+        // so it reserves the scroller gutter to land on the same x.
+        .inkPageColumn(fillsHeight: true, reservesScrollerGutter: true)
+        // minHeight 0 (inside inkPageColumn) is the size limit. Without it SwiftUI used the page's
         // squeezed height as its minimum. The header text is fixedSize
         // vertically, so at a near-zero width it wraps a word per line, and the
         // settings host turned that into a window min height of 1496 at 1040x700
         // (measured). Other pages sit in a scroll view, which hides this.
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .top)
     }
 
     private var searchField: some View {

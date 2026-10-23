@@ -163,14 +163,7 @@ struct SpeechModelPicker: View {
         } else {
             // Footer action (not a nested Button — those fight the card Button on macOS).
             Text("Download \(choice.megabytes) MB")
-                .font(Ink.buttonSmallFont)
-                .foregroundStyle(Ink.label)
-                .padding(.horizontal, Ink.space2)
-                .padding(.vertical, Ink.space1)
-                .overlay(
-                    Rectangle()
-                        .strokeBorder(Ink.label, lineWidth: Ink.stroke)
-                )
+                .inkSecondaryChrome()
                 .contentShape(Rectangle())
                 .onTapGesture {
                     guard !transfer.isWorking else { return }

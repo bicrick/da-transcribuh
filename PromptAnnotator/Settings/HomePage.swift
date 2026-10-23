@@ -35,13 +35,9 @@ struct HomePage: View {
                     bentoBody
                         .frame(maxHeight: showGetStarted ? nil : .infinity, alignment: .top)
                 }
-                .padding(.top, HomeFitLayout.pageTop)
-                .padding(.horizontal, Ink.pageSide)
-                .padding(.bottom, HomeFitLayout.pageBottom)
-                // One content column: same max as other Settings pages so hero divider
-                // and bento edges share one alignment.
-                .frame(maxWidth: Ink.maxContentWidth, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .center)
+                // The shared page column, so the hero starts at the same y and x
+                // as every other page's title (was 20pt top / 20pt bottom).
+                .inkPageColumn()
                 .frame(height: showGetStarted ? nil : fitHeight, alignment: .top)
                 .background {
                     GeometryReader { geo in
@@ -764,8 +760,6 @@ enum HomeBentoLayout {
 
 /// Home's one-screen budget. Values are points.
 enum HomeFitLayout {
-    static let pageTop: CGFloat = 20
-    static let pageBottom: CGFloat = 20
     static let heroGap: CGFloat = Ink.space4
     static let statFont = Ink.mono(22)
     static let stripGlyph: CGFloat = 32
@@ -773,7 +767,8 @@ enum HomeFitLayout {
     static let recentMax = 12
     /// Below this the page scrolls instead of squeezing (hero, stats, strip,
     /// and a Recent cell with two rows).
-    static let minimumHeight: CGFloat = 440
+    /// Includes the shared page column's 28 top and 36 bottom (was 20 and 20).
+    static let minimumHeight: CGFloat = 464
 
     static func recentRowsThatFit(height: CGFloat) -> Int {
         guard height.isFinite, height > 0 else { return 1 }

@@ -190,16 +190,8 @@ struct ModelPage: View {
                 setStatus("Removed \(model.name).", error: false)
             } label: {
                 Text("Remove")
-                    .font(Ink.buttonSmallFont)
-                    .foregroundStyle(Ink.label)
-                    .padding(.horizontal, Ink.space3)
-                    .frame(height: 24)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
-                            .strokeBorder(Ink.label, lineWidth: Ink.stroke)
-                    )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(InkSecondaryButtonStyle())
             .padding(.trailing, Ink.rowHPad)
             .padding(.top, Ink.rowVPad)
             .disabled(transfer.isWorking)

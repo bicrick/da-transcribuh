@@ -135,9 +135,7 @@ struct OnboardingFlow: View {
                 InkPageHeader(title: shown.title, subtitle: shown.blurb)
                 stepBody(shown)
             }
-            .padding(.top, Ink.pageTop)
-            .padding(.horizontal, Ink.pageSide)
-            .padding(.bottom, Ink.pageBottom)
+            .inkPageColumn()
             // Root cause of the header hop: with only maxWidth, the scroll host
             // measured this stack at its ideal width (every paragraph on one
             // line), so the document came out shorter than the wrapped page.
