@@ -16,6 +16,12 @@ struct DTScrollView<Content: View>: View {
     var axes: Axis.Set = .vertical
     var showsIndicators: Bool = true
     var bottomInset: CGFloat = 0
+    /// Lazy mode hosts the content in a native SwiftUI `ScrollView` (system
+    /// scroller hidden) so a `LazyVStack` inside builds only the visible rows.
+    /// The default AppKit host sizes an `NSHostingView` to the content's full
+    /// fitting height, which builds every row of a lazy stack. The Ink rail,
+    /// gutter and drag are the same in both modes.
+    var lazy: Bool = false
     @ViewBuilder var content: () -> Content
 
     /// Scroller chrome lives in a reference model that only the rail observes.
@@ -27,11 +33,21 @@ struct DTScrollView<Content: View>: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: showsIndicators ? Ink.scrollerGutterGap : 0) {
-            DTAppKitScrollHost(
-                bottomInset: bottomInset,
-                chrome: chrome
-            ) {
-                content()
+            Group {
+                if lazy {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        content()
+                            .padding(.bottom, bottomInset)
+                            .background(DTNativeScrollProbe(chrome: chrome))
+                    }
+                } else {
+                    DTAppKitScrollHost(
+                        bottomInset: bottomInset,
+                        chrome: chrome
+                    ) {
+                        content()
+                    }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -496,9 +512,121 @@ private final class DTScrollDragNSView: NSView {
         let scrollable = geometry.scrollable
         let target = scrollable * fraction
         var bounds = clip.bounds
-        bounds.origin.y = target
+        // Lazy mode scrolls a SwiftUI-owned document. Handle an unflipped one too.
+        let flipped = scroll.documentView?.isFlipped ?? true
+        bounds.origin.y = flipped ? target : scrollable - target
         clip.setBoundsOrigin(bounds.origin)
         scroll.reflectScrolledClipView(clip)
     }
 }
 
+
+// MARK: - Lazy mode probe
+
+/// Sits behind the content of a native SwiftUI `ScrollView` and feeds the Ink
+/// rail from the backing `NSScrollView` (clip bounds for the offset, document
+/// frame for the content height). macOS 14 has no `onScrollGeometryChange`.
+private struct DTNativeScrollProbe: NSViewRepresentable {
+    let chrome: DTScrollChrome
+
+    func makeNSView(context: Context) -> ProbeView {
+        let view = ProbeView()
+        view.chrome = chrome
+        return view
+    }
+
+    func updateNSView(_ view: ProbeView, context: Context) {
+        view.chrome = chrome
+        view.bind()
+    }
+
+    final class ProbeView: NSView {
+        weak var chrome: DTScrollChrome?
+        private weak var observed: NSScrollView?
+        private var lastOffset: CGFloat = -1
+        private var pending = false
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            bind()
+        }
+
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            schedulePublish()
+        }
+
+        deinit { NotificationCenter.default.removeObserver(self) }
+
+        func bind() {
+            guard window != nil, let scroll = enclosingScrollView, scroll !== observed else { return }
+            NotificationCenter.default.removeObserver(self)
+            observed = scroll
+            scroll.hasVerticalScroller = false
+            scroll.hasHorizontalScroller = false
+            let clip = scroll.contentView
+            clip.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(boundsChanged(_:)),
+                name: NSView.boundsDidChangeNotification, object: clip
+            )
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(frameChanged(_:)),
+                name: NSView.frameDidChangeNotification, object: clip
+            )
+            if let doc = scroll.documentView {
+                doc.postsFrameChangedNotifications = true
+                NotificationCenter.default.addObserver(
+                    self, selector: #selector(frameChanged(_:)),
+                    name: NSView.frameDidChangeNotification, object: doc
+                )
+            }
+            chrome?.scrollView = scroll
+            schedulePublish()
+        }
+
+        @objc private func boundsChanged(_ note: Notification) { publish(scrolled: true) }
+        @objc private func frameChanged(_ note: Notification) { schedulePublish() }
+
+        /// Frame changes land inside SwiftUI layout. Publishing there would
+        /// mutate observed state during a view update, so hop once.
+        private func schedulePublish() {
+            guard !pending else { return }
+            pending = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.pending = false
+                self.publish(scrolled: false)
+            }
+        }
+
+        private func publish(scrolled: Bool) {
+            guard let scroll = observed, let chrome else { return }
+            let clip = scroll.contentView
+            let viewport = clip.bounds.height
+            let content = max(scroll.documentView?.frame.height ?? 0, frame.height)
+            let flipped = scroll.documentView?.isFlipped ?? true
+            let originY = flipped ? clip.bounds.origin.y : content - viewport - clip.bounds.origin.y
+            let geometry = DTScrollGeometry.fromFlippedClip(
+                contentHeight: content, viewportHeight: viewport, originY: originY
+            )
+            if geometry != chrome.geometry { chrome.geometry = geometry }
+            if chrome.scrollView !== scroll { chrome.scrollView = scroll }
+            if scrolled, abs(originY - lastOffset) > 0.5 { chrome.flash() }
+            lastOffset = originY
+            DTNativeScrollProbeStats.updates += 1
+            DTNativeScrollProbeStats.lastOffset = geometry.offset
+            DTNativeScrollProbeStats.lastContent = content
+        }
+    }
+}
+
+/// Read by PerfSuite to confirm the rail follows a lazy scroll.
+@MainActor
+enum DTNativeScrollProbeStats {
+    static var updates = 0
+    static var lastOffset: CGFloat = 0
+    static var lastContent: CGFloat = 0
+}

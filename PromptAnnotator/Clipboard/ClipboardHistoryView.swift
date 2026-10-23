@@ -127,7 +127,9 @@ struct ClipboardHistoryView: View {
             let all = rows
             let pinnedRows = all.filter(\.pinned)
             let unpinnedRows = all.filter { !$0.pinned }
-            DTScrollView {
+            // Lazy: only visible rows are built on open. Selection moves one row at a
+            // time, and LazyVStack keeps the next row built, so the reveal anchor exists.
+            DTScrollView(lazy: true) {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(pinnedRows.enumerated()), id: \.element.id) { index, item in
                         row(item, shortcutIndex: index)

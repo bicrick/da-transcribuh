@@ -398,10 +398,13 @@ enum PerfSuite {
                 await sleep(ms: 100)
                 let sorted = scrollSteps.sorted()
                 if !sorted.isEmpty {
-                    log(String(format: "scroll n=%d p50=%.1f p95=%.1f max=%.1f over16=%d",
+                    log(String(format: "scroll n=%d p50=%.1f p95=%.1f max=%.1f over16=%d railUpdates=%d railOffset=%.0f railContent=%.0f",
                                sorted.count, sorted[sorted.count / 2],
                                sorted[min(sorted.count - 1, Int(Double(sorted.count) * 0.95))],
-                               sorted.last ?? 0, sorted.filter { $0 > 16 }.count))
+                               sorted.last ?? 0, sorted.filter { $0 > 16 }.count,
+                               DTNativeScrollProbeStats.updates,
+                               Double(DTNativeScrollProbeStats.lastOffset),
+                               Double(DTNativeScrollProbeStats.lastContent)))
                 }
                 scrollSteps = []
             }

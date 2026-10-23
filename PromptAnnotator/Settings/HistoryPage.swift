@@ -116,17 +116,15 @@ struct HistoryPage: View {
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
                     .padding(Ink.rowHPad)
             } else {
-                // Native ScrollView, not DTScrollView: DTScrollView hosts its content in an
-                // NSHostingView sized to its intrinsic height, so a LazyVStack inside it is
-                // measured in full and every row is built. At 430 sessions that made the
-                // History tab switch take 2.4 s. Here only the visible rows are built.
-                ScrollView(.vertical) {
+                // Lazy DTScrollView: native SwiftUI scrolling underneath, so the
+                // LazyVStack builds only visible rows (430 sessions took 2.4 s when
+                // every row was built), with the Ink rail in the reserved gutter.
+                DTScrollView(lazy: true) {
                     LazyVStack(spacing: 0) {
                         ForEach(rows) { session in
                             logRow(session, isSelected: session.id == selectedRowID)
                         }
                     }
-                    .padding(.trailing, Ink.scrollerGutter)
                 }
                 .frame(minHeight: 220, maxHeight: 320)
             }
