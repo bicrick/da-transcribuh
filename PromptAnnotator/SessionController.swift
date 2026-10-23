@@ -830,9 +830,7 @@ final class SessionController: ObservableObject {
             monitor.stop()
             audio.stop()
             AudioInputs.endSession()
-            if let createdFolder {
-                try? FileManager.default.removeItem(at: createdFolder)
-            }
+            SessionStartCleanup.removeAttemptFolder(createdFolder)
             directory = nil
             let message = UserFacingError.sessionStart(error)
             lastError = message
@@ -1500,5 +1498,14 @@ final class SessionController: ObservableObject {
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
         ErrorLog.record("\(title): \(message)")
+    }
+}
+
+/// Cleanup after a failed start. Only the folder this attempt created may be removed;
+/// the previous saved session must survive (it is still referenced until a start succeeds).
+enum SessionStartCleanup {
+    static func removeAttemptFolder(_ created: URL?, fileManager: FileManager = .default) {
+        guard let created else { return }
+        try? fileManager.removeItem(at: created)
     }
 }
