@@ -61,7 +61,8 @@ enum SessionEmptyTake {
                 try fileManager.removeItem(at: url)
                 removed += 1
             } catch {
-                ErrorLog.record("Couldn't purge empty session \(url.lastPathComponent): \(error.localizedDescription)")
+                let message = "Couldn't purge empty session \(url.lastPathComponent): \(error.localizedDescription)"
+                Task { @MainActor in ErrorLog.record(message) }
             }
         }
         return removed

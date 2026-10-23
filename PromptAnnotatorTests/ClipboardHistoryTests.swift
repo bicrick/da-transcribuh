@@ -115,6 +115,7 @@ final class ClipboardHistoryTests: XCTestCase {
 
     func testClipboardDefaultChordAllowsShift() {
         let chord = HotkeyChord.clipboardDefault
+        // Apple menu order is ⌃⌥⇧⌘, so ⌘⇧C renders as "⇧⌘C" (same as every other chord).
         XCTAssertEqual(chord.display, "⇧⌘C")
         XCTAssertTrue(chord.canRegister(allowingShift: true))
         XCTAssertFalse(chord.canRegister(allowingShift: false))
