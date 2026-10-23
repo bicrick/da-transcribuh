@@ -11,6 +11,12 @@ import QuartzCore
 /// - `-DTPerfLaunch YES` logs launch milestones in ms since process start.
 /// - `-DTPerfSpeech a.wav,b.wav` feeds each file through the capture pipeline in real
 ///   time and logs stop -> clipboard latency. `-DTPerfSpeechRuns N`, `-DTPerfLive NO`.
+/// - `-DTPerfPaste YES` (with `-DTPerfSpeech`) runs the real paste path into the app named
+///   by `-DTPerfPasteTarget` (bundle id) and logs stop -> ⌘V and stop -> text landed. The
+///   target appends `landed <systemUptime>` lines to `-DTPerfPasteLog`. The general
+///   pasteboard is snapshotted first and restored at the end.
+/// - `-DTPerfTailJitterMs N` adds a random 0…N ms to the tail before each stop, so the stop
+///   lands at a random point of the live-decode cycle (as a person's stop does).
 /// - `-DTPerfRecStart N` starts and cancels N real-mic sessions and logs start latency.
 /// - `-DTPerfPanelType text` / `-DTPerfPanelScroll N` extend `-DTPerfPanel`.
 /// - `-DTPerfSeedClipboard N` fills a `-DTClipboardRoot` store with N items.
@@ -34,6 +40,11 @@ enum PerfSuite {
         return !(d.string(forKey: "DTPerfSpeech") ?? "").isEmpty || d.integer(forKey: "DTPerfRecStart") > 0
     }
 
+    /// `-DTPerfPaste YES`: the speech harness pastes into its own target app.
+    nonisolated static var pasteMode: Bool {
+        UserDefaults.standard.bool(forKey: "DTPerfPaste")
+    }
+
     nonisolated static var liveDecodeDisabled: Bool {
         UserDefaults.standard.object(forKey: "DTPerfLive") != nil && !UserDefaults.standard.bool(forKey: "DTPerfLive")
     }
@@ -48,7 +59,9 @@ enum PerfSuite {
 
     /// The board session output goes to. A private named board under a harness.
     static var sessionPasteboard: NSPasteboard {
-        isolatesSession ? NSPasteboard(name: NSPasteboard.Name("com.bicrick.PromptAnnotator.perf")) : .general
+        isolatesSession && !pasteMode
+            ? NSPasteboard(name: NSPasteboard.Name("com.bicrick.PromptAnnotator.perf"))
+            : .general
     }
 
     static func log(_ line: String) {
@@ -251,8 +264,17 @@ enum PerfSuite {
             await sleep(ms: 1500)
         }
         let runs = max(1, args.integer(forKey: "DTPerfSpeechRuns"))
-        let pad = Double(args.object(forKey: "DTPerfTailMs") as? Int ?? 400)
+        let basePad = Double(args.object(forKey: "DTPerfTailMs") as? Int ?? 400)
+        let jitter = max(0, args.integer(forKey: "DTPerfTailJitterMs"))
         let live = !liveDecodeDisabled
+        let paste = pasteMode
+        let targetID = args.string(forKey: "DTPerfPasteTarget") ?? "com.bicrick.dtpastetarget"
+        let landedLog = URL(fileURLWithPath: args.string(forKey: "DTPerfPasteLog") ?? "/tmp/dtpaste-landed.txt")
+        var savedBoard: [NSPasteboardItem] = []
+        if paste {
+            savedBoard = snapshotGeneralPasteboard()
+            log("paste trusted=\(AXIsProcessTrusted()) target=\(targetID)")
+        }
         for run in 1...runs {
             for path in speechFiles {
                 let url = URL(fileURLWithPath: path)
@@ -269,11 +291,16 @@ enum PerfSuite {
                 guard session.phase == .recording else {
                     log("speech begin failed phase=\(session.phase)")
                     AudioRecorder.feedURL = nil
+                    if paste { restoreGeneralPasteboard(savedBoard) }
                     quitIfRequested()
                     return
                 }
                 let c0 = cpuSeconds()
                 let r0 = CACurrentMediaTime()
+                let pad = basePad + (jitter > 0 ? Double(Int.random(in: 0...jitter)) : 0)
+                if paste {
+                    activate(targetID)
+                }
                 await sleep(ms: seconds * 1000 + pad)
                 let recCPU = (cpuSeconds() - c0) / (CACurrentMediaTime() - r0) * 100
                 let recMem = footprintMB()
@@ -291,8 +318,30 @@ enum PerfSuite {
                 let sc0 = cpuSeconds()
                 stopStamp = s0
                 stopPhases = []
+                let u0 = ProcessInfo.processInfo.systemUptime
+                var frontmost = ""
+                if paste {
+                    frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"
+                    StopTrace.noteTrigger(uptime: u0)
+                }
                 await session.perfFinish()
                 stopStamp = 0
+                if paste {
+                    let w0 = CACurrentMediaTime()
+                    while StopTrace.isOpen, CACurrentMediaTime() - w0 < 2 {
+                        await sleep(ms: 2)
+                    }
+                    // Give the target app time to receive and apply the paste.
+                    await sleep(ms: 600)
+                    let landed = lastLanded(in: landedLog)
+                    let landMs = landed > u0 ? (landed - u0) * 1000 : -1
+                    log(String(format: "paste %@ run=%d pad=%.0f front=%@ stop2paste=%.1f stop2land=%.1f",
+                               url.deletingPathExtension().lastPathComponent, run, pad, frontmost,
+                               StopTrace.lastPasteMs ?? -1, landMs))
+                }
+                if let summary = StopTrace.lastSummary {
+                    log("stoptrace " + summary)
+                }
                 let idleMs = (CACurrentMediaTime() - s0) * 1000
                 let stopCPU = cpuSeconds() - sc0
                 sampler.cancel()
@@ -311,7 +360,37 @@ enum PerfSuite {
                 await sleep(ms: 1200)
             }
         }
+        if paste { restoreGeneralPasteboard(savedBoard) }
         quitIfRequested()
+    }
+
+    private static func activate(_ bundleID: String) {
+        NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?
+            .activate(options: [.activateAllWindows])
+    }
+
+    /// Last `landed <uptime>` stamp the paste target wrote.
+    private static func lastLanded(in url: URL) -> TimeInterval {
+        guard let text = try? String(contentsOf: url, encoding: .utf8),
+              let line = text.split(separator: "\n").last(where: { $0.hasPrefix("landed ") }),
+              let field = line.split(separator: " ").dropFirst().first,
+              let value = Double(field) else { return 0 }
+        return value
+    }
+
+    private static func snapshotGeneralPasteboard() -> [NSPasteboardItem] {
+        (NSPasteboard.general.pasteboardItems ?? []).map { item in
+            let copy = NSPasteboardItem()
+            for type in item.types {
+                if let data = item.data(forType: type) { copy.setData(data, forType: type) }
+            }
+            return copy
+        }
+    }
+
+    private static func restoreGeneralPasteboard(_ items: [NSPasteboardItem]) {
+        NSPasteboard.general.clearContents()
+        if !items.isEmpty { NSPasteboard.general.writeObjects(items) }
     }
 
     // MARK: - Recording start (real microphone)
