@@ -158,7 +158,14 @@ private struct DTTrafficLight: View {
     }
 
     private func resolvedWindow() -> NSWindow? {
-        SettingsPresenter.shared.attachedWindow
+        // The click's own window first. Welcome and Settings both draw these
+        // lights, and preferring Settings closed the wrong window from Welcome.
+        if let clicked = NSApp.currentEvent?.window,
+           clicked === SettingsPresenter.shared.attachedWindow
+            || clicked === OnboardingPresenter.shared.attachedWindow {
+            return clicked
+        }
+        return SettingsPresenter.shared.attachedWindow
             ?? OnboardingPresenter.shared.attachedWindow
             ?? NSApp.keyWindow
     }

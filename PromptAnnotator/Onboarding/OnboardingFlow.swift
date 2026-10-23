@@ -56,6 +56,8 @@ enum OnboardingStep: Int, CaseIterable {
 enum OnboardingMetrics {
     static let width: CGFloat = 560
     static let height: CGFloat = 720
+    /// Width the step page lays out at: the window minus the Ink scroller gutter.
+    static let pageWidth: CGFloat = width - Ink.scrollerGutter
 }
 
 struct OnboardingFlow: View {
@@ -63,6 +65,9 @@ struct OnboardingFlow: View {
     @ObservedObject private var session = SessionController.shared
     @StateObject private var permissions = PermissionModel()
     @State private var step: OnboardingStep = .welcome
+    /// +1 going forward, -1 going back. Picks the side the next step slides in from.
+    @State private var direction: CGFloat = 1
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var listening = false
     @State private var listeningClipboard = false
     @State private var shortcutNote: String?
@@ -73,24 +78,34 @@ struct OnboardingFlow: View {
     var onFinish: () -> Void
 
     var body: some View {
+        // Root cause of the jump between steps: every step lived in one shared
+        // scroll host. Swapping its content kept the old document height and
+        // scroll offset for a turn, so the new step drew shifted, then snapped.
+        // Now the title strip, rail and footer never move, and each step gets
+        // its own top-aligned page that crossfades in place.
         VStack(spacing: 0) {
-            onboardingChrome
-            DTScrollView {
-                VStack(alignment: .leading, spacing: Ink.sectionGap) {
-                    InkStepRail(current: step.rawValue, labels: OnboardingStep.railLabels)
-                    InkPageHeader(title: step.title, subtitle: step.blurb)
-                    stepBody
-                }
-                .padding(.top, Ink.pageTop)
+            DTTitleStrip()
+            InkStepRail(current: step.rawValue, labels: OnboardingStep.railLabels)
+                .padding(.top, Ink.space5)
                 .padding(.horizontal, Ink.pageSide)
-                .padding(.bottom, Ink.pageBottom)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, Ink.space5)
+                .animation(stepAnimation, value: step)
+            Rectangle()
+                .fill(Ink.hairline)
+                .frame(height: 1)
+            ZStack(alignment: .top) {
+                stepPage(step)
+                    .id(step)
+                    .transition(stepTransition)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .clipped()
             footer
         }
         .frame(width: OnboardingMetrics.width, height: OnboardingMetrics.height)
         .background(Ink.window)
         .tint(Ink.label)
+        .ignoresSafeArea(.container, edges: .top)
         .background(ShortcutCapture(active: Binding(
             get: { listening || listeningClipboard },
             set: { if !$0 { listening = false; listeningClipboard = false } }
@@ -101,7 +116,10 @@ struct OnboardingFlow: View {
                 applyShortcut(event)
             }
         })
-        .onAppear { permissions.refresh() }
+        .onAppear {
+            permissions.refresh()
+            OnboardingSnapshotHarness.run { next in go(to: next) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             permissions.refresh()
         }
@@ -110,18 +128,48 @@ struct OnboardingFlow: View {
         }
     }
 
-    /// Wordmark strip — same language as Settings, without SettingsPresenter traffic lights.
-    private var onboardingChrome: some View {
-        ZStack {
-            DTWordmark(size: 13)
+    /// One step's page. Keyed by step, so each step starts at the top of a fresh scroll.
+    private func stepPage(_ shown: OnboardingStep) -> some View {
+        DTScrollView {
+            VStack(alignment: .leading, spacing: Ink.sectionGap) {
+                InkPageHeader(title: shown.title, subtitle: shown.blurb)
+                stepBody(shown)
+            }
+            .padding(.top, Ink.pageTop)
+            .padding(.horizontal, Ink.pageSide)
+            .padding(.bottom, Ink.pageBottom)
+            // Root cause of the header hop: with only maxWidth, the scroll host
+            // measured this stack at its ideal width (every paragraph on one
+            // line), so the document came out shorter than the wrapped page.
+            // NSHostingView centred the taller page in that short document and
+            // pushed the top above the viewport by a different amount per step
+            // (title 3 to 31pt off). A fixed width makes the measured height the
+            // real height, so every title sits at pageTop under the rail.
+            .frame(width: OnboardingMetrics.pageWidth, alignment: .topLeading)
         }
-        .frame(height: Ink.titleStripHeight)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Ink.window)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Ink.label)
-                .frame(height: 2)
+    }
+
+    private var stepAnimation: Animation {
+        .easeInOut(duration: reduceMotion ? 0.12 : 0.22)
+    }
+
+    private var stepTransition: AnyTransition {
+        if reduceMotion { return .opacity }
+        let shift: CGFloat = 28 * direction
+        return .asymmetric(
+            insertion: .opacity.combined(with: .offset(x: shift)),
+            removal: .opacity.combined(with: .offset(x: -shift))
+        )
+    }
+
+    /// Every step change goes through here so it always animates the same way.
+    private func go(to next: OnboardingStep) {
+        guard next != step else { return }
+        direction = next.rawValue > step.rawValue ? 1 : -1
+        withAnimation(stepAnimation) {
+            step = next
         }
     }
 
@@ -168,8 +216,8 @@ struct OnboardingFlow: View {
     }
 
     @ViewBuilder
-    private var stepBody: some View {
-        switch step {
+    private func stepBody(_ shown: OnboardingStep) -> some View {
+        switch shown {
         case .welcome:
             welcomeBody
         case .permissions:
@@ -192,9 +240,20 @@ struct OnboardingFlow: View {
     private var welcomeBody: some View {
         VStack(alignment: .leading, spacing: Ink.space5) {
             InkCard {
-                InkWavePenMotif(inked: false)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Ink.space5)
+                VStack(spacing: Ink.space4) {
+                    RecordingIslandDemo()
+                        // Room for the down-right bevel pane.
+                        .padding(.trailing, 4)
+                        .padding(.bottom, 4)
+                    Text("This is the island while you talk. Timer, your voice, and screen captures so far.")
+                        .font(Ink.captionFont)
+                        .foregroundStyle(Ink.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Ink.space6)
+                .padding(.horizontal, Ink.cardPad)
             }
             HStack(spacing: Ink.space3) {
                 AppLogo(side: 44)
@@ -216,9 +275,11 @@ struct OnboardingFlow: View {
     private var readyBody: some View {
         VStack(alignment: .leading, spacing: Ink.space5) {
             InkCard {
-                InkWavePenMotif(inked: true)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Ink.space5)
+                VStack(alignment: .leading, spacing: 0) {
+                    readyKeyRow(title: "Start or stop a session", keys: settings.chord.keycaps)
+                    InkDivider(leading: 0)
+                    readyKeyRow(title: "Open clipboard history", keys: settings.clipboardChord.keycaps)
+                }
             }
             Text("\(settings.chord.display) starts and stops a session. \(settings.clipboardChord.display) opens clipboard history. While da transcribuh is saving or transcribing, the menu bar icon changes so you can see it working.")
                 .font(Ink.bodyFont)
@@ -226,6 +287,18 @@ struct OnboardingFlow: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func readyKeyRow(title: String, keys: [String]) -> some View {
+        HStack(spacing: Ink.space3) {
+            Text(title)
+                .font(Ink.rowTitleFont)
+                .foregroundStyle(Ink.label)
+            Spacer(minLength: Ink.space2)
+            InkKeycapRow(keys: keys)
+        }
+        .padding(.horizontal, Ink.rowHPad)
+        .padding(.vertical, Ink.rowVPad)
     }
 
     private var permissionsCard: some View {
@@ -615,7 +688,7 @@ struct OnboardingFlow: View {
             practiceOutcome = nil
             permissions.refresh()
         }
-        step = next
+        go(to: next)
     }
 
     private func enterPermissions() {
@@ -634,7 +707,7 @@ struct OnboardingFlow: View {
         shortcutNote = nil
         cancelPractice()
         if let previous = OnboardingStep(rawValue: step.rawValue - 1) {
-            step = previous
+            go(to: previous)
         }
     }
 
@@ -770,14 +843,19 @@ final class OnboardingPresenter {
         let host = NSHostingView(rootView: root)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: OnboardingMetrics.width, height: OnboardingMetrics.height),
-            styleMask: [.titled, .closable],
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
+        // Same chrome as Settings: no system title bar, our Ink title strip and lights.
         window.title = "welcome to da transcribuh"
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.titlebarSeparatorStyle = .none
         window.isReleasedWhenClosed = false
         window.backgroundColor = Ink.windowNSColor
         window.contentView = host
+        DTSystemTrafficLights.hide(on: window)
         window.setContentSize(NSSize(width: OnboardingMetrics.width, height: OnboardingMetrics.height))
         window.center()
         self.window = window
