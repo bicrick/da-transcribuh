@@ -24,8 +24,15 @@ final class ClipboardPreviewPanelController {
     var window: NSWindow? { panel }
     var frame: NSRect? { isShowing ? panel?.frame : nil }
     var isKeyWindow: Bool { panel?.isKeyWindow == true }
+    /// The preview only exists beside an open list. Checked on every show, so no
+    /// caller (late debounce, harness, swap) can put it up on its own.
+    var ownerAllowsShow: () -> Bool = { ClipboardHistoryPanelController.shared.isVisible }
 
     func show(item: ClipboardItem, image: NSImage?, beside listFrame: NSRect) {
+        guard ownerAllowsShow() else {
+            hide(animated: false)
+            return
+        }
         // Measure the free-height card off-window, then pin it to the capped height.
         // The hosting view inside the panel reports the size it already has
         // (sizingOptions are off), so measuring it kept every preview at its first
@@ -105,14 +112,18 @@ final class ClipboardPreviewPanelController {
         let wasShowing = isShowing
         isShowing = false
         guard panel.isVisible else { return }
-        hideGeneration &+= 1
-        let generation = hideGeneration
         if !animated {
+            hideGeneration &+= 1
             panel.orderOut(nil)
             panel.alphaValue = Self.restingAlpha
             return
         }
+        // A slide-back is already running. Bumping the generation here used to
+        // orphan it: its completion saw a newer generation and skipped orderOut,
+        // so the window stayed on screen. Let that completion finish the job.
         guard wasShowing else { return }
+        hideGeneration &+= 1
+        let generation = hideGeneration
         let tuck = sitsRight ? -PanelMotion.previewTravel : PanelMotion.previewTravel
         PanelMotion.dismiss(panel, toward: CGVector(dx: tuck, dy: 0), duration: PanelMotion.previewClose) { [weak self] in
             guard let self, self.hideGeneration == generation, !self.isShowing else { return }

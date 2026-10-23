@@ -23,6 +23,18 @@ final class ClipboardHistoryPanelController {
     private(set) var isClosing = false
     /// Final frame of the open slide. The preview anchors here, not to the mid-animation frame.
     private var restingFrame: NSRect = .zero
+    /// Owns the preview's lifetime. Every close ends it; stale shows are refused.
+    private lazy var previewOwner = ClipboardPreviewOwner<ClipboardItem>(
+        show: { [weak self] item in
+            guard let self else { return }
+            ClipboardPreviewPanelController.shared.show(
+                item: item,
+                image: ClipboardHistoryStore.shared.image(for: item),
+                beside: self.listFrame
+            )
+        },
+        hide: { animated in ClipboardPreviewPanelController.shared.hide(animated: animated) }
+    )
 
     var isVisible: Bool {
         panel?.isVisible == true && !isClosing
@@ -36,7 +48,7 @@ final class ClipboardHistoryPanelController {
 
     func toggle() {
         if isVisible {
-            hide()
+            hide(reason: .hotkeyToggle)
         } else {
             show()
         }
@@ -50,6 +62,8 @@ final class ClipboardHistoryPanelController {
         resignHideWork?.cancel()
         resignHideWork = nil
         showGeneration &+= 1
+        // A new preview session. Requests scheduled by an earlier open stay refused.
+        let previewToken = previewOwner.listOpened()
         let root = ClipboardHistoryView(
             store: store,
             onPick: { [weak self] item, paste in
@@ -58,25 +72,20 @@ final class ClipboardHistoryPanelController {
                 // ⌥Enter copy-only keeps the panel open. Instant, so a synthesized ⌘V
                 // lands in the target app, not a fading panel.
                 if paste, wrote {
-                    self?.hide(animated: false)
+                    self?.hide(animated: false, reason: .pick)
                 }
             },
-            onClose: { [weak self] in self?.hide() },
+            onClose: { [weak self] in self?.hide(reason: .escape) },
             openGeneration: showGeneration,
             onOpenPreferences: { [weak self] in
-                self?.hide()
+                self?.hide(reason: .preferences)
                 SettingsPresenter.shared.show(page: .clipboard)
             },
-            onPreview: { item in
-                if let item {
-                    ClipboardPreviewPanelController.shared.show(
-                        item: item,
-                        image: ClipboardHistoryStore.shared.image(for: item),
-                        beside: ClipboardHistoryPanelController.shared.listFrame
-                    )
-                } else {
-                    ClipboardPreviewPanelController.shared.hide()
-                }
+            onPreview: { [weak self] item in
+                // The view's hover debounce can fire after a close. The token says
+                // which open scheduled it; the owner drops it if that open is over.
+                guard let self else { return }
+                self.previewOwner.request(item, token: previewToken)
             }
         )
         if panel == nil {
@@ -198,14 +207,15 @@ final class ClipboardHistoryPanelController {
 
     private var hideGeneration: UInt64 = 0
 
+    /// The single close path for every dismissal. It always ends the preview first.
     /// `animated: false` is for picks: the panel must be gone before the paste.
-    func hide(animated: Bool = true) {
+    func hide(animated: Bool = true, reason: ClipboardListDismissal = .programmatic) {
         resignHideWork?.cancel()
         resignHideWork = nil
         stopScreenshotWatch()
         removeOutsideClickMonitor()
         removeResignObserver()
-        ClipboardPreviewPanelController.shared.hide(animated: animated)
+        previewOwner.listClosed(reason, animated: animated)
         guard let panel, panel.isVisible else { return }
         hideGeneration &+= 1
         let generation = hideGeneration
@@ -257,7 +267,7 @@ final class ClipboardHistoryPanelController {
             return
         }
         if !listHit && !previewHit {
-            hide()
+            hide(reason: .clickOutside)
         }
     }
 
@@ -293,7 +303,7 @@ final class ClipboardHistoryPanelController {
                             self.startScreenshotWatch()
                             return
                         }
-                        self.hide()
+                        self.hide(reason: self.userSwitchedApps() ? .appSwitch : .resignKey)
                     }
                 }
                 self.resignHideWork = work
@@ -330,7 +340,7 @@ final class ClipboardHistoryPanelController {
                 }
                 self.stopScreenshotWatch()
                 if self.userSwitchedApps() {
-                    self.hide()
+                    self.hide(reason: .screenshotEnded)
                 } else if self.panel?.isKeyWindow != true {
                     // Back from the shot: take keys again so Escape, arrows and typing work.
                     self.panel?.makeKey()
