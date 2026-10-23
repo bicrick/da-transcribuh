@@ -28,6 +28,10 @@ final class ClipboardHistoryController {
         }
     }
 
+    func checkPasteboardNow() {
+        watcher.checkNow()
+    }
+
     func remove() {
         watcher.stop()
         store.onOwnWriteEnded = nil

@@ -39,6 +39,8 @@ final class ClipboardHistoryPanelController {
     }
 
     func show() {
+        // Catch a copy from the watcher's quiet interval before listing rows.
+        ClipboardHistoryController.shared.checkPasteboardNow()
         PerfProbe.begin("panel", "open")
         defer { PerfProbe.endAfterDisplay("panel") }
         resignHideWork?.cancel()

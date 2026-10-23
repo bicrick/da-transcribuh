@@ -1,11 +1,23 @@
 import AppKit
 import Foundation
 
-/// Polls `NSPasteboard.general.changeCount` (~0.5s). Cheap; stays off session hot paths.
+/// Polls `NSPasteboard.general.changeCount`. Cheap; stays off session hot paths.
+///
+/// Idle wakeups: a fixed 0.5 s poll woke the app twice a second forever. Now it
+/// polls every 1.5 s while the pasteboard is quiet and drops to 0.5 s for 20 s
+/// after any change, so copy bursts are sampled as before. It also checks at once
+/// when the frontmost app changes (copy, then switch apps is the common path),
+/// so a quiet-mode copy is caught at the switch, not up to 1.5 s later.
 @MainActor
 final class ClipboardWatcher {
     private var timer: Timer?
     private var lastChangeCount: Int = -1
+    private var activationObserver: NSObjectProtocol?
+    private var fastUntil: CFTimeInterval = 0
+    private var fast = false
+    static let quietInterval: TimeInterval = 1.5
+    static let burstInterval: TimeInterval = 0.5
+    static let burstWindow: CFTimeInterval = 20
     private let store: ClipboardHistoryStore
     var isEnabled: () -> Bool = { true }
 
@@ -16,25 +28,62 @@ final class ClipboardWatcher {
     func start() {
         guard timer == nil else { return }
         lastChangeCount = NSPasteboard.general.changeCount
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+        schedule(fast: false)
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.tick()
             }
         }
-        timer.tolerance = 0.1
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
     }
 
     func stop() {
         timer?.invalidate()
         timer = nil
+        if let activationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
+        }
+        activationObserver = nil
+    }
+
+    private func schedule(fast: Bool) {
+        timer?.invalidate()
+        self.fast = fast
+        let interval = fast ? Self.burstInterval : Self.quietInterval
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.tick()
+            }
+        }
+        timer.tolerance = fast ? 0.1 : 0.3
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    /// Fast polling after a change, back to quiet once the burst window passes.
+    private func adjustRate(changed: Bool) {
+        guard timer != nil else { return }
+        let now = CACurrentMediaTime()
+        if changed {
+            fastUntil = now + Self.burstWindow
+            if !fast { schedule(fast: true) }
+        } else if fast, now > fastUntil {
+            schedule(fast: false)
+        }
     }
 
     /// Call when an own-write suppress nest ends so the next tick does not
     /// re-capture the pasteboard we just wrote.
     func acknowledgePasteboard() {
         lastChangeCount = NSPasteboard.general.changeCount
+    }
+
+    /// Sample now. The panel calls this on open, so a copy made in the last
+    /// quiet interval is listed even without an app switch.
+    func checkNow() {
+        guard timer != nil else { return }
+        tick()
     }
 
     private func tick() {
@@ -50,8 +99,12 @@ final class ClipboardWatcher {
         }
         let board = NSPasteboard.general
         let count = board.changeCount
-        guard count != lastChangeCount else { return }
+        guard count != lastChangeCount else {
+            adjustRate(changed: false)
+            return
+        }
         lastChangeCount = count
+        adjustRate(changed: true)
         capture(from: board)
     }
 
