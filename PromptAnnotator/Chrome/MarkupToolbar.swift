@@ -4,6 +4,10 @@ struct MarkupToolbarView: View {
     @ObservedObject var session: SessionController
 
     var body: some View {
+        bodyContent.focusEffectDisabled()
+    }
+
+    @ViewBuilder private var bodyContent: some View {
         HStack(spacing: Ink.space1) {
             captureButton
             hairline

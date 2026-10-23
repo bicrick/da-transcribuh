@@ -11,7 +11,7 @@ struct ClipboardHistoryView: View {
     /// does not fire again; this resets search and preselects the first row.
     var openGeneration: UInt64 = 0
     var onOpenPreferences: () -> Void = {
-        ClipboardHistoryPanelController.shared.hide()
+        ClipboardHistoryPanelController.shared.hide(reason: .preferences)
         SettingsPresenter.shared.show(page: .clipboard)
     }
     var onPreview: (ClipboardItem?) -> Void = { _ in }
@@ -41,6 +41,10 @@ struct ClipboardHistoryView: View {
 
 
     var body: some View {
+        bodyContent.focusEffectDisabled()
+    }
+
+    @ViewBuilder private var bodyContent: some View {
         VStack(spacing: 0) {
             if settings.clipboardShowSearchField {
                 header
@@ -441,6 +445,10 @@ struct ClipboardPreviewPopover: View {
     }()
 
     var body: some View {
+        bodyContent.focusEffectDisabled()
+    }
+
+    @ViewBuilder private var bodyContent: some View {
         VStack(alignment: .leading, spacing: Ink.space2) {
             previewBody
             Rectangle().fill(Ink.hairline).frame(height: 1)

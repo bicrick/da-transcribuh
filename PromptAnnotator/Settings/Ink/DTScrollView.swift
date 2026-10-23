@@ -322,7 +322,8 @@ private struct DTAppKitScrollHost<Content: View>: NSViewRepresentable {
         }
 
         private func rootView(_ content: Content, bottomInset: CGFloat) -> AnyView {
-            AnyView(DTWidthPinnedRoot(width: hostedWidth, content: content.padding(.bottom, bottomInset)))
+            // A nested hosting view starts a fresh environment; repeat the no-ring rule.
+            AnyView(DTWidthPinnedRoot(width: hostedWidth, content: content.padding(.bottom, bottomInset).focusEffectDisabled()))
         }
 
         private var relayoutScheduled = false

@@ -40,7 +40,7 @@ final class ClipboardHistoryController {
             RemoveEventHandler(eventHandler)
             self.eventHandler = nil
         }
-        ClipboardHistoryPanelController.shared.hide()
+        ClipboardHistoryPanelController.shared.hide(reason: .featureOff)
     }
 
     /// Register or clear the Carbon hotkey when the feature toggle changes.
@@ -49,7 +49,7 @@ final class ClipboardHistoryController {
             installHotKey(AppSettings.shared.clipboardChord)
         } else {
             unregisterHotKey()
-            ClipboardHistoryPanelController.shared.hide()
+            ClipboardHistoryPanelController.shared.hide(reason: .featureOff)
         }
     }
 
