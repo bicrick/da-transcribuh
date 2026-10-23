@@ -58,6 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DockPresence.apply(show: settings.showInDock)
         }
         PasteFollowUp.shared.install()
+        // Sparkle. Automatic checks are off in Info.plist; this only wires up the manual check.
+        MainActor.assumeIsolated { UpdateController.shared.start() }
         ClipboardHistoryController.shared.install()
         // Drop empty (no text, no images) sessions left from older builds — once.
         SessionEmptyTake.runOneTimeCleanupIfNeeded()

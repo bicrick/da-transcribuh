@@ -7,6 +7,7 @@
 
 /* Begin PBXBuildFile section */
 		A1000000000000000000000E /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000014 /* WhisperKit */; };
+		A10000000000000000000022 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000021 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,6 +44,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000000000000000000000E /* WhisperKit in Frameworks */,
+				A10000000000000000000022 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -95,6 +97,7 @@
 			name = PromptAnnotator;
 			packageProductDependencies = (
 				A10000000000000000000014 /* WhisperKit */,
+				A10000000000000000000021 /* Sparkle */,
 			);
 			productName = PromptAnnotator;
 			productReference = A1000000000000000000000F /* da transcribuh.app */;
@@ -153,6 +156,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A10000000000000000000013 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */,
+				A10000000000000000000020 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000003 /* Products */;
@@ -476,6 +480,14 @@
 				version = 1.1.1;
 			};
 		};
+		A10000000000000000000020 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -483,6 +495,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000013 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */;
 			productName = WhisperKit;
+		};
+		A10000000000000000000021 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000020 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

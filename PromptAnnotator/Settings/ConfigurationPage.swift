@@ -5,8 +5,7 @@ struct ConfigurationPage: View {
     @ObservedObject var settings: AppSettings
     @State private var capture: CaptureTarget?
     @State private var message: String?
-    @State private var updateMessage = "This build is \(AppVersion.label)."
-    @State private var checkingUpdate = false
+    @ObservedObject private var updates = UpdateController.shared
     @State private var folderNote: String?
     @State private var folderPath = SessionStore.displayPath()
     @State private var customFolder = SessionStore.usesCustomFolder()
@@ -221,12 +220,12 @@ struct ConfigurationPage: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 InkDivider(leading: 0)
-                InkSettingRow(title: "Updates", detail: updateMessage) {
-                    Button(checkingUpdate ? "Checking" : "Check") {
-                        checkForUpdate()
+                InkSettingRow(title: "Updates", detail: updatesDetail) {
+                    Button(UpdateController.menuTitle) {
+                        updates.checkForUpdates()
                     }
                     .buttonStyle(InkSecondaryButtonStyle())
-                    .disabled(checkingUpdate)
+                    .disabled(!updates.canCheckForUpdates)
                 }
                 InkDivider(leading: 0)
                 InkToggleRow(
@@ -443,13 +442,11 @@ struct ConfigurationPage: View {
         }
     }
 
-    private func checkForUpdate() {
-        checkingUpdate = true
-        Task {
-            let message = await ReleaseCheck.lookUp()
-            updateMessage = message
-            checkingUpdate = false
-        }
+    private var updatesDetail: String {
+        let automatic = updates.automaticallyChecksForUpdates
+            ? "Checks automatically."
+            : "Automatic checks are off during the beta."
+        return "This build is \(AppVersion.label). \(automatic)"
     }
 
     private func chooseFolder() {

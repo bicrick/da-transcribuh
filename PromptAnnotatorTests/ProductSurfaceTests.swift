@@ -5,9 +5,9 @@ import XCTest
 final class ProductSurfaceTests: XCTestCase {
     func testBetaLabelCarriesTheMarketingVersionAndBuild() {
         XCTAssertEqual(AppVersion.channel, "beta")
-        XCTAssertEqual(AppVersion.marketing, "0.9.0")
-        XCTAssertEqual(AppVersion.build, "2")
-        XCTAssertEqual(AppVersion.label, "0.9.0 beta (2)")
+        XCTAssertEqual(AppVersion.marketing, "0.9.2")
+        XCTAssertEqual(AppVersion.build, "4")
+        XCTAssertEqual(AppVersion.label, "0.9.2 beta (4)")
         XCTAssertEqual(ReleaseCheck.currentVersion(), AppVersion.marketing)
     }
 
