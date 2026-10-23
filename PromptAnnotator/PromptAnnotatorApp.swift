@@ -60,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardHistoryController.shared.install()
         // Drop empty (no text, no images) sessions left from older builds — once.
         SessionEmptyTake.runOneTimeCleanupIfNeeded()
-        if OnboardingStore.isFinished() {
+        if OnboardingStore.isFinished() && !OnboardingSnapshotHarness.isActive {
             SettingsPresenter.shared.show()
         } else {
             OnboardingPresenter.shared.show()

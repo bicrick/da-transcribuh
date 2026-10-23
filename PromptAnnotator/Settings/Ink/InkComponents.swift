@@ -798,8 +798,13 @@ struct InkStepDots: View {
     }
 }
 
-/// Paint-style step rail for onboarding: filled past, inverted current, outlined ahead.
+/// Paint-style step rail for onboarding. Done steps are Paint green with a check,
+/// the current step is Paint blue, steps ahead are outlined. The swatches are the
+/// same hex in light and dark, so the rail reads the same in both.
 struct InkStepRail: View {
+    static let currentFill = Ink.paintBlue
+    static let doneFill = Ink.paintGreen
+
     var current: Int
     var labels: [String]
 
@@ -809,8 +814,8 @@ struct InkStepRail: View {
                 stepCell(index: index, label: label)
                 if index < labels.count - 1 {
                     Rectangle()
-                        .fill(index < current ? Ink.label : Ink.hairline)
-                        .frame(height: 1)
+                        .fill(index < current ? Self.doneFill : Ink.hairline)
+                        .frame(height: index < current ? 2 : 1)
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -828,16 +833,16 @@ struct InkStepRail: View {
         return VStack(spacing: Ink.space1) {
             ZStack {
                 Rectangle()
-                    .fill(state == .current ? Ink.primaryFill : Ink.window)
+                    .fill(fill(for: state))
                     .overlay(Rectangle().strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke))
                 if state == .done {
                     Image(systemName: "checkmark")
-                        .font(Ink.microFont)
-                        .foregroundStyle(Ink.success)
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundStyle(Ink.paintWhite)
                 } else {
                     Text("\(index + 1)")
                         .font(Ink.headingFont)
-                        .foregroundStyle(state == .current ? Ink.onPrimary : Ink.label)
+                        .foregroundStyle(state == .current ? Ink.paintWhite : Ink.label)
                 }
             }
             .frame(width: 22, height: 22)
@@ -848,6 +853,14 @@ struct InkStepRail: View {
                 .minimumScaleFactor(0.7)
         }
         .frame(width: 56)
+    }
+
+    private func fill(for state: StepState) -> Color {
+        switch state {
+        case .done: return Self.doneFill
+        case .current: return Self.currentFill
+        case .ahead: return Ink.window
+        }
     }
 
     private enum StepState {
