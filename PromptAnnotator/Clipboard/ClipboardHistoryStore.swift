@@ -227,18 +227,55 @@ final class ClipboardHistoryStore: ObservableObject {
         return image
     }
 
-    /// Row thumbnail downsampled once with ImageIO to `maxHeight` points at 2x,
-    /// so list rows never decode or rescale a full screenshot while scrolling.
-    func thumbnail(for item: ClipboardItem, maxHeight: CGFloat) -> NSImage? {
+    // Row thumbnails are downsampled once with ImageIO to `maxHeight` points at 2x,
+    // so list rows never decode or rescale a full screenshot while scrolling.
+
+    /// Cache-only lookup: never touches disk.
+    func cachedThumbnail(for item: ClipboardItem, maxHeight: CGFloat) -> NSImage? {
         guard let name = item.imageFileName else { return nil }
-        let key = "\(name)@\(Int(maxHeight))" as NSString
-        if let hit = thumbnailCache.object(forKey: key) { return hit }
-        let url = imagesURL.appendingPathComponent(name)
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return thumbnailCache.object(forKey: Self.thumbnailKey(name, maxHeight) as NSString)
+    }
+
+    /// Decodes off the main thread and caches. The panel builds every row on first
+    /// open (DTScrollView measures its LazyVStack in full), and decoding ~70
+    /// thumbnails synchronously there was most of a ~700 ms first open.
+    func loadThumbnail(for item: ClipboardItem, maxHeight: CGFloat) async -> NSImage? {
+        if let hit = cachedThumbnail(for: item, maxHeight: maxHeight) { return hit }
+        guard let request = thumbnailRequest(for: item, maxHeight: maxHeight) else { return nil }
+        let image = await Task.detached(priority: .userInitiated) {
+            Self.decodeThumbnail(request)
+        }.value
+        if let image {
+            thumbnailCache.setObject(image, forKey: request.key as NSString)
+        }
+        return image
+    }
+
+    struct ThumbnailRequest: Sendable {
+        var url: URL
+        var maxHeight: CGFloat
+        var key: String
+    }
+
+    private func thumbnailRequest(for item: ClipboardItem, maxHeight: CGFloat) -> ThumbnailRequest? {
+        guard let name = item.imageFileName else { return nil }
+        return ThumbnailRequest(
+            url: imagesURL.appendingPathComponent(name),
+            maxHeight: maxHeight,
+            key: Self.thumbnailKey(name, maxHeight)
+        )
+    }
+
+    private nonisolated static func thumbnailKey(_ name: String, _ maxHeight: CGFloat) -> String {
+        "\(name)@\(Int(maxHeight))"
+    }
+
+    nonisolated static func decodeThumbnail(_ request: ThumbnailRequest) -> NSImage? {
+        guard let source = CGImageSourceCreateWithURL(request.url as CFURL, nil) else { return nil }
         let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
         let pixelW = (props?[kCGImagePropertyPixelWidth] as? CGFloat) ?? 0
         let pixelH = (props?[kCGImagePropertyPixelHeight] as? CGFloat) ?? 0
-        let scale = pixelH > 0 ? min(1, (maxHeight * 2) / pixelH) : 1
+        let scale = pixelH > 0 ? min(1, (request.maxHeight * 2) / pixelH) : 1
         let maxPixel = max(1, max(pixelW, pixelH) * scale)
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -248,9 +285,7 @@ final class ClipboardHistoryStore: ObservableObject {
         guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
             return nil
         }
-        let image = NSImage(cgImage: cg, size: NSSize(width: CGFloat(cg.width) / 2, height: CGFloat(cg.height) / 2))
-        thumbnailCache.setObject(image, forKey: key)
-        return image
+        return NSImage(cgImage: cg, size: NSSize(width: CGFloat(cg.width) / 2, height: CGFloat(cg.height) / 2))
     }
 
     /// History folder (index + images). Read-only for off-main measurement.

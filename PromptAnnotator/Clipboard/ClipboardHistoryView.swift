@@ -191,20 +191,7 @@ struct ClipboardHistoryView: View {
     private func rowBody(_ item: ClipboardItem, foreground: Color) -> some View {
         switch item.kind {
         case .image:
-            if let image = store.thumbnail(for: item, maxHeight: imageMaxHeight) {
-                Image(nsImage: image)
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fit)
-                    .frame(height: imageMaxHeight)
-                    .frame(maxWidth: 120, alignment: .leading)
-                    .clipped()
-            } else {
-                Rectangle()
-                    .fill(Ink.fill)
-                    .frame(width: 48, height: imageMaxHeight)
-                    .overlay(Rectangle().strokeBorder(Ink.hairline, lineWidth: 1))
-            }
+            ClipboardThumbnail(store: store, item: item, maxHeight: imageMaxHeight)
         case .text, .fileURL:
             Text(middleTruncated(item.previewLine))
                 .font(Ink.mono(12))
@@ -603,5 +590,33 @@ private struct ClipboardSearchGlyph: View {
             context.stroke(path, with: .foreground, lineWidth: stroke)
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// Row thumbnail: cache hit draws at once; a miss shows the placeholder and decodes off main.
+private struct ClipboardThumbnail: View {
+    let store: ClipboardHistoryStore
+    let item: ClipboardItem
+    let maxHeight: CGFloat
+    @State private var loaded: NSImage?
+
+    var body: some View {
+        if let image = loaded ?? store.cachedThumbnail(for: item, maxHeight: maxHeight) {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(height: maxHeight)
+                .frame(maxWidth: 120, alignment: .leading)
+                .clipped()
+        } else {
+            Rectangle()
+                .fill(Ink.fill)
+                .frame(width: 48, height: maxHeight)
+                .overlay(Rectangle().strokeBorder(Ink.hairline, lineWidth: 1))
+                .task(id: item.imageFileName) {
+                    loaded = await store.loadThumbnail(for: item, maxHeight: maxHeight)
+                }
+        }
     }
 }
