@@ -12,6 +12,7 @@ struct DTMenuBarPanel: View {
     private var shadow: CGFloat { Ink.bevelOffset }
 
     var body: some View {
+        let _ = PerfSuite.count("menuPanel")
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 DTWordmark(size: 11)

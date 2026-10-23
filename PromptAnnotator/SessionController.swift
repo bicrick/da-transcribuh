@@ -401,7 +401,8 @@ final class SessionController: ObservableObject {
             text = TranscriptText.leadingCapital(text)
         }
         pasteText = text
-        SessionClipboard.copy(image: image, transcript: text)
+        SessionClipboard.copy(image: image, transcript: text, to: PerfSuite.sessionPasteboard)
+        PerfSuite.markClipboardWritten()
     }
 
     /// Puts the last session back on the clipboard after something else overwrote it.
@@ -418,6 +419,8 @@ final class SessionController: ObservableObject {
     }
 
     private func deliverIfRequested() {
+        // Measurement runs never paste into whatever app is frontmost.
+        guard !PerfSuite.isolatesSession else { return }
         let skipping = skipNextPaste
         if skipNextPaste {
             skipNextPaste = false
@@ -459,6 +462,8 @@ final class SessionController: ObservableObject {
     private func startSpeechFollow() {
         speechTask?.cancel()
         keepTranscribing = true
+        // Ablation: `-DTPerfLive NO` decodes only at stop.
+        guard !PerfSuite.liveDecodeDisabled else { return }
         // Stays on the main actor (SessionController is @MainActor). Cancel + throwing sleep
         // so a new follow cannot resurrect after cancel/finish.
         speechTask = Task { @MainActor in
@@ -761,7 +766,9 @@ final class SessionController: ObservableObject {
             let audioFile = folder.appendingPathComponent("audio.m4a")
             startedAt = Date()
             let preferences = AppSettings.shared
-            AudioInputs.beginSession(uid: preferences.inputDeviceUID, raiseVolume: preferences.raiseInputVolume)
+            if AudioRecorder.feedURL == nil {
+                AudioInputs.beginSession(uid: preferences.inputDeviceUID, raiseVolume: preferences.raiseInputVolume)
+            }
             try audio.start(url: audioFile)
             directory = folder
             audioURL = audioFile
@@ -826,6 +833,10 @@ final class SessionController: ObservableObject {
         }
     }
 
+    /// Harness entry points (`PerfSuite`).
+    func perfBegin() async { await begin() }
+    func perfFinish() async { await finish() }
+
     private func finish() async {
         guard phase == .recording else { return }
         PushToTalk.shared.disarm()
@@ -881,10 +892,13 @@ final class SessionController: ObservableObject {
             }
         }
         keepTranscribing = false
+        PerfSuite.stopMark("captures")
         await speechTask?.value
         speechTask = nil
+        PerfSuite.stopMark("liveDrained")
         audio.stop()
         AudioInputs.endSession()
+        PerfSuite.stopMark("audioStopped")
         // When the live PCM buffer was trimmed, prefer the AAC file so the dropped prefix is not lost.
         let speechBuffer = audio.copySpeechBuffer()
         let spokenSamples: [Float]
@@ -935,6 +949,7 @@ final class SessionController: ObservableObject {
                 }
                 spoken = transcript.words
                 model = transcript.model
+                PerfSuite.stopMark("transcribed")
             } catch {
                 let message = UserFacingError.transcription(error)
                 transcriptionError = message
@@ -974,6 +989,7 @@ final class SessionController: ObservableObject {
                 model: model,
                 transcriptionError: transcriptionError
             )
+            PerfSuite.stopMark("written")
             pasteText = saved.pasteText
             sheetURL = saved.sheetURL
             lastSessionURL = directory
@@ -985,8 +1001,10 @@ final class SessionController: ObservableObject {
                 lastError = "No speech detected"
             }
             copyToClipboard()
+            PerfSuite.stopMark("copied")
             deliverIfRequested()
             NotificationCenter.default.post(name: .promptAnnotatorSessionsChanged, object: nil)
+            PerfSuite.stopMark("notified")
             setPhase(.idle)
         } catch {
             skipNextPaste = false
@@ -1331,6 +1349,7 @@ final class SessionController: ObservableObject {
 
     private func advanceProcessingMotion() {
         guard isBusy else { return }
+        PerfSuite.pace("processing")
         let elapsed = CACurrentMediaTime() - processingStartedAt
         let wave = WaveformMotion.loading(time: elapsed)
         let from = processingOrigin.isEmpty ? wave : processingOrigin
@@ -1380,6 +1399,7 @@ final class SessionController: ObservableObject {
 
     private func refreshLevels() {
         guard phase == .recording else { return }
+        PerfSuite.pace("levels")
         let now = CACurrentMediaTime()
         let delta = lastLevelTime == 0 ? (1.0 / 60.0) : min(0.05, now - lastLevelTime)
         lastLevelTime = now

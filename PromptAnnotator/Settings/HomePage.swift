@@ -22,6 +22,7 @@ struct HomePage: View {
     private var isNarrow: Bool { HomeBentoLayout.isNarrow(contentWidth: contentWidth) }
 
     var body: some View {
+        let _ = PerfSuite.count("homePage")
         // Home is a one-screen dashboard. The page is sized to the visible
         // viewport so the middle row (Recent + This Week) absorbs the spare
         // height. Below `HomeFitLayout.minimumHeight` it falls back to scrolling.

@@ -13,6 +13,7 @@ struct RecordingIslandView: View {
     }
 
     var body: some View {
+        let _ = PerfSuite.count("island")
         Group {
             if motion.presence != .hidden {
                 island

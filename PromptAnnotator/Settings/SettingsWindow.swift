@@ -20,6 +20,7 @@ struct SettingsRoot: View {
     @State private var selectHistoryID: String? = nil
 
     var body: some View {
+        let _ = PerfSuite.count("settingsRoot")
         ZStack {
             VStack(spacing: 0) {
                 DTTitleStrip()
@@ -245,7 +246,11 @@ struct SettingsRoot: View {
     }
 
     private func reload() {
+        let started = CACurrentMediaTime()
         sessions = SessionLibrary.load()
+        if PerfHarness.isEnabled {
+            PerfSuite.log(String(format: "reload sessions=%d ms=%.1f", sessions.count, (CACurrentMediaTime() - started) * 1000))
+        }
     }
 }
 

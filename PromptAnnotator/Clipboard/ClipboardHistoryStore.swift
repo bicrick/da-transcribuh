@@ -44,11 +44,30 @@ final class ClipboardHistoryStore: ObservableObject {
     }
 
     static func defaultFolder() -> URL {
+        if let override = PerfSuite.clipboardRootOverride { return override }
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return support.appendingPathComponent("PromptAnnotator/ClipboardHistory", isDirectory: true)
     }
 
     func beginOwnWrite() { suppressWatcher += 1 }
+
+    /// Harness only (`-DTPerfSeedClipboard`, temp store): every third item is an image.
+    func perfSeed(count: Int) {
+        historyLimitOverride = max(count, historyLimit)
+        var index = items.count
+        while items.count < count {
+            index += 1
+            if index % 3 == 0 {
+                let png = PerfSuite.syntheticPNG(width: 1200, height: 760, seed: index)
+                ingest(kind: .image, source: .pasteboard, text: nil, imagePNG: png, filePaths: nil,
+                       fingerprint: ClipboardFingerprint.image(png), applicationName: "Perf")
+            } else {
+                let text = "item \(index) " + String(repeating: "the quick brown fox \(index % 17) ", count: 1 + index % 40)
+                ingest(kind: .text, source: .pasteboard, text: text, imagePNG: nil, filePaths: nil,
+                       fingerprint: ClipboardFingerprint.text(text), applicationName: "Perf")
+            }
+        }
+    }
 
     func endOwnWrite() {
         let previous = suppressWatcher

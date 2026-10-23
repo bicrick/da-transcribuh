@@ -69,7 +69,9 @@ enum PerfHarness {
         UserDefaults.standard.integer(forKey: "DTPerfTabCycle")
     }
 
-    static var isEnabled: Bool { rounds > 0 || UserDefaults.standard.integer(forKey: "DTPerfPanel") > 0 }
+    static var isEnabled: Bool {
+        rounds > 0 || UserDefaults.standard.integer(forKey: "DTPerfPanel") > 0 || PerfSuite.isActive
+    }
 
     private static var started = false
 
@@ -122,9 +124,11 @@ extension PerfHarness {
         let previewWait = moves > 0 ? max(0, AppSettings.shared.clipboardPreviewDelayMs) + 300 : 0
         after(ms: 300 + previewWait) {
             postArrows(moves) {
+                PerfSuite.panelExtras {
                 after(ms: 400) {
                     ClipboardHistoryPanelController.shared.hide()
                     after(ms: 300) { panelStep(remaining: remaining - 1) }
+                }
                 }
             }
         }

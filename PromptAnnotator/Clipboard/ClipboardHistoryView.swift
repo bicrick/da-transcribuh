@@ -55,6 +55,7 @@ struct ClipboardHistoryView: View {
             schedulePreview(for: selection)
         }
         .onChange(of: filter) { _, _ in
+            PerfProbe.endAfterDisplay("type")
             selection = rows.first?.id
             schedulePreview(for: selection)
         }

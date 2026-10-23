@@ -34,6 +34,7 @@ enum SessionStore {
     }
 
     private static func resolvedFolder() -> URL {
+        if let override = PerfSuite.sessionsRootOverride { return override }
         if let bookmarked = resolveBookmark() {
             return bookmarked
         }
