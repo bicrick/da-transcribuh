@@ -43,6 +43,8 @@ final class ClipboardPreviewPanelController {
         if panel == nil {
             let panel = ChromePanel(radius: 0)
             panel.resignKeyOnMouseUp = false
+            // Capturable in screenshots, like the list (ChromePanel defaults to hidden).
+            panel.sharingType = .readOnly
             panel.isOpaque = false
             panel.backgroundColor = .clear
             panel.animationBehavior = .none

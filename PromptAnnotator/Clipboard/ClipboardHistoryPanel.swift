@@ -13,6 +13,10 @@ final class ClipboardHistoryPanelController {
     private var outsideLocalMonitor: Any?
     private var resignObserver: NSObjectProtocol?
     private var resignHideWork: DispatchWorkItem?
+    /// Polls while the screenshot UI is up so the panel survives the shot.
+    private var screenshotWatch: Timer?
+    /// The app in front when the panel opened. A change means the user left.
+    private var openerPID: pid_t?
     /// Bumped on each `show()` so a stale resign-hide cannot close a fresh panel.
     private var showGeneration: UInt64 = 0
     /// True while the close fade runs. The window is still on screen but logically gone.
@@ -78,6 +82,9 @@ final class ClipboardHistoryPanelController {
         if panel == nil {
             let panel = ChromePanel(radius: 0)
             panel.resignKeyOnMouseUp = false
+            // ChromePanel hides itself from screen capture (the recording island must
+            // stay out of its own tiles). The clipboard panel should show up in ⌘⇧3/4/5.
+            panel.sharingType = .readOnly
             panel.isOpaque = false
             panel.backgroundColor = .clear
             let host = NSHostingView(rootView: root)
@@ -124,6 +131,7 @@ final class ClipboardHistoryPanelController {
             panel.alphaValue = Self.restingAlpha
         }
         AnimSampler.sample("list-open", panel)
+        openerPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         installOutsideClickMonitor()
         installResignObserver()
     }
@@ -194,6 +202,7 @@ final class ClipboardHistoryPanelController {
     func hide(animated: Bool = true) {
         resignHideWork?.cancel()
         resignHideWork = nil
+        stopScreenshotWatch()
         removeOutsideClickMonitor()
         removeResignObserver()
         ClipboardPreviewPanelController.shared.hide(animated: animated)
@@ -241,6 +250,12 @@ final class ClipboardHistoryPanelController {
         let screenPoint = NSEvent.mouseLocation
         let listHit = panel.frame.contains(screenPoint)
         let previewHit = ClipboardPreviewPanelController.shared.frame?.contains(screenPoint) == true
+        // A ⌘⇧4 crosshair drag or window pick lands on the screenshot overlay, not
+        // on another app. Stay open for the shot.
+        if !listHit && !previewHit && ScreenshotUI.covers(screenPoint) {
+            startScreenshotWatch()
+            return
+        }
         if !listHit && !previewHit {
             hide()
         }
@@ -273,6 +288,11 @@ final class ClipboardHistoryPanelController {
                         guard let self else { return }
                         guard self.isVisible, self.showGeneration == generation else { return }
                         if self.shouldKeepOpenAfterResign() { return }
+                        // Focus went to the screenshot UI (⌘⇧4 or ⌘⇧5), not to another app.
+                        if ScreenshotUI.isActive(), !self.userSwitchedApps() {
+                            self.startScreenshotWatch()
+                            return
+                        }
                         self.hide()
                     }
                 }
@@ -281,6 +301,57 @@ final class ClipboardHistoryPanelController {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
             }
         }
+    }
+
+    /// True when a different regular app came to the front since the panel opened.
+    private func userSwitchedApps() -> Bool {
+        let front = NSWorkspace.shared.frontmostApplication
+        if ScreenshotUI.isFrontmost(front) { return false }
+        guard let front, let openerPID else { return false }
+        return front.processIdentifier != openerPID
+            && front.processIdentifier != ProcessInfo.processInfo.processIdentifier
+    }
+
+    private func startScreenshotWatch() {
+        guard screenshotWatch == nil else { return }
+        let generation = showGeneration
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                guard self.isVisible, self.showGeneration == generation else {
+                    self.stopScreenshotWatch()
+                    return
+                }
+                // The post-shot thumbnail can linger. Only the crosshair, toolbar
+                // or the Screenshot app in front count as "still shooting".
+                if ScreenshotUI.isFrontmost(NSWorkspace.shared.frontmostApplication)
+                    || ScreenshotUI.windows().contains(where: Self.isFullScreenshotWindow) {
+                    return
+                }
+                self.stopScreenshotWatch()
+                if self.userSwitchedApps() {
+                    self.hide()
+                } else if self.panel?.isKeyWindow != true {
+                    // Back from the shot: take keys again so Escape, arrows and typing work.
+                    self.panel?.makeKey()
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        screenshotWatch = timer
+    }
+
+    private func stopScreenshotWatch() {
+        screenshotWatch?.invalidate()
+        screenshotWatch = nil
+    }
+
+    /// The crosshair overlay spans a screen; the ⌘⇧5 toolbar sits above the Dock.
+    /// Both are wider than the floating thumbnail (about 220pt).
+    private static func isFullScreenshotWindow(_ info: [String: Any]) -> Bool {
+        guard let dict = info[kCGWindowBounds as String] as? NSDictionary,
+              let rect = CGRect(dictionaryRepresentation: dict as CFDictionary) else { return false }
+        return rect.width > 300
     }
 
     /// Keep the list open when focus moves to our preview, or the pointer is still on chrome.
