@@ -24,6 +24,20 @@ everything runs from `scripts/release.sh` on a Mac with Xcode 16+.
 
 3. **gh** (only for `--publish`): `brew install gh && gh auth login`.
 
+4. **Sparkle EdDSA key.** already done on Patrick's Mac (Oct 23, 2026). the private key lives only in the
+   login keychain (item `https://sparkle-project.org`, account `ed25519`). the public half is
+   `SUPublicEDKey` in `Config/Info.plist`. to check the pair still matches:
+
+   ```sh
+   build/spm/artifacts/sparkle/Sparkle/bin/generate_keys -p   # prints the public key only
+   ```
+
+   never run `generate_keys -x` (it exports the private key to a file), and never paste the key anywhere.
+   back it up with the login keychain itself (Time Machine, or Keychain Access export to an encrypted
+   location you control). if it is lost, already-installed copies can no longer accept updates; they would
+   need a manual reinstall of a build carrying a new `SUPublicEDKey`.
+   on a new Mac with no key, `generate_keys` (no flags) makes one and prints only the public key.
+
 ## cut a release
 
 ```sh
@@ -94,6 +108,64 @@ if a new feature needs another entitlement, add it to `Config/Release.entitlemen
 - `codesign --verify --deep --strict` passes, the runtime flag (`0x10000`) is set, team is `3BUPEZ2FJQ`, a secure timestamp is present
 - the signed entitlements include audio-input and do **not** include `get-task-allow` (notarization rejects it)
 - after notarizing: `stapler validate` and `spctl -a -vvv` report `source=Notarized Developer ID` for the app and the DMG
+- preflight: the keychain EdDSA key (`generate_keys -p`) equals `SUPublicEDKey` in `Config/Info.plist`
+- `Sparkle.framework` is embedded, and it and its helpers (Autoupdate, Updater.app, Downloader.xpc,
+  Installer.xpc) carry team `3BUPEZ2FJQ` with a secure timestamp. the exported app carries the same `SUPublicEDKey`
+- `appcast.xml` has an `sparkle:edSignature` on the enclosure, a signed feed, and passes `sign_update --verify`
+
+## auto-updates (Sparkle 2)
+
+the app embeds Sparkle 2.10.0 (SwiftPM, exact version). `UpdateController` owns one
+`SPUStandardUpdaterController`. it never starts under unit tests. "Check for Updates…" sits in the
+menu bar menu and on General → Updates.
+
+**what ships now (beta, private repo):**
+
+| Info.plist key | value | why |
+|---|---|---|
+| `SUFeedURL` | `https://github.com/bicrick/da-transcribuh/releases/latest/download/appcast.xml` | stable URL, follows the newest full release |
+| `SUPublicEDKey` | public EdDSA key | verifies every update and the feed |
+| `SUEnableAutomaticChecks` | `false` | no background checks, and no first-launch permission prompt |
+| `SUAutomaticallyUpdate` | `false` | never installs without asking |
+| `SURequireSignedFeed` | `true` | rejects an appcast that is not signed by our key |
+| `SUVerifyUpdateBeforeExtraction` | `true` | checks the DMG signature before unpacking it |
+
+while the repo is private the feed URL 404s for anyone not logged in to GitHub, so a manual
+check shows Sparkle's "update error" alert. that is expected until launch.
+
+**the appcast.** `scripts/release.sh` runs `scripts/make-appcast.sh` after the DMG is notarized and stapled.
+it calls Sparkle's `generate_appcast` on a folder holding just `da-transcribuh.dmg`, with enclosure URL
+`https://github.com/bicrick/da-transcribuh/releases/download/v<version>/da-transcribuh.dmg`. the enclosure
+gets an EdDSA signature and the feed is signed (generate_appcast signs it because the app sets
+`SURequireSignedFeed`). `--publish` uploads `appcast.xml` next to the DMGs. the feed lists one version.
+Sparkle only needs the newest.
+
+**keychain prompts.** `generate_keys` created the key, so `generate_keys -p` reads it silently.
+`generate_appcast` and `sign_update` are different binaries, so the first release may show
+"generate_appcast wants to use your confidential information stored in "https://sparkle-project.org"".
+click **Always Allow** while you are at the Mac. the release preflight also resolves SwiftPM packages into
+`build/spm` on the first run, which fetches from github.com through git's `osxkeychain` helper. that
+can raise a GitHub keychain prompt too.
+
+**flip at public launch** (one PR, then cut the release):
+
+1. make the repo public (or host `appcast.xml` and the DMG somewhere public, and point `SUFeedURL` there).
+2. publish full releases, not prereleases. `releases/latest` skips prereleases, so the feed and the README
+   download link only resolve for a full release: `PRERELEASE=0 scripts/release.sh <version> --publish`.
+   make that the default in `release.sh` once betas stop.
+3. in `Config/Info.plist` set `SUEnableAutomaticChecks` to `true`. optionally add
+   `SUScheduledCheckInterval` (seconds, default 86400 = daily).
+4. optional: `SUAutomaticallyUpdate` `true` for silent background installs (users can still opt out).
+5. change the General → Updates detail text (`updatesDetail` in `ConfigurationPage.swift`) and the
+   `UpdateConfigTests` expectations to match.
+6. updates only reach installs that already embed Sparkle (the first release after this lands, and later).
+   0.9.2 and older need one manual download.
+
+**test an update end to end** (before launch, once the repo is public or with a local feed): install
+version N, publish N+1 with `--publish`, then "Check for Updates…" in N should offer N+1, download,
+verify and relaunch. to rehearse against a private feed, build a throwaway copy with a different
+`SUFeedURL` and never install it over `/Applications`. `make-appcast.sh` can be dry-run with a throwaway
+key file (`ED_KEY_FILE=/tmp/... ASSET_NAME=...`) so the real key is not touched.
 
 ## Dev install (keeps permissions)
 

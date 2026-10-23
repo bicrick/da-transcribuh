@@ -3,6 +3,9 @@
 #
 #   scripts/release.sh <version> [--skip-notarize] [--publish]
 #
+# Env: PRERELEASE=0 publishes a full release instead of a prerelease. The Sparkle feed
+# (releases/latest/download/appcast.xml) only resolves for a full release; see docs/releasing.md.
+#
 # See docs/releasing.md for one-time setup.
 set -euo pipefail
 
@@ -48,6 +51,11 @@ DMG="$OUT/$APP_NAME $VERSION.dmg"          # "da transcribuh 0.9.1.dmg"
 DMG_ALIAS="da-transcribuh.dmg"              # URL-safe copy for GitHub (see docs/releasing.md)
 DMG_BG="$ROOT/Config/dmg/background.tiff"   # 600x400 + 1200x800, from Config/dmg/render-background.swift
 ENTITLEMENTS="$ROOT/Config/Release.entitlements"
+PRERELEASE="${PRERELEASE:-1}"
+# Sparkle comes in through SwiftPM. Clone packages into build/ so its tools sit at a known path.
+SPM_DIR="$ROOT/build/spm"
+SPARKLE_BIN="${SPARKLE_BIN:-$SPM_DIR/artifacts/sparkle/Sparkle/bin}"
+PLIST_ED_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' Config/Info.plist 2>/dev/null || true)"
 
 # ---- preflight: fail before the slow build, not after ----
 step "preflight"
@@ -75,6 +83,21 @@ if (( PUBLISH == 1 )); then
   gh auth status >/dev/null 2>&1 || die "gh is not logged in; run: gh auth login"
   gh release view "v$VERSION" -R "$REPO" >/dev/null 2>&1 && die "release v$VERSION already exists"
 fi
+# Sparkle: tools present, and the EdDSA key in the login Keychain matches the app's public key.
+# generate_keys -p prints only the public key. The private key never leaves the Keychain.
+[[ -n "$PLIST_ED_KEY" ]] || die "SUPublicEDKey missing from Config/Info.plist"
+if [[ ! -x "$SPARKLE_BIN/generate_appcast" ]]; then
+  mkdir -p "$SPM_DIR"
+  xcodebuild -resolvePackageDependencies -project PromptAnnotator.xcodeproj -scheme "$SCHEME" \
+    -clonedSourcePackagesDirPath "$SPM_DIR" > "$ROOT/build/spm-resolve.log" 2>&1 \
+    || die "package resolve failed (log: $ROOT/build/spm-resolve.log)"
+fi
+for tool in generate_keys generate_appcast sign_update; do
+  [[ -x "$SPARKLE_BIN/$tool" ]] || die "Sparkle tool missing: $SPARKLE_BIN/$tool"
+done
+KEYCHAIN_ED_KEY="$("$SPARKLE_BIN/generate_keys" -p 2>/dev/null || true)"
+[[ -n "$KEYCHAIN_ED_KEY" ]] || die "no Sparkle EdDSA key in the login Keychain (see docs/releasing.md, Sparkle key)"
+[[ "$KEYCHAIN_ED_KEY" == "$PLIST_ED_KEY" ]] || die "Keychain EdDSA key does not match SUPublicEDKey in Config/Info.plist"
 [[ -f "$DMG_BG" ]] || die "missing $DMG_BG (run: swift Config/dmg/render-background.swift Config/dmg)"
 [[ ! -d "/Volumes/$APP_NAME" ]] || die "/Volumes/$APP_NAME is mounted; eject it first"
 echo "version $VERSION (build $BUILD_NUMBER), identity: $IDENTITY"
@@ -88,6 +111,7 @@ xcodebuild archive \
   -configuration Release \
   -destination 'generic/platform=macOS' \
   -archivePath "$ARCHIVE" \
+  -clonedSourcePackagesDirPath "$SPM_DIR" \
   -xcconfig Config/Release.xcconfig \
   CODE_SIGN_ENTITLEMENTS="$ENTITLEMENTS" \
   MARKETING_VERSION="$VERSION" \
@@ -116,6 +140,19 @@ grep -q 'Timestamp=' <<<"$SIG" || die "no secure timestamp"
 ENTS="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null)"
 grep -q 'com.apple.security.device.audio-input' <<<"$ENTS" || die "audio-input entitlement missing"
 grep -q 'get-task-allow' <<<"$ENTS" && die "get-task-allow present; notarization would reject it"
+# Sparkle ships nested helpers (Autoupdate, Updater.app, XPC services). Each must carry our
+# Developer ID signature with a timestamp, or notarization rejects the app.
+SPARKLE_FW="$APP/Contents/Frameworks/Sparkle.framework"
+[[ -d "$SPARKLE_FW" ]] || die "Sparkle.framework not embedded"
+for nested in "$SPARKLE_FW" "$SPARKLE_FW/Versions/B/Autoupdate" "$SPARKLE_FW/Versions/B/Updater.app" \
+  "$SPARKLE_FW/Versions/B/XPCServices/Downloader.xpc" "$SPARKLE_FW/Versions/B/XPCServices/Installer.xpc"; do
+  [[ -e "$nested" ]] || continue
+  NSIG="$(codesign -dv --verbose=4 "$nested" 2>&1)"
+  grep -qx "TeamIdentifier=$TEAM_ID" <<<"$NSIG" || die "$nested is not signed by team $TEAM_ID"
+  grep -q 'Timestamp=' <<<"$NSIG" || die "$nested has no secure timestamp"
+done
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP/Contents/Info.plist")" == "$PLIST_ED_KEY" ]] \
+  || die "exported app carries a different SUPublicEDKey"
 echo "spctl (before notarization this says 'Unnotarized Developer ID'; that's expected):"
 spctl -a -vvv -t exec "$APP" 2>&1 || true
 
@@ -229,16 +266,24 @@ else
   echo "skipped notarization (--skip-notarize): this DMG will be blocked by Gatekeeper on other Macs"
 fi
 
+# ---- 7b. Sparkle appcast (EdDSA-signed enclosure + signed feed) ----
+# Signs with the Keychain key. The first run may raise a Keychain prompt for
+# generate_appcast / sign_update; see docs/releasing.md.
+step "appcast"
+SPARKLE_BIN="$SPARKLE_BIN" scripts/make-appcast.sh "$DMG" "$VERSION" "$OUT"
+
 # ---- 8. publish ----
 if (( PUBLISH == 1 )); then
   step "publish GitHub release v$VERSION"
   # GitHub turns spaces in asset names into dots, so the proper-named DMG shows up as
   # "da.transcribuh.<version>.dmg". The URL-safe alias keeps a stable
   # releases/latest/download/da-transcribuh.dmg link for the README.
+  # appcast.xml rides along so releases/latest/download/appcast.xml (SUFeedURL) finds it.
   cp "$DMG" "$OUT/$DMG_ALIAS"
+  PRE_FLAG=(); (( PRERELEASE == 1 )) && PRE_FLAG=(--prerelease)
   gh release create "v$VERSION" -R "$REPO" \
-    --title "da transcribuh $VERSION beta" --generate-notes --prerelease --target "$(git rev-parse HEAD)" \
-    "$DMG" "$OUT/$DMG_ALIAS"
+    --title "da transcribuh $VERSION beta" --generate-notes ${PRE_FLAG[@]+"${PRE_FLAG[@]}"} --target "$(git rev-parse HEAD)" \
+    "$DMG" "$OUT/$DMG_ALIAS" "$OUT/appcast.xml"
 fi
 
 # ---- 9. leave no second app on disk ----

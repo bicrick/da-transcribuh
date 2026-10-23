@@ -42,5 +42,21 @@
 	<false/>
 	<key>NSSupportsSuddenTermination</key>
 	<false/>
+	<!-- Sparkle 2. See docs/releasing.md ("auto-updates") for what to flip at public launch.
+	     Checks stay off while the repo is private: the feed below 404s without a GitHub login. -->
+	<key>SUFeedURL</key>
+	<string>https://github.com/bicrick/da-transcribuh/releases/latest/download/appcast.xml</string>
+	<!-- Public half of the EdDSA key. The private half lives only in Patrick's login Keychain
+	     (generate_keys, account ed25519). -->
+	<key>SUPublicEDKey</key>
+	<string>G6SPYolzL6cJ7xbOSHKEttfAfRfUKrVPUfdwCXSjvus=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 </dict>
 </plist>

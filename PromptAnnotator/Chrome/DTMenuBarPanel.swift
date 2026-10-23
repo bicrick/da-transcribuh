@@ -6,6 +6,7 @@ import SwiftUI
 struct DTMenuBarPanel: View {
     @ObservedObject var session: SessionController
     @ObservedObject var settings: AppSettings
+    @ObservedObject private var updates = UpdateController.shared
     @Environment(\.dismiss) private var dismiss
 
     private let panelWidth: CGFloat = 260
@@ -63,6 +64,10 @@ struct DTMenuBarPanel: View {
                 .padding(.horizontal, Ink.space3)
                 .padding(.vertical, Ink.space2)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            row(UpdateController.menuTitle, disabled: !updates.canCheckForUpdates) {
+                updates.checkForUpdates()
+            }
 
             row("quit da transcribuh") {
                 NSApp.terminate(nil)
