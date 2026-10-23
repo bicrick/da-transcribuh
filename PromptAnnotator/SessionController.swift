@@ -1015,6 +1015,7 @@ final class SessionController: ObservableObject {
             deliverIfRequested()
             NotificationCenter.default.post(name: .promptAnnotatorSessionsChanged, object: nil)
             PerfSuite.stopMark("notified")
+            AppLog.info("session saved chars=\(saved.pasteText.count) captures=\(captureCount) heardSpeech=\(heardSpeech) transcriptionError=\(transcriptionError != nil)")
             setPhase(.idle)
         } catch {
             skipNextPaste = false

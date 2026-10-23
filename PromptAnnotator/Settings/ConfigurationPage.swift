@@ -265,6 +265,11 @@ struct ConfigurationPage: View {
                         NSWorkspace.shared.activateFileViewerSelecting([url])
                     }
                     .buttonStyle(InkSecondaryButtonStyle())
+                    Button("Export diagnostics…") {
+                        DiagnosticsExporter.exportInteractively()
+                    }
+                    .buttonStyle(InkSecondaryButtonStyle())
+                    .help("Zips local logs, crash reports and system info. Nothing is uploaded.")
                 }
                 .padding(.horizontal, Ink.rowHPad)
                 .padding(.bottom, Ink.rowVPad)
