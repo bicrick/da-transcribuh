@@ -25,6 +25,9 @@ enum KeychainStore {
     }
 
     static func get(account: String) -> String? {
+        // A unit-test host is signed differently from the installed app, so a
+        // keychain read there can raise an access prompt. Tests never need it.
+        if Runtime.isUnitTest { return nil }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
