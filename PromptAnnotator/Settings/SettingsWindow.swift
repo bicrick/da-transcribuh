@@ -13,6 +13,8 @@ struct SettingsRoot: View {
     @StateObject private var permissions = PermissionModel()
     @State private var page: SettingsPage = .home
     @State private var sessions: [SessionSummary] = []
+    /// Reference box: stamping a reload must not re-render the window.
+    @State private var lastReloadAt = ReloadStamp()
     @State private var showPalette = false
     @State private var highlightTitle: String? = nil
     @State private var historyQuery = ""
@@ -71,7 +73,9 @@ struct SettingsRoot: View {
             SnapshotHarness.run { next in timedPage.wrappedValue = next }
         }
         .onReceive(NotificationCenter.default.publisher(for: .promptAnnotatorSettingsShown)) { _ in
-            reload()
+            // First open fires onAppear and this notification back to back.
+            // Skip the second load (it decoded the library twice per open).
+            reloadUnlessRecent(0.5)
             permissions.refresh()
             SettingsPresenter.shared.applyChrome()
         }
@@ -245,13 +249,23 @@ struct SettingsRoot: View {
         }
     }
 
+    private func reloadUnlessRecent(_ window: CFTimeInterval) {
+        if CACurrentMediaTime() - lastReloadAt.value < window { return }
+        reload()
+    }
+
     private func reload() {
         let started = CACurrentMediaTime()
+        lastReloadAt.value = started
         sessions = SessionLibrary.load()
         if PerfHarness.isEnabled {
             PerfSuite.log(String(format: "reload sessions=%d ms=%.1f", sessions.count, (CACurrentMediaTime() - started) * 1000))
         }
     }
+}
+
+final class ReloadStamp {
+    var value: CFTimeInterval = 0
 }
 
 @MainActor
