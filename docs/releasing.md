@@ -32,12 +32,40 @@ scripts/release.sh 1.0.0 --publish    # same, then create GitHub release v1.0.0 
 scripts/release.sh 1.0.0 --skip-notarize   # local dry run: stops after signing + DMG (Gatekeeper will block it elsewhere)
 ```
 
-output lands in `build/release/<version>/` (gitignored): `da-transcribuh-<version>.dmg`, the archive, export and logs.
+output lands in `build/release/<version>/` (gitignored):
 
-- the version arg sets `MARKETING_VERSION`. `CURRENT_PROJECT_VERSION` defaults to `git rev-list --count HEAD`
-  (override with `BUILD_NUMBER=...`).
-- `--publish` uploads two copies of the same DMG: `da-transcribuh-<version>.dmg` and `da-transcribuh.dmg`,
-  so the README's `releases/latest` link always has a stable name.
+- `da transcribuh <version>.dmg`: volume `da transcribuh`, holding `da transcribuh.app` and an `Applications` link
+- `da transcribuh <version>.xcarchive.zip` (dSYMs), `app.zip` (what was notarized), logs and `notary.json`
+
+the script deletes the exported `.app` and the `.xcarchive` at the end, so Spotlight and LaunchServices
+only ever see the copy in `/Applications`.
+
+- bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.pbxproj` in the release PR. the script
+  builds the version you pass (it warns if that differs from the project) with the project's build number
+  (override with `BUILD_NUMBER=...`). the app shows them as `<version> beta (<build>)` (`AppVersion.channel`).
+- `--publish` creates a prerelease and uploads two copies of the same DMG. GitHub replaces spaces in asset
+  names with dots, so `da transcribuh <version>.dmg` appears as `da.transcribuh.<version>.dmg`.
+  the URL-safe alias `da-transcribuh.dmg` keeps the README's `releases/latest/download/da-transcribuh.dmg`
+  link stable. it is the only reason the alias exists.
+
+## the DMG window
+
+opening the DMG shows a 600x400 Finder window with no toolbar or status bar and 128pt icons:
+the app on the left card, `Applications` on the right, and "drag me into Applications" with a
+pixel arrow in Departure Mono on the Ink paper background.
+
+- background: `Config/dmg/background.tiff` (600x400 and 1200x800 in one file, for Retina). regenerate with
+
+  ```sh
+  swift Config/dmg/render-background.swift Config/dmg
+  (cd Config/dmg && tiffutil -cathidpicheck background.png background@2x.png -out background.tiff)
+  ```
+
+  if you move icons, keep the positions in `render-background.swift` and `scripts/release.sh` in sync.
+- layout: `create-dmg` when it is installed (`brew install create-dmg`). otherwise the script falls back
+  to `hdiutil` plus a Finder AppleScript doing the same thing. either way Finder opens the image once
+  while it is writable, so a Finder window flashes during the build, and the first run may ask to let
+  the terminal control Finder.
 
 ## how signing is wired
 
