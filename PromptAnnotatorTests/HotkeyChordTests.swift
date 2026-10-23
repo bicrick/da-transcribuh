@@ -78,8 +78,9 @@ final class HotkeyChordTests: XCTestCase {
 
     @MainActor
     func testLegacyDefaultMigratesOnceToOptionSpace() {
-        let defaults = UserDefaults(suiteName: "test.hotkey.migrate.\(UUID().uuidString)")!
-        defer { defaults.removePersistentDomain(forName: defaults.suiteName!) }
+        let suiteName = "test.hotkey.migrate.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
 
         defaults.set(Int(kVK_Space), forKey: "hotkey.keyCode")
         defaults.set(Int(controlKey | optionKey), forKey: "hotkey.modifiers")
@@ -99,8 +100,9 @@ final class HotkeyChordTests: XCTestCase {
 
     @MainActor
     func testCustomChordIsNotMigrated() {
-        let defaults = UserDefaults(suiteName: "test.hotkey.custom.\(UUID().uuidString)")!
-        defer { defaults.removePersistentDomain(forName: defaults.suiteName!) }
+        let suiteName = "test.hotkey.custom.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let custom = HotkeyChord(
             keyCode: UInt32(kVK_ANSI_K),
