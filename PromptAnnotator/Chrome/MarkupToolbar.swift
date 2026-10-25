@@ -58,11 +58,18 @@ struct MarkupToolbarView: View {
                     RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
                         .fill(selected ? Ink.primaryFill : Color.clear)
                 )
+                .retroHover(
+                    in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous),
+                    tint: selected ? Ink.hoverTintOnPrimary : Ink.hoverTint,
+                    cursor: false
+                )
         }
         .help("Capture a snippet")
         .accessibilityLabel("Capture")
     }
 
+    // Toolbar hovers tint only. The markup overlay owns the cursor (crosshair,
+    // tool cursors), so the shared hand cursor stays off here.
     private func toolButton(_ tool: AnnotationTool) -> some View {
         let selected = session.markupMode == .annotate && session.tool == tool
         return PressSurface(action: { session.select(tool: tool) }) {
@@ -73,6 +80,11 @@ struct MarkupToolbarView: View {
                 .background(
                     RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
                         .fill(selected ? Ink.primaryFill : Color.clear)
+                )
+                .retroHover(
+                    in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous),
+                    tint: selected ? Ink.hoverTintOnPrimary : Ink.hoverTint,
+                    cursor: false
                 )
         }
         .help(tool.title)
@@ -85,6 +97,11 @@ struct MarkupToolbarView: View {
                 .font(Ink.buttonSmallFont)
                 .frame(width: 36, height: 32)
                 .foregroundStyle(Ink.label.opacity(enabled ? 1 : 0.35))
+                .retroHover(
+                    in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous),
+                    cursor: false,
+                    enabled: enabled
+                )
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
@@ -110,6 +127,7 @@ struct MarkupToolbarView: View {
                         .padding(-3)
                 )
                 .frame(width: 28, height: 32)
+                .retroHover(in: Circle(), cursor: false)
         }
         .buttonStyle(.plain)
         .help(color.name.capitalized)

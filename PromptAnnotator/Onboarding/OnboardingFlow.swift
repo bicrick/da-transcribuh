@@ -183,11 +183,16 @@ struct OnboardingFlow: View {
                     .monospacedDigit()
                 Spacer(minLength: Ink.space2)
                 if step != .ready {
-                    Button("Skip setup") { finishSetup() }
-                        .buttonStyle(.plain)
-                        .font(Ink.buttonSmallFont)
-                        .foregroundStyle(Ink.secondary)
-                        .disabled(practiceRunning || transfer.isWorking)
+                    Button {
+                        finishSetup()
+                    } label: {
+                        Text("Skip setup")
+                            .font(Ink.buttonSmallFont)
+                            .retroHoverForeground(Ink.secondary, hovered: Ink.label)
+                            .retroHover(tint: nil)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(practiceRunning || transfer.isWorking)
                 }
                 if step != .welcome {
                     Button("Back") { retreat() }
@@ -413,6 +418,10 @@ struct OnboardingFlow: View {
                                         style: StrokeStyle(lineWidth: Ink.stroke, dash: listening ? [4, 3] : [])
                                     )
                             )
+                            .retroHover(
+                                in: RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous),
+                                enabled: !listening
+                            )
                             .onTapGesture {
                                 listening = true
                                 listeningClipboard = false
@@ -480,6 +489,10 @@ struct OnboardingFlow: View {
                                             listeningClipboard ? Ink.label : Color.clear,
                                             style: StrokeStyle(lineWidth: Ink.stroke, dash: listeningClipboard ? [4, 3] : [])
                                         )
+                                )
+                                .retroHover(
+                                    in: RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous),
+                                    enabled: !listeningClipboard
                                 )
                                 .onTapGesture {
                                     listeningClipboard = true

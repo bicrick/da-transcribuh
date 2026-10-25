@@ -84,7 +84,7 @@ struct PerformancePage: View {
     private func memoryTile(title: String, value: String, detail: String, fraction: Double) -> some View {
         // Same tile as Models, Sound and Appearance (card fill, radius, cardPad,
         // bevel gutter) instead of a bare 1pt rectangle with space3 padding.
-        InkTile {
+        InkTile(hoverable: false) {
             VStack(alignment: .leading, spacing: Ink.space2) {
                 Text(title.uppercased())
                     .font(Ink.headingFont)

@@ -251,6 +251,7 @@ struct ClipboardHistoryView: View {
             .padding(.horizontal, Ink.space3)
             .padding(.vertical, 5)
             .contentShape(Rectangle())
+            .retroHover()
         }
         .buttonStyle(.plain)
     }

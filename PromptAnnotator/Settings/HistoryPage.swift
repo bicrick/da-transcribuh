@@ -261,6 +261,7 @@ struct HistoryPage: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
+                .retroHover(tint: nil)
             }
             .buttonStyle(.plain)
 
@@ -276,6 +277,8 @@ struct HistoryPage: View {
             .padding(.trailing, Ink.space2)
         }
         .frame(minHeight: 36)
+        // Whole row washes; the hand stays on the part that expands it.
+        .retroHover(cursor: false)
         .accessibilityAddTraits(isExpanded ? [.isSelected, .isButton] : .isButton)
         .accessibilityHint(isExpanded ? "Collapses the transcript" : "Shows the full transcript")
     }

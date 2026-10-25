@@ -72,13 +72,20 @@ struct SettingsFolderTabs: View {
             selection = page
         } label: {
             SettingsPageLabel(page: page)
-            .foregroundStyle(selected ? Ink.label : Ink.secondary)
+            .retroHoverForeground(selected ? Ink.label : Ink.secondary, hovered: Ink.label)
             .padding(.horizontal, Ink.space3)
             .frame(height: tabHeight)
             .background {
                 FolderTabShape(closeBottom: true)
                     .fill(selected ? Ink.front : Ink.fill)
             }
+            // Unselected tabs wash with their own accent on hover. No lift and no
+            // bevel: tabs rest on the shelf and layout stays selection-invariant.
+            .retroHover(
+                in: FolderTabShape(closeBottom: true),
+                tint: page.tabAccent.opacity(0.14),
+                enabled: !selected
+            )
             .overlay {
                 // Unselected only — selected outline is the overlay shelf path (same 2pt).
                 if !selected {

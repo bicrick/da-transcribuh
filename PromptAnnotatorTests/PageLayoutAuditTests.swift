@@ -9,6 +9,8 @@ import XCTest
 ///     TEST_RUNNER_DTPageAuditDir=/tmp/audit xcodebuild test \
 ///       -only-testing:PromptAnnotatorTests/PageLayoutAuditTests
 ///
+/// Add `TEST_RUNNER_DTPageAuditForceHover=1` to draw every hover state on.
+///
 /// The window sits far off screen at alpha 0 and never becomes key, so
 /// nothing appears and focus does not move. `cacheDisplay` draws it.
 @MainActor
@@ -21,6 +23,9 @@ final class PageLayoutAuditTests: XCTestCase {
         }
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         InkFontRegistrar.registerBundledFonts()
+        // `DTPageAuditForceHover=1` draws every hover target hovered, to review coverage.
+        RetroHover.forceAll = ProcessInfo.processInfo.environment["DTPageAuditForceHover"] == "1"
+        defer { RetroHover.forceAll = false }
 
         for (name, appearance) in [("light", NSAppearance.Name.aqua), ("dark", NSAppearance.Name.darkAqua)] {
             NSApp.appearance = NSAppearance(named: appearance)
