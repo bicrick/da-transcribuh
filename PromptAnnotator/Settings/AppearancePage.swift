@@ -37,7 +37,7 @@ struct AppearancePage: View {
 
             SettingsSection(
                 title: "Defaults",
-                footer: "These tools show while you hold Shift. Drag captures the front window or modal."
+                footer: "These tools show while you hold \(settings.sessionKeys.screenshot.title)\(settings.sessionKeys.annotate.map { " or \($0.title)" } ?? ""). Drag captures the front window or modal."
             ) {
                 InkCard {
                     VStack(alignment: .leading, spacing: 0) {

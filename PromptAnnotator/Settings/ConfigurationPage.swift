@@ -110,6 +110,35 @@ struct ConfigurationPage: View {
                         set: { settings.setPushToTalk($0) }
                     )
                 )
+                InkDivider(leading: 0)
+                InkSettingRow(
+                    title: "Screenshot key",
+                    detail: "Hold it alone for the crosshair. Drag to grab, release to cancel."
+                ) {
+                    InkMenuPicker(
+                        title: "Screenshot key",
+                        selection: Binding(
+                            get: { settings.screenshotKey },
+                            set: { message = settings.setScreenshotKey($0) }
+                        ),
+                        options: SessionModifier.screenshotChoices.map { ($0, "\($0.glyph) \($0.title)") }
+                    )
+                }
+                InkDivider(leading: 0)
+                InkSettingRow(
+                    title: "Annotate key",
+                    detail: "Hold it alone to draw with the default tool. Off leaves drawing on the bar."
+                ) {
+                    InkMenuPicker(
+                        title: "Annotate key",
+                        selection: Binding(
+                            get: { settings.annotateKey },
+                            set: { message = settings.setAnnotateKey($0) }
+                        ),
+                        options: SessionModifier.annotateChoices.map { (Optional($0), "\($0.glyph) \($0.title)") }
+                            + [(nil, "Off")]
+                    )
+                }
                 if let message {
                     Text(message)
                         .font(Ink.captionFont)
@@ -117,7 +146,7 @@ struct ConfigurationPage: View {
                         .padding(.horizontal, Ink.rowHPad)
                         .padding(.bottom, Ink.space2)
                 }
-                Text("Click the keycaps, press a new combo (needs a modifier, or a function key). It re-registers live — no relaunch. Shift stays free for drawing. Command-Space and Option-Command-Space stay with the system. Escape while capturing Cancel clears it.")
+                Text("Click the keycaps, press a new combo (needs a modifier, or a function key). It re-registers live — no relaunch. Session keys stay free: hold one alone to grab the screen or draw. Command-Space and Option-Command-Space stay with the system. Escape while capturing Cancel clears it.")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -375,7 +404,7 @@ struct ConfigurationPage: View {
                 InkDivider(leading: 0)
                 InkToggleRow(
                     title: "Press Return when Shift is held",
-                    detail: "After an automatic paste, Shift sends the message.",
+                    detail: "After an automatic paste, holding Shift as the session ends sends the message.",
                     isOn: Binding(
                         get: { settings.returnOnShift },
                         set: { settings.setReturnOnShift($0) }
@@ -418,7 +447,7 @@ struct ConfigurationPage: View {
                 return
             }
             let chord = HotkeyChord(event: event)
-            if let rejection = chord.rejection {
+            if let rejection = chord.rejection(reserving: settings.sessionKeys) {
                 message = rejection
                 return
             }

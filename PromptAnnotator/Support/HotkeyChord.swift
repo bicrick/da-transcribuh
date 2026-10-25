@@ -2,7 +2,8 @@ import AppKit
 import Carbon.HIToolbox
 import Foundation
 
-/// The session toggle. Shift is not allowed: while a session is running, Shift draws.
+/// The session toggle. It cannot use a session key (Shift grabs the screen and Control
+/// draws by default), because those are held on their own during a session.
 /// Command-Space and Option-Command-Space stay with Spotlight / Finder search.
 /// Option-Space is the default Start/Stop chord (Carbon consumes it so it won’t type NBSP).
 struct HotkeyChord: Equatable, Codable {
@@ -52,15 +53,28 @@ struct HotkeyChord: Equatable, Codable {
         kVK_F7, kVK_F8, kVK_F9, kVK_F10, kVK_F11, kVK_F12,
     ].reduce(into: []) { $0.insert(UInt32($1)) }
 
+    func includes(_ modifier: SessionModifier) -> Bool {
+        normalizedModifiers & modifier.carbonMask != 0
+    }
+
+    /// Valid for Carbon at all: a modifier or a function key, and not a system chord.
+    var isRegistrable: Bool {
+        (normalizedModifiers != 0 || isFunctionKey) && !takesOverSystemShortcut
+    }
+
+    /// Recording chord with the default screenshot key reserved.
     var canRegister: Bool {
         canRegister(allowingShift: false)
     }
 
-    /// Clipboard chords may include Shift (e.g. ⌘⇧C). Recording chords may not.
+    /// Clipboard chords may include Shift (e.g. ⌘⇧C). Recording chords may not by default.
     func canRegister(allowingShift: Bool) -> Bool {
-        (normalizedModifiers != 0 || isFunctionKey)
-            && (allowingShift || !includesShift)
-            && !takesOverSystemShortcut
+        canRegister(reserving: allowingShift ? nil : Self.shiftOnly)
+    }
+
+    /// `nil` reserves nothing. Otherwise the chord may not use a session key.
+    func canRegister(reserving keys: SessionKeys.Bindings?) -> Bool {
+        rejection(reserving: keys) == nil
     }
 
     var rejection: String? {
@@ -68,17 +82,29 @@ struct HotkeyChord: Equatable, Codable {
     }
 
     func rejection(allowingShift: Bool) -> String? {
+        rejection(reserving: allowingShift ? nil : Self.shiftOnly)
+    }
+
+    func rejection(reserving keys: SessionKeys.Bindings?) -> String? {
         if normalizedModifiers == 0 && !isFunctionKey {
             return "Add at least one modifier, or use a function key."
         }
-        if includesShift && !allowingShift {
-            return "Shift is held to draw, so the shortcut cannot include Shift."
+        if let keys {
+            if includes(keys.screenshot) {
+                let name = keys.screenshot.title
+                return "\(name) is held to grab the screen, so the shortcut cannot include \(name)."
+            }
+            if let annotate = keys.annotate, includes(annotate) {
+                return "\(annotate.title) is held to draw, so the shortcut cannot include \(annotate.title)."
+            }
         }
         if takesOverSystemShortcut {
             return "Command-Space and Option-Command-Space stay with the system."
         }
         return nil
     }
+
+    private static let shiftOnly = SessionKeys.Bindings(screenshot: .shift, annotate: nil)
 
     /// Default clipboard-history chord: ⌘⇧C.
     static let clipboardDefault = HotkeyChord(
@@ -193,7 +219,7 @@ enum RecordingChordCapture {
             return .restoredDefault(success: ok)
         }
         let chord = HotkeyChord(event: event)
-        if let rejection = chord.rejection {
+        if let rejection = chord.rejection(reserving: settings.sessionKeys) {
             return .rejected(rejection)
         }
         let ok = settings.setChord(chord)

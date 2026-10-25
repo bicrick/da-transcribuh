@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import Carbon.HIToolbox
 import os
 
 enum SessionPhase: Equatable {
@@ -48,7 +49,7 @@ final class SessionController: ObservableObject {
     private let log = Logger(subsystem: "com.bicrick.PromptAnnotator", category: "session")
     private let chrome = ChromeHost()
     private let overlay = OverlayController()
-    private let monitor = ShiftPenMonitor()
+    private let monitor = SessionKeyMonitor()
     private let audio = AudioRecorder()
     private let transcriber: any Transcribing
 
@@ -77,6 +78,10 @@ final class SessionController: ObservableObject {
     private var captureTail: Task<Void, Never> = Task {}
     private var isStarting = false
     private var chromeScreenID: CGDirectDisplayID?
+    /// Shows the markup bar a beat after the screenshot key goes down, so typing a
+    /// capital letter never flashes it. The crosshair changes right away.
+    private var toolbarRevealWork: DispatchWorkItem?
+    static let screenshotToolbarDelay: TimeInterval = 0.13
     private var lastToggle = Date.distantPast
     private var lastOfferedPermissions: String?
     private var keepTranscribing = false
@@ -291,8 +296,8 @@ final class SessionController: ObservableObject {
 
     func selectCapture() {
         guard phase == .recording || phase == .idle else { return }
-        let shiftHeld = phase == .recording && monitor.shiftIsDown
-        // Shift is still down: arm the snippet tool and leave the open marks on screen.
+        let shiftHeld = phase == .recording && monitor.holdIsActive
+        // A session key is still down: arm the snippet tool and leave the open marks on screen.
         // Committing here used to dismiss the bar and throw away the drag that followed.
         if !shiftHeld {
             let hadMarks = textEdit != nil || draft != nil || shapes.contains(where: { $0.isSignificant() })
@@ -310,7 +315,7 @@ final class SessionController: ObservableObject {
         if shiftHeld {
             showsPenState = true
             setToolbarVisible(true)
-            NSCursor.crosshair.set()
+            ScreenshotCursor.cursor.set()
         } else {
             showsPenState = false
             setToolbarVisible(false)
@@ -323,8 +328,9 @@ final class SessionController: ObservableObject {
     func select(tool: AnnotationTool) {
         self.tool = tool
         AppSettings.shared.setDefaultTool(tool)
-        if phase == .recording, monitor.shiftIsDown, textEdit == nil {
+        if phase == .recording, monitor.holdIsActive, textEdit == nil {
             markupMode = .annotate
+            overlay.updateBadge(nil, displayID: nil)
             showsPenState = true
             setToolbarVisible(true)
             ToolCursors.cursor(for: tool).set()
@@ -354,8 +360,22 @@ final class SessionController: ObservableObject {
     }
 
     private func setToolbarVisible(_ visible: Bool) {
+        toolbarRevealWork?.cancel()
+        toolbarRevealWork = nil
         showsToolbar = visible
         chrome.setToolbarVisible(visible)
+    }
+
+    private func revealToolbarSoon() {
+        guard !showsToolbar, toolbarRevealWork == nil else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.toolbarRevealWork = nil
+            guard self.phase == .recording, self.monitor.holdIsActive else { return }
+            self.setToolbarVisible(true)
+        }
+        toolbarRevealWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.screenshotToolbarDelay, execute: work)
     }
 
     func undo() {
@@ -539,38 +559,94 @@ final class SessionController: ObservableObject {
         return .passThrough
     }
 
-    func penShift(down: Bool) {
+    /// Modifiers of the push-to-talk chord while it is held, so ⌥Space plus Shift still
+    /// counts as Shift alone.
+    func heldChordFlags() -> CGEventFlags {
+        guard PushToTalk.shared.isArmed else { return [] }
+        let mods = AppSettings.shared.chord.normalizedModifiers
+        var flags: CGEventFlags = []
+        for key in SessionModifier.allCases where mods & key.carbonMask != 0 {
+            flags.insert(key.eventFlag)
+        }
+        if mods & UInt32(cmdKey) != 0 { flags.insert(.maskCommand) }
+        return flags
+    }
+
+    func sessionHoldChanged(to hold: SessionKeys.Hold) {
         guard phase == .recording else { return }
-        let effect = ShiftAnnotation.shiftEdge(
-            down: down,
+        let effect = SessionKeys.edge(
+            to: hold,
             editing: textEdit != nil,
-            selecting: monitor.isSwallowingMouse && !monitor.isAnnotating,
-            stroking: monitor.isAnnotating
+            gestureInProgress: monitor.isSwallowingMouse
         )
         switch effect {
         case .keepEditing:
-            if !down {
+            if hold == .none {
                 showsPenState = false
                 setToolbarVisible(false)
             }
-        case .keepSelecting:
+        case .keepGesture:
             break
-        case .beginDrawing:
+        case .beginScreenshot:
+            if markupMode == .annotate, hasOpenMarks {
+                // Annotate key handed straight to the screenshot key: keep the marks open.
+            } else {
+                markupMode = .capture
+            }
+            showsPenState = true
+            chromeScreenID = ScreenGeometry.screenUnderMouse().flatMap(ScreenGeometry.displayID)
+            revealToolbarSoon()
+            showScreenshotBadgeAtPointer()
+        case .beginAnnotate:
             markupMode = .annotate
             showsPenState = true
-            setToolbarVisible(true)
             chromeScreenID = ScreenGeometry.screenUnderMouse().flatMap(ScreenGeometry.displayID)
+            overlay.updateBadge(nil, displayID: nil)
+            setToolbarVisible(true)
         case .finishGestureOnRelease:
             showsPenState = false
             setToolbarVisible(false)
         case .endHold:
             showsPenState = false
             setToolbarVisible(false)
+            overlay.updateBadge(nil, displayID: nil)
             commitCanvas()
             markupMode = .capture
         }
         DispatchQueue.main.async { self.chrome.relayout() }
         refreshControls()
+    }
+
+    /// A grab, stroke, or replayed click ended after its key came up.
+    func sessionHoldGestureFinished() {
+        guard phase == .recording else { return }
+        overlay.updateBadge(nil, displayID: nil)
+        guard !showsPenState, textEdit == nil else { return }
+        commitCanvas()
+        markupMode = .capture
+        setToolbarVisible(false)
+        refreshControls()
+    }
+
+    /// Live readout beside the crosshair: the pointer before a drag, the box during one.
+    func screenshotPointerMoved(to point: CGPoint, display: CGDirectDisplayID) {
+        guard phase == .recording else { return }
+        guard monitor.holdIsActive, markupMode == .capture, textEdit == nil, !monitor.isCapturing else {
+            if !monitor.isCapturing { overlay.updateBadge(nil, displayID: nil) }
+            return
+        }
+        overlay.updateBadge(.position(point), displayID: display)
+    }
+
+    private func showScreenshotBadgeAtPointer() {
+        let appKit = NSEvent.mouseLocation
+        guard let screen = ScreenGeometry.screen(containingAppKitPoint: appKit),
+              let display = ScreenGeometry.displayID(of: screen) else { return }
+        screenshotPointerMoved(to: ScreenGeometry.displayLocal(appKitPoint: appKit, screen: screen), display: display)
+    }
+
+    private var hasOpenMarks: Bool {
+        textEdit != nil || draft != nil || shapes.contains(where: { $0.isSignificant() })
     }
 
     func penMouseDown(at point: CGPoint, display: CGDirectDisplayID) {
@@ -652,12 +728,16 @@ final class SessionController: ObservableObject {
         selectionRect = CaptureGesture.rect(from: origin, to: current)
         // Layer-only selection update — do not redraw baked marks on drag start.
         overlay.updateSelection(selectionRect, displayID: display)
+        if let selectionRect {
+            overlay.updateBadge(.size(of: selectionRect, at: current), displayID: display)
+        }
     }
 
     func captureDragMoved(origin: CGPoint, current: CGPoint, display: CGDirectDisplayID) {
         guard phase == .recording, display == drawingDisplayID else { return }
         guard markupMode == .capture || selectionRect != nil else { return }
         let rect = CaptureGesture.rect(from: origin, to: current)
+        overlay.updateBadge(.size(of: rect, at: current), displayID: display)
         // Coalesce no-ops (same integral box) so 120 Hz mice do not thrash layers.
         if let previous = selectionRect,
            Int(previous.minX) == Int(rect.minX),
@@ -677,8 +757,13 @@ final class SessionController: ObservableObject {
         selectionRect = nil
         drawingDisplayID = nil
         overlay.updateSelection(nil, displayID: nil)
+        if monitor.holdIsActive {
+            overlay.updateBadge(.position(current), displayID: display)
+        } else {
+            overlay.updateBadge(nil, displayID: nil)
+        }
         guard phase == .recording, armed, displayID == display else { return }
-        if !monitor.shiftIsDown {
+        if !monitor.holdIsActive {
             markupMode = .capture
             showsPenState = false
         }
@@ -697,6 +782,7 @@ final class SessionController: ObservableObject {
         selectionRect = nil
         drawingDisplayID = nil
         overlay.updateSelection(nil, displayID: nil)
+        overlay.updateBadge(nil, displayID: nil)
     }
 
     func penKey(_ key: PenKey) {
@@ -705,7 +791,7 @@ final class SessionController: ObservableObject {
         case .escape:
             if textEdit != nil {
                 textEdit = nil
-                if !monitor.shiftIsDown {
+                if !monitor.holdIsActive {
                     showsPenState = false
                     markupMode = .capture
                     setToolbarVisible(false)
@@ -812,6 +898,8 @@ final class SessionController: ObservableObject {
             waveform.set(FrequencyBands.resting(WaveformSamples.count))
             showsPenState = false
             markupMode = .capture
+            toolbarRevealWork?.cancel()
+            toolbarRevealWork = nil
             showsToolbar = false
             selectionRect = nil
             tool = AppSettings.shared.defaultTool
@@ -1119,7 +1207,7 @@ final class SessionController: ObservableObject {
             redoShapes.removeAll()
         }
         textEdit = nil
-        if !monitor.shiftIsDown {
+        if !monitor.holdIsActive {
             showsPenState = false
             markupMode = .capture
             setToolbarVisible(false)
@@ -1287,9 +1375,11 @@ final class SessionController: ObservableObject {
             overlay.show()
             showRecordingChrome()
         case .finishing, .downloading, .preparingModel, .transcribing:
+            overlay.updateBadge(nil, displayID: nil)
             overlay.hide()
             showProcessingChrome(from: previous)
         case .idle:
+            overlay.updateBadge(nil, displayID: nil)
             overlay.hide()
             hideChrome()
         }
@@ -1355,6 +1445,8 @@ final class SessionController: ObservableObject {
         }
         islandChrome.setPresence(.processing)
         islandChrome.setTargets(IslandSlots.processing(phase: phase), animated: !wasHidden)
+        toolbarRevealWork?.cancel()
+        toolbarRevealWork = nil
         showsToolbar = false
         chrome.hideToolbar()
         if entering || wasHidden {
@@ -1366,6 +1458,8 @@ final class SessionController: ObservableObject {
 
     private func hideChrome() {
         islandChrome.freeze()
+        toolbarRevealWork?.cancel()
+        toolbarRevealWork = nil
         showsToolbar = false
         chrome.dismissIsland(animated: islandChrome.presence != .hidden, hideToolbar: true) { [weak self] in
             self?.islandChrome.setPresence(.hidden)

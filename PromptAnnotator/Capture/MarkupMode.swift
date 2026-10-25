@@ -1,7 +1,8 @@
 import Foundation
 
-/// Capture is the session default: drag a rectangle to snippet the screen.
-/// Annotate keeps Shift-to-draw for the pen, highlighter, arrow, rectangle, and text.
+/// Capture: a drag with the screenshot key held snippets the screen.
+/// Annotate draws with the pen, highlighter, arrow, rectangle, and text.
+/// See `SessionKeys` for which held key selects which mode.
 enum MarkupMode: Equatable {
     case capture
     case annotate

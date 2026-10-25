@@ -328,7 +328,7 @@ struct OnboardingFlow: View {
                     InkDivider(leading: 0)
                     permissionRow(
                         title: "Accessibility",
-                        detail: "Global shortcuts, Shift-draw, paste into other apps, and clipboard history. One grant covers all of them.",
+                        detail: "Global shortcuts, screen grabs, drawing, paste into other apps, and clipboard history. One grant covers all of them.",
                         on: permissions.status.accessibility,
                         recovery: permissions.status.accessibility
                             ? nil
@@ -585,9 +585,9 @@ struct OnboardingFlow: View {
                 VStack(alignment: .leading, spacing: 0) {
                     guideRow("1", "Talk for a few seconds, or stay quiet — both paths are fine.")
                     InkDivider(leading: 0)
-                    guideRow("2", "Drag a rectangle to capture the front window when you want a tile.")
+                    guideRow("2", "Hold \(settings.sessionKeys.screenshot.title) and drag a rectangle when you want a tile.")
                     InkDivider(leading: 0)
-                    guideRow("3", "Hold Shift to annotate. Release Shift to save that tile.")
+                    guideRow("3", settings.sessionKeys.drawSentence)
                 }
             }
             Text("da transcribuh stops after about five seconds and shows what happened.")
@@ -820,6 +820,14 @@ struct OnboardingFlow: View {
         shortcutNote = settings.setClipboardChord(chord)
             ? nil
             : "That shortcut is already used, or macOS would not register it."
+    }
+}
+
+extension OnboardingFlow {
+    /// Opens on a later step. Used by offscreen renders.
+    init(settings: AppSettings, startAt: OnboardingStep, onFinish: @escaping () -> Void) {
+        self.init(settings: settings, onFinish: onFinish)
+        _step = State(initialValue: startAt)
     }
 }
 
