@@ -123,24 +123,26 @@ menu bar menu and on General → Updates.
 
 | Info.plist key | value | why |
 |---|---|---|
-| `SUFeedURL` | `https://github.com/bicrick/da-transcribuh/releases/latest/download/appcast.xml` | stable URL, follows the newest full release |
+| `SUFeedURL` | `https://da-transcribuh-site.vercel.app/appcast.xml` | public, served by the website repo. keep this URL even after a custom domain is added |
 | `SUPublicEDKey` | public EdDSA key | verifies every update and the feed |
 | `SUEnableAutomaticChecks` | `false` | no background checks, and no first-launch permission prompt |
 | `SUAutomaticallyUpdate` | `false` | never installs without asking |
 | `SURequireSignedFeed` | `true` | rejects an appcast that is not signed by our key |
 | `SUVerifyUpdateBeforeExtraction` | `true` | checks the DMG signature before unpacking it |
 
-while the repo is private the feed URL 404s for anyone not logged in to GitHub, so a manual
-check shows Sparkle's "update error" alert. that is expected until launch.
+the feed and the DMGs live on the public website (`bicrick/da-transcribuh-site`), so updates work while
+this repo stays private. 0.9.4 and older builds still point at the old GitHub feed and never see updates.
 
 **the appcast.** `scripts/release.sh` runs `scripts/make-appcast.sh` after the DMG is notarized and stapled.
-it calls Sparkle's `generate_appcast` on a folder holding just `da-transcribuh.dmg`, with enclosure URL
-`https://github.com/bicrick/da-transcribuh/releases/download/v<version>/da-transcribuh.dmg`. the enclosure
-gets an EdDSA signature and the feed is signed (generate_appcast signs it because the app sets
-`SURequireSignedFeed`). `--publish` uploads `appcast.xml` next to the DMGs. the feed lists one version.
-Sparkle only needs the newest.
+it calls Sparkle's `generate_appcast` on a folder holding just `da-transcribuh-<version>.dmg`, with enclosure URL
+`https://da-transcribuh-site.vercel.app/download/da-transcribuh-<version>.dmg`. the enclosure gets an EdDSA
+signature and the feed is signed (generate_appcast signs it because the app sets `SURequireSignedFeed`).
+the feed lists one version. Sparkle only needs the newest.
 
-**keychain prompts.** `generate_keys` created the key, so `generate_keys -p` reads it silently.
+**publish to the site.** copy the DMG to the site repo as `download/da-transcribuh-<version>.dmg` (keep older
+ones), copy `appcast.xml` to the site root, point the `/download` and `/download/latest` redirects in its
+`vercel.json` at the new DMG, push to main, then check `/appcast.xml` and the DMG return 200.
+
 `generate_appcast` and `sign_update` are different binaries, so the first release may show
 "generate_appcast wants to use your confidential information stored in "https://sparkle-project.org"".
 click **Always Allow** while you are at the Mac. the release preflight also resolves SwiftPM packages into

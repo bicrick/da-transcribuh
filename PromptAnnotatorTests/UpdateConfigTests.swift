@@ -3,10 +3,10 @@ import XCTest
 
 /// Sparkle settings baked into Info.plist. Beta ships with automatic checks off.
 final class UpdateConfigTests: XCTestCase {
-    func testFeedPointsAtTheLatestReleaseAppcast() {
+    func testFeedPointsAtTheWebsiteAppcast() {
         XCTAssertEqual(
             UpdateController.Config.feedURL,
-            "https://github.com/bicrick/da-transcribuh/releases/latest/download/appcast.xml"
+            "https://da-transcribuh-site.vercel.app/appcast.xml"
         )
     }
 

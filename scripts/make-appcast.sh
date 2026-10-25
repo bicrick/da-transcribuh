@@ -21,7 +21,11 @@ die() { echo "error: $*" >&2; exit 1; }
 [[ $# -eq 3 ]] || die "usage: scripts/make-appcast.sh <dmg> <version> <out-dir>"
 DMG="$1"; VERSION="$2"; OUT="$3"
 REPO="bicrick/da-transcribuh"
-DMG_ALIAS="${ASSET_NAME:-da-transcribuh.dmg}"   # asset name the enclosure URL points at (ASSET_NAME only for dry runs)
+# The feed and DMGs are served by the public website (bicrick/da-transcribuh-site), so
+# updates work while this repo stays private. The site hosts each DMG at
+# /download/da-transcribuh-<version>.dmg and the feed at /appcast.xml (SUFeedURL).
+SITE="${SITE_URL:-https://da-transcribuh-site.vercel.app}"
+DMG_ALIAS="${ASSET_NAME:-da-transcribuh-$VERSION.dmg}"   # file name the enclosure URL points at (ASSET_NAME only for dry runs)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SPARKLE_BIN="${SPARKLE_BIN:?set SPARKLE_BIN to the Sparkle bin directory}"
 [[ -f "$DMG" ]] || die "no DMG at $DMG"
@@ -37,13 +41,13 @@ fi
 EXPECT_ED_KEY="${EXPECT_ED_KEY:-$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$ROOT/Config/Info.plist")}"
 
 # generate_appcast reads every archive in a folder and writes into it, so give it a
-# folder holding only this release, under the asset name GitHub will serve.
+# folder holding only this release, under the file name the site will serve.
 STAGE="$OUT/appcast-stage"
 rm -rf "$STAGE"; mkdir -p "$STAGE"
 cp "$DMG" "$STAGE/$DMG_ALIAS"
 
 "$SPARKLE_BIN/generate_appcast" ${KEY_ARGS[@]+"${KEY_ARGS[@]}"} \
-  --download-url-prefix "https://github.com/$REPO/releases/download/v$VERSION/" \
+  --download-url-prefix "$SITE/download/" \
   --link "https://github.com/$REPO" \
   --maximum-versions 1 \
   -o "$OUT/appcast.xml" \
@@ -53,7 +57,7 @@ rm -rf "$STAGE"
 
 # The enclosure must carry an EdDSA signature (SUVerifyUpdateBeforeExtraction checks it).
 grep -q 'sparkle:edSignature=' "$OUT/appcast.xml" || die "appcast enclosure has no sparkle:edSignature"
-grep -q "releases/download/v$VERSION/$DMG_ALIAS" "$OUT/appcast.xml" || die "enclosure URL is not the v$VERSION $DMG_ALIAS asset"
+grep -q "url=\"$SITE/download/$DMG_ALIAS\"" "$OUT/appcast.xml" || die "enclosure URL is not $SITE/download/$DMG_ALIAS"
 
 # The feed itself must be signed (Info.plist sets SURequireSignedFeed). generate_appcast
 # signs it when the app requires that; sign it here if it didn't.

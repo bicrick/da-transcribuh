@@ -3,8 +3,8 @@
 #
 #   scripts/release.sh <version> [--skip-notarize] [--publish]
 #
-# Env: PRERELEASE=0 publishes a full release instead of a prerelease. The Sparkle feed
-# (releases/latest/download/appcast.xml) only resolves for a full release; see docs/releasing.md.
+# Env: PRERELEASE=0 publishes a full release instead of a prerelease. The Sparkle feed is
+# served by the website (appcast.xml + download/da-transcribuh-<version>.dmg); see docs/releasing.md.
 #
 # See docs/releasing.md for one-time setup.
 set -euo pipefail
@@ -278,7 +278,7 @@ if (( PUBLISH == 1 )); then
   # GitHub turns spaces in asset names into dots, so the proper-named DMG shows up as
   # "da.transcribuh.<version>.dmg". The URL-safe alias keeps a stable
   # releases/latest/download/da-transcribuh.dmg link for the README.
-  # appcast.xml rides along so releases/latest/download/appcast.xml (SUFeedURL) finds it.
+  # appcast.xml rides along as a record. SUFeedURL reads the copy on the website.
   cp "$DMG" "$OUT/$DMG_ALIAS"
   PRE_FLAG=(); (( PRERELEASE == 1 )) && PRE_FLAG=(--prerelease)
   gh release create "v$VERSION" -R "$REPO" \
