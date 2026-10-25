@@ -216,7 +216,13 @@ private struct DTMenuRow: View {
         }
         .buttonStyle(.plain)
         .disabled(disabled)
-        .onHover { hovering = $0 && !disabled }
+        // Same fade as every other hover (Ink.hoverDuration), so rows glide.
+        // The inverted fill stays: it is the menu highlight, not a card hover.
+        .onHover { over in
+            withAnimation(.easeOut(duration: Ink.hoverDuration)) {
+                hovering = over && !disabled
+            }
+        }
         .accessibilityLabel(title)
     }
 

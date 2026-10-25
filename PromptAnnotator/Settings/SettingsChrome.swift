@@ -213,6 +213,7 @@ struct InkAppearanceSegment: View {
                         .padding(.vertical, Ink.space2)
                         .contentShape(Rectangle())
                         .background(selected ? Ink.primaryFill : Color.clear)
+                        .retroHover(tint: selected ? Ink.hoverTintOnPrimary : Ink.hoverTint)
                 }
                 .buttonStyle(.plain)
                 if mode != AppAppearance.allCases.last {

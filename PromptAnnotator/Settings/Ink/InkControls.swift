@@ -28,6 +28,8 @@ struct InkRadioGroup<Selection: Hashable>: View {
                             .lineLimit(1)
                     }
                     .contentShape(Rectangle())
+                    // The radio box takes the tint (InkRadio reads the hover), not the text.
+                    .retroHover(tint: nil)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(option.1)
@@ -114,6 +116,7 @@ private struct InkStepperButtonStyle: ButtonStyle {
         configuration.label
             .foregroundStyle(configuration.isPressed ? Ink.window : (enabled ? Ink.label : Ink.tertiary))
             .background(configuration.isPressed ? Ink.label : Ink.window)
+            .retroHover(enabled: enabled)
     }
 }
 

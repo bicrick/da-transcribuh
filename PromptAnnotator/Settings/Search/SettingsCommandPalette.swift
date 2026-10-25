@@ -148,6 +148,7 @@ struct SettingsCommandPalette: View {
             .padding(.vertical, Ink.space2 + 2)
             .background(selected ? Ink.fill : Color.clear)
             .contentShape(Rectangle())
+            .retroHover()
         }
         .buttonStyle(.plain)
     }
@@ -220,11 +221,12 @@ struct SettingsSearchAffordance: View {
                 Text("⌘K")
                     .font(Ink.mono(10))
             }
-            .foregroundStyle(Ink.secondary)
+            .retroHoverForeground(Ink.secondary, hovered: Ink.label)
             .padding(.horizontal, Ink.space2)
             .padding(.vertical, 4)
             .background(Ink.fill)
             .overlay(Rectangle().strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke))
+            .retroHover()
         }
         .buttonStyle(.plain)
         .help("Search settings (⌘K)")

@@ -172,6 +172,10 @@ struct AppearancePage: View {
                     RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
                         .strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke)
                 )
+                .retroHover(
+                    in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous),
+                    tint: selected ? Ink.hoverTintOnPrimary : Ink.hoverTint
+                )
         }
         .buttonStyle(.plain)
         .help(tool.title)
@@ -193,6 +197,7 @@ struct AppearancePage: View {
                     .frame(width: selected ? 22 : 18, height: selected ? 22 : 18)
             }
             .frame(width: 28, height: 28)
+            .retroHover(in: Circle())
         }
         .buttonStyle(.plain)
         .help(color.name)

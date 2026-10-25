@@ -90,29 +90,35 @@ struct InkCard<Content: View>: View {
 
 struct InkTile<Content: View>: View {
     var selected: Bool = false
+    /// Off for tiles that only show data (Performance), so they don't invite a click.
+    var hoverable: Bool = true
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         content()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(Ink.cardPad)
-            .background {
-                ZStack(alignment: .topLeading) {
-                    // Hard shadow is paint-only — always reserved via outer padding so
-                    // selection never shifts the card in a grid.
-                    if selected {
-                        RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
-                            .fill(Ink.bevel)
-                            .offset(x: Ink.bevelOffset, y: Ink.bevelOffset)
-                    }
-                    RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
-                        .fill(Ink.card)
-                }
-            }
+            .background(Ink.card, in: RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
                     .strokeBorder(Ink.label, lineWidth: selected ? Ink.selectedBorder : Ink.lineWidth)
             )
+            // Selected tiles rise off their bevel; the rest just take the tint.
+            .retroHover(
+                in: RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous),
+                lift: selected ? .upLeft : .none,
+                enabled: hoverable
+            )
+            .background(alignment: .topLeading) {
+                // Hard shadow is paint-only — always reserved via outer padding so
+                // selection never shifts the card in a grid. Drawn after the hover
+                // so it stays put while the face lifts.
+                if selected {
+                    RoundedRectangle(cornerRadius: Ink.tileRadius, style: .continuous)
+                        .fill(Ink.bevel)
+                        .offset(x: Ink.bevelOffset, y: Ink.bevelOffset)
+                }
+            }
             // Reserve shadow gutter on every tile (selected or not) so tops/heights line up.
             .padding(.trailing, Ink.bevelOffset)
             .padding(.bottom, Ink.bevelOffset)
@@ -256,13 +262,11 @@ struct InkKeycapRow: View {
 
 /// Home Start-row chord editor — same `ShortcutCapture` + `AppSettings.setChord` as General.
 /// Muted “click to rebind” hint sits left of the keycaps (does not shift Start).
-/// Hover: label border + pointing hand. Click to capture; Esc cancels;
+/// Hover: label border + tint + pointing hand. Click to capture; Esc cancels;
 /// Delete restores ⌥Space. Conflicts show as a brief red caption under the caps.
 struct HomeChordEditor: View {
     @ObservedObject var settings: AppSettings
     @State private var listening = false
-    @State private var hovering = false
-    @State private var cursorPushed = false
     @State private var message: String?
 
     var body: some View {
@@ -277,30 +281,16 @@ struct HomeChordEditor: View {
                 Button {
                     beginListening()
                 } label: {
-                    InkKeycapRow(keys: settings.chord.keycaps)
-                        .padding(3)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
-                                .strokeBorder(
-                                    listening
-                                        ? Ink.label
-                                        : (hovering ? Ink.label : Color.clear),
-                                    style: StrokeStyle(
-                                        lineWidth: Ink.stroke,
-                                        dash: listening ? [4, 3] : []
-                                    )
-                                )
+                    ChordEditorFace(keys: settings.chord.keycaps, listening: listening)
+                        .retroHover(
+                            in: RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous),
+                            enabled: !listening
                         )
-                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help(listening ? "Press a shortcut — Esc cancels, Delete restores ⌥Space" : "Edit recording shortcut")
                 .accessibilityLabel(listening ? "Listening for shortcut" : "Recording shortcut \(settings.chord.display)")
                 .accessibilityHint("Click to change the Start and stop shortcut")
-                .onHover { over in
-                    hovering = over && !listening
-                    syncCursor(wantHand: over && !listening)
-                }
             }
 
             if let message {
@@ -318,8 +308,6 @@ struct HomeChordEditor: View {
             ShortcutCapture(active: $listening) { event in
                 let outcome = RecordingChordCapture.applyToggleEvent(event, settings: settings)
                 listening = false
-                hovering = false
-                syncCursor(wantHand: false)
                 message = RecordingChordCapture.message(for: outcome)
             }
         )
@@ -328,18 +316,25 @@ struct HomeChordEditor: View {
     private func beginListening() {
         listening = true
         message = nil
-        hovering = false
-        syncCursor(wantHand: false)
     }
+}
 
-    private func syncCursor(wantHand: Bool) {
-        if wantHand, !cursorPushed {
-            NSCursor.pointingHand.push()
-            cursorPushed = true
-        } else if !wantHand, cursorPushed {
-            NSCursor.pop()
-            cursorPushed = false
-        }
+/// Keycaps with the editor outline: solid on hover, dashed while listening.
+private struct ChordEditorFace: View {
+    var keys: [String]
+    var listening: Bool
+    @Environment(\.retroHovered) private var hovered
+
+    var body: some View {
+        InkKeycapRow(keys: keys)
+            .padding(3)
+            .overlay(
+                RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
+                    .strokeBorder(
+                        listening || hovered ? Ink.label : Color.clear,
+                        style: StrokeStyle(lineWidth: Ink.stroke, dash: listening ? [4, 3] : [])
+                    )
+            )
     }
 }
 
@@ -375,6 +370,7 @@ struct InkShortcutRecorder: View {
                 RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
                     .strokeBorder(listening ? Ink.paintCyan : Ink.controlBorder, lineWidth: Ink.stroke)
             )
+            .retroHover(in: RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous), lift: .upLeft)
             .background(
                 RoundedRectangle(cornerRadius: Ink.fieldRadius, style: .continuous)
                     .fill(Ink.bevel)
@@ -450,11 +446,15 @@ struct InkProgressBar: View {
 /// Square Paint radio: 2pt ink box, solid square dot when selected.
 struct InkRadio: View {
     var selected: Bool
+    @Environment(\.retroHovered) private var hovered
 
     var body: some View {
         ZStack {
             Rectangle()
                 .fill(Ink.field)
+            Rectangle()
+                .fill(Ink.hoverTint)
+                .opacity(hovered ? 1 : 0)
             Rectangle()
                 .strokeBorder(Ink.label, lineWidth: Ink.stroke)
             if selected {
@@ -469,11 +469,15 @@ struct InkRadio: View {
 
 struct InkCheck: View {
     var done: Bool
+    @Environment(\.retroHovered) private var hovered
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 1, style: .continuous)
                 .fill(done ? Ink.paintGreen : Ink.window)
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                .fill(Ink.hoverTint)
+                .opacity(hovered ? 1 : 0)
             RoundedRectangle(cornerRadius: 1, style: .continuous)
                 .strokeBorder(Ink.label, lineWidth: Ink.stroke)
             if done {
@@ -548,9 +552,13 @@ struct InkToggleRow: View {
             }
         }
         .toggleStyle(InkToggleStyle())
-        .disabled(!enabled)
         .padding(.horizontal, Ink.rowHPad)
         .padding(.vertical, Ink.rowVPad)
+        // The whole hovered row toggles, padding included, so the hand never lies.
+        .contentShape(Rectangle())
+        .onTapGesture { if enabled { isOn.toggle() } }
+        .retroHover()
+        .disabled(!enabled)
         .opacity(enabled ? 1 : 0.55)
         .background(highlightTitle == title ? Ink.paintYellow.opacity(0.55) : Color.clear)
         .animation(.easeOut(duration: 0.2), value: highlightTitle)
@@ -570,6 +578,7 @@ struct InkCheckboxStyle: ToggleStyle {
                 Spacer(minLength: 0)
             }
             .contentShape(Rectangle())
+            .retroHover(tint: nil)
         }
         .buttonStyle(.plain)
     }
@@ -683,6 +692,7 @@ struct InkMenuPicker<Selection: Hashable>: View {
                     .strokeBorder(Ink.label, lineWidth: Ink.stroke)
             )
             .contentShape(Rectangle())
+            .retroHover(in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous))
         }
         .buttonStyle(.plain)
         .background(InkMenuAnchorView(anchor: anchor))
@@ -873,6 +883,9 @@ struct InkStepRail: View {
 struct InkPrimaryButtonStyle: ButtonStyle {
     var large: Bool = true
     var enabled: Bool = true
+    /// Set when the caller draws a hard bevel behind the button (Home Start),
+    /// so the face rises off it on hover. Flat primaries only tint.
+    var lift: RetroLift = .none
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -887,6 +900,12 @@ struct InkPrimaryButtonStyle: ButtonStyle {
             .overlay(
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
                     .strokeBorder(enabled ? Ink.controlBorder : Ink.tertiary, lineWidth: Ink.stroke)
+            )
+            .retroHover(
+                in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous),
+                tint: Ink.hoverTintOnPrimary,
+                lift: lift,
+                enabled: enabled
             )
             .opacity(configuration.isPressed ? 0.88 : 1)
     }
@@ -912,6 +931,8 @@ extension View {
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
                     .strokeBorder(Ink.controlBorder, lineWidth: Ink.stroke)
             )
+            // Face rises 1pt off the bevel on hover; the bevel below stays put.
+            .retroHover(in: RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous), lift: .up)
             .background(
                 RoundedRectangle(cornerRadius: Ink.buttonRadius, style: .continuous)
                     .fill(Ink.bevel)

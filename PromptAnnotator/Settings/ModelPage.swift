@@ -130,6 +130,7 @@ struct ModelPage: View {
                                 .padding(.horizontal, Ink.rowHPad)
                                 .padding(.vertical, Ink.rowVPad)
                                 .contentShape(Rectangle())
+                                .retroHover()
                         }
                         .buttonStyle(.plain)
                         .disabled(transfer.isWorking)
@@ -180,6 +181,7 @@ struct ModelPage: View {
                         .frame(width: 2)
                 }
                 .contentShape(Rectangle())
+                .retroHover()
             }
             .buttonStyle(.plain)
             .disabled(transfer.isWorking)

@@ -111,7 +111,7 @@ struct HomePage: View {
                         .font(Ink.buttonFont)
                 }
             }
-            .buttonStyle(InkPrimaryButtonStyle(large: true, enabled: !session.isBusy))
+            .buttonStyle(InkPrimaryButtonStyle(large: true, enabled: !session.isBusy, lift: .upLeft))
             .background(
                 Rectangle()
                     .fill(Ink.paintRed)
@@ -232,10 +232,15 @@ struct HomePage: View {
         return HomeBentoCell(
             title: "RECENT",
             trailing: AnyView(
-                Button("All in History →") { onOpenHistory(nil) }
-                    .buttonStyle(.plain)
-                    .font(Ink.captionFont)
-                    .foregroundStyle(Ink.secondary)
+                Button {
+                    onOpenHistory(nil)
+                } label: {
+                    Text("All in History →")
+                        .font(Ink.captionFont)
+                        .retroHoverForeground(Ink.secondary, hovered: Ink.label)
+                        .retroHover(tint: nil)
+                }
+                .buttonStyle(.plain)
             )
         ) {
             if rows.isEmpty {
@@ -454,6 +459,7 @@ struct HomePage: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .retroHover(tint: nil)
 
             if hovering {
                 Button("Copy") { copy(summary) }
@@ -463,6 +469,8 @@ struct HomePage: View {
             recentThumb(summary)
         }
         .frame(height: height)
+        // Whole row washes; the hand stays on the part that opens History.
+        .retroHover(cursor: false)
         .onHover { over in
             if over {
                 hoveredRecentID = summary.id
