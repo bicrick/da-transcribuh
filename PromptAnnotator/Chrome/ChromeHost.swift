@@ -15,19 +15,60 @@ final class ChromeHost {
         self.session = session
     }
 
+    /// Fades the markup bar in and out. Holding a session key shows it, so it has to
+    /// feel instant without popping: a short ease-out on alpha, nothing else moves.
     func setToolbarVisible(_ visible: Bool) {
         guard let session else { return }
         ensureHosts(session)
+        guard let panel = toolbarPanel else { return }
         if visible {
-            toolbarPanel?.orderFrontRegardless()
+            relayout()
+            fadeToolbar(panel, to: 1)
         } else {
-            toolbarPanel?.orderOut(nil)
+            fadeToolbar(panel, to: 0)
         }
-        relayout()
     }
 
     func hideToolbar() {
+        toolbarFadeToken += 1
+        toolbarTarget = 0
         toolbarPanel?.orderOut(nil)
+        toolbarPanel?.alphaValue = 1
+    }
+
+    private var toolbarFadeToken = 0
+    private var toolbarTarget: CGFloat = 0
+    static let toolbarFadeIn: TimeInterval = 0.14
+    static let toolbarFadeOut: TimeInterval = 0.1
+
+    private func fadeToolbar(_ panel: ChromePanel, to target: CGFloat) {
+        let showing = target > 0
+        if toolbarTarget == target, panel.isVisible == showing { return }
+        toolbarTarget = target
+        toolbarFadeToken += 1
+        let token = toolbarFadeToken
+        if showing, !panel.isVisible {
+            panel.alphaValue = 0
+            panel.orderFrontRegardless()
+        }
+        guard panel.isVisible else { return }
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            panel.alphaValue = 1
+            if !showing { panel.orderOut(nil) }
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = showing ? Self.toolbarFadeIn : Self.toolbarFadeOut
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.allowsImplicitAnimation = true
+            panel.animator().alphaValue = target
+        } completionHandler: {
+            DispatchQueue.main.async {
+                guard self.toolbarFadeToken == token, !showing else { return }
+                panel.orderOut(nil)
+                panel.alphaValue = 1
+            }
+        }
     }
 
     /// Puts the pill on screen at alpha zero before its contents change, so the swap cannot flash.
@@ -87,7 +128,7 @@ final class ChromeHost {
         fadeToken += 1
         let token = fadeToken
         if hideToolbar {
-            toolbarPanel?.orderOut(nil)
+            self.hideToolbar()
         }
         guard let panel = islandPanel else {
             completion()

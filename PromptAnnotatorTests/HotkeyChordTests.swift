@@ -49,7 +49,7 @@ final class HotkeyChordTests: XCTestCase {
         XCTAssertFalse(chord.canRegister)
         XCTAssertEqual(
             chord.rejection,
-            "Shift is held to draw, so the shortcut cannot include Shift."
+            "Shift is held to grab the screen, so the shortcut cannot include Shift."
         )
     }
 

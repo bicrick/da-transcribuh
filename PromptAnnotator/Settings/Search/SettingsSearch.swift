@@ -83,6 +83,8 @@ enum SettingsSearch {
         hit("clip.ignore", .clipboard, "Clipboard ignore", "Ignored apps and concealed types"),
         hit("clip.advanced", .clipboard, "Clipboard advanced", "Pause capture, clear on quit"),
         hit("gen.ptt", .configuration, "Push to talk", "Hold to record"),
+        hit("gen.shotkey", .configuration, "Screenshot key", "Hold for the crosshair (Shift)"),
+        hit("gen.drawkey", .configuration, "Annotate key", "Hold to draw (Control)"),
         hit("gen.login", .configuration, "Launch at login", "Open at login"),
         hit("gen.updates", .configuration, "Updates", "Check for a new build"),
         hit("gen.top", .configuration, "Keep this window above others", "Floating Settings"),

@@ -97,6 +97,10 @@ final class AppSettings: ObservableObject {
     @Published var clipboardClearOnQuit: Bool = false
     @Published var clipboardClearSystemClipboard: Bool = false
     @Published var pushToTalk: Bool
+    /// Held alone during a session for the screenshot crosshair.
+    @Published private(set) var screenshotKey: SessionModifier
+    /// Held alone during a session to draw. `nil` is Off.
+    @Published private(set) var annotateKey: SessionModifier?
     @Published var islandStyle: IslandStyle
     @Published var soundEnabled: Bool
     @Published var soundVolume: Double
@@ -139,8 +143,11 @@ final class AppSettings: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         isLoading = true
-        chord = Self.loadChord(defaults: defaults)
-        cancelChord = Self.chord(key: Keys.cancelKey, mods: Keys.cancelMods, defaults: defaults)
+        let shortcuts = Self.loadSessionShortcuts(defaults: defaults)
+        chord = shortcuts.chord
+        cancelChord = shortcuts.cancel
+        screenshotKey = shortcuts.keys.screenshot
+        annotateKey = shortcuts.keys.annotate
         clipboardHistoryEnabled = defaults.object(forKey: Keys.clipboardEnabled) as? Bool ?? true
         if let key = defaults.object(forKey: Keys.clipboardChordKey) as? Int,
            let mods = defaults.object(forKey: Keys.clipboardChordMods) as? Int {
@@ -229,11 +236,124 @@ final class AppSettings: ObservableObject {
         guard let keyCode = defaults.object(forKey: key) as? Int,
               let modifiers = defaults.object(forKey: mods) as? Int else { return nil }
         let chord = HotkeyChord(keyCode: UInt32(keyCode), carbonModifiers: UInt32(modifiers))
-        return chord.canRegister ? chord : nil
+        return chord.isRegistrable ? chord : nil
+    }
+
+    /// Loads the recording chords and the session keys together, since each limits the other.
+    /// Builds before the session-key pickers stored nothing: Shift becomes the screenshot key
+    /// and drawing moves to the first of Control or Option that no chord uses.
+    private static func loadSessionShortcuts(
+        defaults: UserDefaults
+    ) -> (chord: HotkeyChord, cancel: HotkeyChord?, keys: SessionKeys.Bindings) {
+        var chord = loadChord(defaults: defaults)
+        if !chord.isRegistrable { chord = .default }
+        var cancel = Self.chord(key: Keys.cancelKey, mods: Keys.cancelMods, defaults: defaults)
+
+        // The chords win over stored keys: a clash moves the keys, not the shortcut.
+        var keys = storedSessionKeys(defaults: defaults)
+            ?? migratedSessionKeys(chord: chord, cancelChord: cancel)
+        if sessionKeyRejection(keys, chord: chord, cancelChord: cancel) != nil {
+            keys = migratedSessionKeys(chord: chord, cancelChord: cancel)
+        }
+        if !chord.canRegister(reserving: keys) {
+            // Only a chord with Shift gets here. Shift always grabs the screen after a migration.
+            chord = .default
+            keys = migratedSessionKeys(chord: chord, cancelChord: cancel)
+        }
+        if let current = cancel, !current.canRegister(reserving: keys) {
+            cancel = nil
+        }
+        if defaults.string(forKey: Keys.screenshotKey) != keys.screenshot.rawValue
+            || defaults.string(forKey: Keys.annotateKey) != (keys.annotate?.rawValue ?? Self.annotateOff) {
+            defaults.set(keys.screenshot.rawValue, forKey: Keys.screenshotKey)
+            defaults.set(keys.annotate?.rawValue ?? Self.annotateOff, forKey: Keys.annotateKey)
+        }
+        return (chord, cancel, keys)
+    }
+
+    private static let annotateOff = "off"
+
+    private static func storedSessionKeys(defaults: UserDefaults) -> SessionKeys.Bindings? {
+        guard let shot = defaults.string(forKey: Keys.screenshotKey).flatMap(SessionModifier.init(rawValue:)),
+              let rawAnnotate = defaults.string(forKey: Keys.annotateKey) else { return nil }
+        if rawAnnotate == annotateOff {
+            return SessionKeys.Bindings(screenshot: shot, annotate: nil)
+        }
+        guard let annotate = SessionModifier(rawValue: rawAnnotate),
+              SessionModifier.annotateChoices.contains(annotate) else { return nil }
+        return SessionKeys.Bindings(screenshot: shot, annotate: annotate)
+    }
+
+    /// First-run keys for a user whose chords may already use Control or Option.
+    static func migratedSessionKeys(chord: HotkeyChord, cancelChord: HotkeyChord?) -> SessionKeys.Bindings {
+        let used: (SessionModifier) -> Bool = { key in
+            chord.includes(key) || (cancelChord?.includes(key) ?? false)
+        }
+        let annotate = SessionModifier.annotateChoices.first { !used($0) }
+        return SessionKeys.Bindings(screenshot: .shift, annotate: annotate)
+    }
+
+    /// Why a pair of session keys cannot be used with these chords, or `nil` when it can.
+    static func sessionKeyRejection(
+        _ keys: SessionKeys.Bindings,
+        chord: HotkeyChord,
+        cancelChord: HotkeyChord?
+    ) -> String? {
+        if keys.annotate == keys.screenshot {
+            return "\(keys.screenshot.title) cannot both grab the screen and draw."
+        }
+        if !SessionModifier.screenshotChoices.contains(keys.screenshot) {
+            return "\(keys.screenshot.title) cannot be the screenshot key."
+        }
+        if let annotate = keys.annotate, !SessionModifier.annotateChoices.contains(annotate) {
+            return "\(annotate.title) cannot be the annotate key."
+        }
+        for key in [keys.screenshot, keys.annotate].compactMap({ $0 }) {
+            if chord.includes(key) {
+                return "Start and stop uses \(chord.display), so \(key.title) stays free for it."
+            }
+            if let cancelChord, cancelChord.includes(key) {
+                return "Cancel recording uses \(cancelChord.display), so \(key.title) stays free for it."
+            }
+        }
+        return nil
+    }
+
+    var sessionKeys: SessionKeys.Bindings {
+        SessionKeys.Bindings(screenshot: screenshotKey, annotate: annotateKey)
+    }
+
+    /// Returns why the key was refused, or `nil` once it is saved.
+    @discardableResult
+    func setScreenshotKey(_ key: SessionModifier) -> String? {
+        setSessionKeys(SessionKeys.Bindings(screenshot: key, annotate: annotateKey))
+    }
+
+    /// `nil` turns the hold-to-draw key off. Returns why the key was refused, or `nil` once saved.
+    @discardableResult
+    func setAnnotateKey(_ key: SessionModifier?) -> String? {
+        setSessionKeys(SessionKeys.Bindings(screenshot: screenshotKey, annotate: key))
+    }
+
+    private func setSessionKeys(_ keys: SessionKeys.Bindings) -> String? {
+        if keys == sessionKeys { return nil }
+        if keys.annotate == keys.screenshot, let taken = keys.annotate {
+            return keys.screenshot == screenshotKey
+                ? "\(taken.title) already grabs the screen. Pick another key, or Off."
+                : "\(taken.title) already draws. Change the annotate key first."
+        }
+        if let reason = Self.sessionKeyRejection(keys, chord: chord, cancelChord: cancelChord) {
+            return reason
+        }
+        screenshotKey = keys.screenshot
+        annotateKey = keys.annotate
+        defaults.set(keys.screenshot.rawValue, forKey: Keys.screenshotKey)
+        defaults.set(keys.annotate?.rawValue ?? Self.annotateOff, forKey: Keys.annotateKey)
+        return nil
     }
 
     func setChord(_ chord: HotkeyChord) -> Bool {
-        guard chord.canRegister else { return false }
+        guard chord.canRegister(reserving: sessionKeys) else { return false }
         guard chord != cancelChord else { return false }
         guard chord != clipboardChord else { return false }
         guard HotkeyCenter.shared.apply(chord) else { return false }
@@ -245,7 +365,7 @@ final class AppSettings: ObservableObject {
 
     func setCancelChord(_ chord: HotkeyChord?) -> Bool {
         if let chord {
-            guard chord.canRegister, chord != self.chord else { return false }
+            guard chord.canRegister(reserving: sessionKeys), chord != self.chord else { return false }
             guard chord != clipboardChord else { return false }
         }
         guard HotkeyCenter.shared.applyCancel(chord) else { return false }
@@ -496,6 +616,8 @@ final class AppSettings: ObservableObject {
         static let clipboardChordMods = "clipboard.hotkey.modifiers"
         static let clipboardLimit = "clipboard.historyLimit"
         static let pushToTalk = "hotkey.pushToTalk"
+        static let screenshotKey = "session.screenshotKey"
+        static let annotateKey = "session.annotateKey"
         static let island = "island.style"
         static let sound = "sound.enabled"
         static let volume = "sound.volume"

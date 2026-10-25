@@ -51,7 +51,7 @@ final class HotkeyCenter {
             self.cancelKey = nil
         }
         guard let chord else { return true }
-        guard chord.canRegister else { return false }
+        guard chord.isRegistrable else { return false }
         var registered: EventHotKeyRef?
         let id = EventHotKeyID(signature: signature, id: cancelID)
         let status = RegisterEventHotKey(
@@ -119,7 +119,7 @@ final class HotkeyCenter {
 
     @discardableResult
     private func register(_ chord: HotkeyChord) -> Bool {
-        guard chord.canRegister else { return false }
+        guard chord.isRegistrable else { return false }
         if let hotKey {
             UnregisterEventHotKey(hotKey)
             self.hotKey = nil

@@ -348,13 +348,13 @@ struct HomePage: View {
 
     private var captureActionCell: some View {
         HomeStripCell(title: "CAPTURE", glyph: actionGlyph("viewfinder")) {
-            Text("Talk, or hold Shift and drag")
+            Text("Talk, or \(settings.sessionKeys.grabPhrase)")
                 .font(Ink.labelFont)
                 .foregroundStyle(Ink.label)
                 .lineLimit(1)
             statusCaption
         }
-        .help("Hold Shift to mark the screen, then drag. Speech alone pastes the transcript. A capture pastes the picture with the words.")
+        .help("Hold \(settings.sessionKeys.screenshot.title) for the crosshair, then drag. \(settings.sessionKeys.drawSentence) Speech alone pastes the transcript. A capture pastes the picture with the words.")
     }
 
     private var folderActionCell: some View {

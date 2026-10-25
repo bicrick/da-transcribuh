@@ -14,6 +14,10 @@ final class AnnotationCanvasView: NSView {
     private let shadeLayer = CAShapeLayer()
     private let borderOuterLayer = CAShapeLayer()
     private let borderInnerLayer = CAShapeLayer()
+    /// Screenshot-mode readout next to the crosshair. Moves without animation, fades in and out.
+    private let badgeLayer = CALayer()
+    private let badgeTextLayer = CATextLayer()
+    private(set) var badge: ScreenshotBadge?
 
     override var isOpaque: Bool { false }
 
@@ -46,12 +50,32 @@ final class AnnotationCanvasView: NSView {
         borderInnerLayer.lineWidth = 1
         borderInnerLayer.isHidden = true
 
+        badgeLayer.backgroundColor = NSColor(white: 0.07, alpha: 0.9).cgColor
+        badgeLayer.borderColor = NSColor.white.withAlphaComponent(0.9).cgColor
+        badgeLayer.borderWidth = 1
+        badgeLayer.cornerRadius = 4
+        badgeLayer.opacity = 0
+        badgeLayer.actions = Self.noActions
+        badgeTextLayer.font = ScreenshotBadge.font
+        badgeTextLayer.fontSize = ScreenshotBadge.font.pointSize
+        badgeTextLayer.foregroundColor = NSColor.white.cgColor
+        badgeTextLayer.alignmentMode = .center
+        badgeTextLayer.truncationMode = .none
+        badgeTextLayer.actions = Self.noActions
+        badgeLayer.addSublayer(badgeTextLayer)
+
         guard let root = layer else { return }
-        for sub in [shadeLayer, borderOuterLayer, borderInnerLayer] {
+        for sub in [shadeLayer, borderOuterLayer, borderInnerLayer, badgeLayer] {
             sub.contentsScale = NSScreen.main?.backingScaleFactor ?? 2
             root.addSublayer(sub)
         }
+        badgeTextLayer.contentsScale = badgeLayer.contentsScale
     }
+
+    private static let noActions: [String: CAAction] = [
+        "position": NSNull(), "bounds": NSNull(), "frame": NSNull(),
+        "contents": NSNull(), "string": NSNull(), "opacity": NSNull(),
+    ]
 
     override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
@@ -59,6 +83,8 @@ final class AnnotationCanvasView: NSView {
         shadeLayer.contentsScale = scale
         borderOuterLayer.contentsScale = scale
         borderInnerLayer.contentsScale = scale
+        badgeLayer.contentsScale = scale
+        badgeTextLayer.contentsScale = scale
     }
 
     override func layout() {
@@ -70,6 +96,57 @@ final class AnnotationCanvasView: NSView {
         if layerBackedSelection, let selection {
             applyLayerSelectionPath(selection)
         }
+        if let badge {
+            placeBadge(badge)
+        }
+    }
+
+    /// Shows, moves, or hides the screenshot readout. Moves are instant so the badge
+    /// tracks the pointer. Showing and hiding are a short opacity fade.
+    func setBadge(_ next: ScreenshotBadge?) {
+        guard next != badge else { return }
+        let wasVisible = badge != nil
+        badge = next
+        if let next {
+            placeBadge(next)
+        }
+        if wasVisible != (next != nil) {
+            fadeBadge(to: next == nil ? 0 : 1)
+        }
+    }
+
+    private func placeBadge(_ badge: ScreenshotBadge) {
+        let frame = badge.frame(in: bounds.size)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        badgeLayer.frame = CGRect(
+            x: frame.minX,
+            y: bounds.height - frame.maxY,
+            width: frame.width,
+            height: frame.height
+        )
+        badgeTextLayer.string = badge.text
+        badgeTextLayer.frame = badgeLayer.bounds.insetBy(
+            dx: ScreenshotBadge.padding.width,
+            dy: ScreenshotBadge.padding.height
+        )
+        CATransaction.commit()
+    }
+
+    private func fadeBadge(to target: Float) {
+        let current = badgeLayer.presentation()?.opacity ?? badgeLayer.opacity
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        badgeLayer.opacity = target
+        CATransaction.commit()
+        badgeLayer.removeAnimation(forKey: "fade")
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = current
+        fade.toValue = target
+        fade.duration = target > 0 ? 0.12 : 0.09
+        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        badgeLayer.add(fade, forKey: "fade")
     }
 
     private var hasMarks: Bool {
@@ -225,7 +302,7 @@ final class OverlayPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// Clear full-display surfaces. The windows ignore the mouse. `ShiftPenMonitor`
+/// Clear full-display surfaces. The windows ignore the mouse. `SessionKeyMonitor`
 /// captures a drag in capture mode, and captures the pointer while Shift is held
 /// in annotate mode.
 @MainActor
@@ -292,6 +369,13 @@ final class OverlayController {
         }
     }
 
+    /// The screenshot readout lives on one display at a time.
+    func updateBadge(_ badge: ScreenshotBadge?, displayID: CGDirectDisplayID?) {
+        for (id, canvas) in canvases {
+            canvas.setBadge(displayID == id ? badge : nil)
+        }
+    }
+
     /// Selection-only update used while dragging a snip (skips mark dirty checks).
     func updateSelection(_ selection: CGRect?, displayID: CGDirectDisplayID?) {
         for (id, canvas) in canvases {
@@ -324,6 +408,7 @@ final class OverlayController {
             if !keepingContent {
                 canvas.setMarks(shapes: [], draft: nil, textEdit: nil, caretOn: true)
                 canvas.setSelection(nil)
+                canvas.setBadge(nil)
             }
             nextPanels[id] = panel
             nextCanvases[id] = canvas
