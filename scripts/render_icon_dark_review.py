@@ -1,6 +1,6 @@
 """Review renders for the dark AppIcon: Dock mockups (light + dark wallpaper) and small sizes.
 
-usage: render_icon_dark_review.py <work_dir_with_light_a_b> <out_dir>
+usage: render_icon_dark_review.py <work_dir_with_light_a_c> <out_dir>
 """
 import sys
 from pathlib import Path
@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FONT = ROOT / 'PromptAnnotator' / 'Fonts' / 'DepartureMono-Regular.otf'
 W, OUT = Path(sys.argv[1]), Path(sys.argv[2])
 OUT.mkdir(parents=True, exist_ok=True)
-NAMES = [('light', 'now'), ('a', 'A inverted'), ('b', 'B black edge')]
+NAMES = [('light', 'light (0.9.5)'), ('a', 'A v1 pale bevel'), ('c', 'A v2 dark bevel')]
 
 
 def font(px):
