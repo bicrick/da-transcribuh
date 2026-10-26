@@ -6,3 +6,23 @@ xcuserdata/
 .swiftpm/
 *.moved-aside
 .idea/
+
+# build output
+*.xcarchive
+*.dmg
+dist/
+
+# python / node scratch
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+
+# local secrets + agent scratch
+.env
+.env.*
+.claude/
+.cursor/
+
+# readme renderer temp file
+docs/readme/.render.html

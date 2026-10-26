@@ -1,7 +1,7 @@
 """Render the "M" AppIcon: big Departure Mono dt on a graphite squircle where the
 stems double as waveform bars (d stem pale and a bit taller, t stem red and tallest).
 
-Frame follows the 0.9.6 icon (render_dt_icon_dark.py / fit_icon_squircle.py):
+Frame follows the 0.9.6 icon (see fit_icon_squircle.py):
 superellipse n=5 on the 99..925 grid, 8 px ink hairline, pale #F2F2F2 offset bevel
 of 29 px down-right, graphite face.
 
