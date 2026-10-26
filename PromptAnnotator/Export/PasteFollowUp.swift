@@ -13,11 +13,36 @@ enum PasteKey {
     }
 }
 
-/// After the picture is on the clipboard, the next Command-V pastes it, and
-/// this posts a second Command-V with the words. Control-Option-V does both.
+/// When da transcribuh pastes for you (auto-paste on stop, a history pick,
+/// ⌃⌥V) it pastes the picture, waits `followUpDelay`, then pastes the words,
+/// and finally puts the linked two-item board back. An image-only board still
+/// arms the older ⌘V follow-up: the next Command-V pastes the picture and this
+/// posts a second Command-V with the words.
 @MainActor
 final class PasteFollowUp {
     static let shared = PasteFollowUp()
+
+    /// Picture ⌘V to words ⌘V. 0.35 s has shipped since the first release.
+    nonisolated static let followUpDelay: TimeInterval = 0.35
+    /// Words ⌘V to restoring the linked board. Long enough that a slow target
+    /// has read the words before the board changes under it.
+    nonisolated static let restoreDelay: TimeInterval = 1.0
+
+    /// Tests pass a named board, a recording poster, and short delays.
+    private let board: NSPasteboard
+    private let poster: (() -> Void)?
+    private let delays: (followUp: TimeInterval, idle: TimeInterval, restore: TimeInterval)
+
+    init(
+        board: NSPasteboard = .general,
+        poster: (() -> Void)? = nil,
+        delays: (followUp: TimeInterval, idle: TimeInterval, restore: TimeInterval) =
+            (PasteFollowUp.followUpDelay, 0.5, PasteFollowUp.restoreDelay)
+    ) {
+        self.board = board
+        self.poster = poster
+        self.delays = delays
+    }
     static let shortcut = "⌃⌥V"
     static let readyHint = "Ready to paste: press ⌃⌥V or ⌘V in any text field"
 
@@ -25,6 +50,10 @@ final class PasteFollowUp {
     private var tiff: Data?
     private var transcript = ""
     private var armedChangeCount: Int?
+    /// changeCount right after `copy` staged the linked board (held paste can reuse it).
+    private var stagedChangeCount: Int?
+    /// Bumped per sequence so a stale restore never overwrites a newer paste.
+    private var sequence = 0
     private var delivering = false
     private var commandVIsDown = false
     private var followUp: DispatchWorkItem?
@@ -76,8 +105,29 @@ final class PasteFollowUp {
         self.tiff = tiff
         self.transcript = transcript
         armedChangeCount = (png != nil && !transcript.isEmpty) ? changeCount : nil
+        stagedChangeCount = nil
         // Image-then-text staging is for immediate / sequential paste — not a held pending.
         setAwaitingPaste(false)
+    }
+
+    /// The board holds the linked two-item entry. Keeps the payload for the
+    /// sequential paste (auto-paste, ⌃⌥V) without arming the ⌘V follow-up.
+    func armLinked(png: Data, tiff: Data?, transcript: String, changeCount: Int) {
+        self.png = png
+        self.tiff = tiff
+        self.transcript = transcript
+        armedChangeCount = nil
+        stagedChangeCount = changeCount
+        setAwaitingPaste(false)
+    }
+
+    /// Held paste (no text field). If the linked board `copy` staged is still
+    /// on the clipboard, only flag the wait; otherwise the caller restages.
+    func holdStagedLinked() -> Bool {
+        guard let stagedChangeCount, png != nil, !transcript.isEmpty,
+              board.changeCount == stagedChangeCount else { return false }
+        setAwaitingPaste(true)
+        return true
     }
 
     /// Keep payload for ⌃⌥V / Copy Last Again without arming the ⌘V image→text follow-up.
@@ -86,6 +136,7 @@ final class PasteFollowUp {
         self.tiff = tiff
         self.transcript = transcript
         armedChangeCount = nil
+        stagedChangeCount = nil
         setAwaitingPaste(true)
     }
 
@@ -123,9 +174,18 @@ final class PasteFollowUp {
         return true
     }
 
+    /// Pastes the staged take: the picture, then the words. ⌃⌥V and auto-paste.
     func pasteBoth() {
-        let image = png
-        let words = transcript
+        deliver(png: png, tiff: tiff, words: transcript)
+    }
+
+    /// Pastes a history entry the same way, without replacing the staged take
+    /// that ⌃⌥V and Copy Last Again replay.
+    func pasteSequence(png: Data?, tiff: Data?, transcript: String) {
+        deliver(png: png, tiff: tiff, words: transcript)
+    }
+
+    private func deliver(png image: Data?, tiff: Data?, words: String) {
         guard !delivering else { return }
         guard image != nil || !words.isEmpty else { return }
         followUp?.cancel()
@@ -133,29 +193,44 @@ final class PasteFollowUp {
         commandVIsDown = false
         delivering = true
         armedChangeCount = nil
+        stagedChangeCount = nil
+        sequence += 1
         setAwaitingPaste(false)
 
         guard let image else {
-            _ = SessionClipboard.writeTranscript(words, to: .general)
+            _ = SessionClipboard.writeTranscript(words, to: board)
             postCommandV()
             scheduleIdle()
             return
         }
 
-        _ = SessionClipboard.writeImage(png: image, tiff: tiff, to: .general)
+        _ = SessionClipboard.writeImage(png: image, tiff: tiff, to: board)
         postCommandV()
         guard !words.isEmpty else {
             scheduleIdle()
             return
         }
+        let current = sequence
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            _ = SessionClipboard.writeTranscript("\n" + words, to: .general)
+            self.followUp = nil
+            _ = SessionClipboard.writeTranscript("\n" + words, to: self.board)
             self.postCommandV()
             self.scheduleIdle()
+            self.scheduleRestore(png: image, tiff: tiff, words: words, sequence: current)
         }
         followUp = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delays.followUp, execute: work)
+    }
+
+    /// After the words are pasted, put the linked two-item board back so a later
+    /// manual ⌘V gets the whole entry. Skipped if anything wrote the board since.
+    private func scheduleRestore(png: Data, tiff: Data?, words: String, sequence current: Int) {
+        let expected = board.changeCount
+        DispatchQueue.main.asyncAfter(deadline: .now() + delays.restore) { [weak self] in
+            guard let self, self.sequence == current, self.board.changeCount == expected else { return }
+            _ = SessionClipboard.writeLinked(png: png, tiff: tiff, text: words, to: self.board)
+        }
     }
 
     private func installMonitors() {
@@ -237,7 +312,7 @@ final class PasteFollowUp {
 
     private func scheduleTranscript() {
         guard followUp == nil, let expected = armedChangeCount, !transcript.isEmpty else { return }
-        guard NSPasteboard.general.changeCount == expected else {
+        guard board.changeCount == expected else {
             armedChangeCount = nil
             return
         }
@@ -245,23 +320,23 @@ final class PasteFollowUp {
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.followUp = nil
-            guard NSPasteboard.general.changeCount == expected else {
+            guard self.board.changeCount == expected else {
                 self.armedChangeCount = nil
                 return
             }
             self.delivering = true
             self.armedChangeCount = nil
             self.setAwaitingPaste(false)
-            _ = SessionClipboard.writeTranscript("\n" + words, to: .general)
+            _ = SessionClipboard.writeTranscript("\n" + words, to: self.board)
             self.postCommandV()
             self.scheduleIdle()
         }
         followUp = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delays.followUp, execute: work)
     }
 
     private func scheduleIdle() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + delays.idle) { [weak self] in
             self?.delivering = false
         }
     }
@@ -272,6 +347,12 @@ final class PasteFollowUp {
     }
 
     private func postCommandV() {
+        if let poster {
+            poster()
+            return
+        }
+        // Never post real keystrokes from unit tests.
+        guard !Runtime.isUnitTest else { return }
         // A full chord: ⌘ down, V down, V up, ⌘ up. Posting only V with the ⌘ flag left
         // the HID system state reporting ⌘ held after every paste, so the next synthetic
         // Return went out as ⌘Return and the modifier gate waited its full 250 ms.

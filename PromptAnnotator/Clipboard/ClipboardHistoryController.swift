@@ -106,7 +106,16 @@ final class ClipboardHistoryController {
             to: .general
         )
 
-        if shouldPaste, wrote {
+        guard shouldPaste, wrote else { return wrote }
+        if item.isLinkedSession, let png = store.imagePNGData(for: item) {
+            // Not one ⌘V of the two-item board: plenty of targets take only the
+            // picture. Paste the picture, then the words, then restore the board.
+            PasteFollowUp.shared.pasteSequence(
+                png: png,
+                tiff: NSImage(data: png)?.tiffRepresentation,
+                transcript: item.text ?? ""
+            )
+        } else {
             PasteFollowUp.shared.simulateCommandV()
         }
         return wrote
@@ -123,6 +132,10 @@ final class ClipboardHistoryController {
         switch item.kind {
         case .text:
             let text = item.text ?? ""
+            if item.isLinkedSession, let png = store.imagePNGData(for: item) {
+                let tiff = NSImage(data: png)?.tiffRepresentation
+                return SessionClipboard.writeLinked(png: png, tiff: tiff, text: text, to: board)
+            }
             if item.isMixed, let png = store.imagePNGData(for: item) {
                 return SessionClipboard.writeMixed(text: text, png: png, plainOnly: plainOnly, to: board)
             }
@@ -139,10 +152,31 @@ final class ClipboardHistoryController {
         }
     }
 
-    /// Session transcript / screenshot ingest (tagged). Skips empty quiet takes.
+    /// Session ingest. A collage with words is ONE linked row (kind `.text`,
+    /// source `.transcript`, plus the collage file), so pin and delete act on
+    /// both. A take with only one part keeps its single row. Skips empty takes.
     func ingestSession(transcript: String?, imagePNG: Data?) {
         guard AppSettings.shared.clipboardHistoryEnabled else { return }
+        Self.ingestSession(transcript: transcript, imagePNG: imagePNG, into: store)
+    }
+
+    /// Store-injectable body of `ingestSession` (tests use an isolated store).
+    static func ingestSession(transcript: String?, imagePNG: Data?, into store: ClipboardHistoryStore) {
         if ClipboardEmptySession.shouldSkip(transcript: transcript, imagePNG: imagePNG) {
+            return
+        }
+        let text = transcript?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let scrubbed = NonSpeechFilter.scrub(text).trimmingCharacters(in: .whitespacesAndNewlines)
+        if let imagePNG, !imagePNG.isEmpty, !scrubbed.isEmpty {
+            _ = store.ingest(
+                kind: .text,
+                source: .transcript,
+                text: scrubbed,
+                imagePNG: imagePNG,
+                filePaths: nil,
+                fingerprint: ClipboardFingerprint.linked(text: scrubbed, png: imagePNG),
+                applicationName: "da transcribuh"
+            )
             return
         }
         if let imagePNG, !imagePNG.isEmpty {
@@ -156,8 +190,6 @@ final class ClipboardHistoryController {
                 applicationName: "da transcribuh"
             )
         }
-        let text = transcript?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let scrubbed = NonSpeechFilter.scrub(text).trimmingCharacters(in: .whitespacesAndNewlines)
         if !scrubbed.isEmpty {
             _ = store.ingest(
                 kind: .text,

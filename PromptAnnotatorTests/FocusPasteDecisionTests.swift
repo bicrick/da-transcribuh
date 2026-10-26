@@ -183,14 +183,16 @@ final class FocusPasteDecisionTests: XCTestCase {
 }
 
 final class SessionClipboardCombinedTests: XCTestCase {
-    func testStageCombinedWritesImageTextAndRichFallbacks() throws {
+    func testStageCombinedWritesTheLinkedTwoItemBoard() throws {
         let image = try redImage()
         let board = NSPasteboard(name: NSPasteboard.Name("PromptAnnotatorCombinedClipboardTest"))
         XCTAssertTrue(SessionClipboard.stageCombined(image: image, transcript: "hello tiles", to: board))
+        XCTAssertEqual(board.pasteboardItems?.count, 2)
         XCTAssertNotNil(board.data(forType: .png))
         XCTAssertEqual(board.string(forType: .string), "hello tiles")
         XCTAssertNotNil(board.data(forType: .rtfd))
-        XCTAssertNotNil(board.data(forType: .html))
+        // No HTML: Chrome prefers it over the picture.
+        XCTAssertNil(board.data(forType: .html))
     }
 
     func testReadyHintCopy() {

@@ -488,9 +488,12 @@ final class SessionController: ObservableObject {
                 }
             }
         case .holdPending:
-            // Restage as multi-rep so ⌘V keeps images + text where the target allows it.
-            let image = sheetURL.flatMap { NSImage(contentsOf: $0) }
-            _ = SessionClipboard.stageCombined(image: image, transcript: pasteText)
+            // `copy` already staged the linked two-item board. Reuse it when nothing
+            // else wrote the clipboard since; restaging re-read and re-encoded the sheet.
+            if !PasteFollowUp.shared.holdStagedLinked() {
+                let image = sheetURL.flatMap { NSImage(contentsOf: $0) }
+                _ = SessionClipboard.stageCombined(image: image, transcript: pasteText)
+            }
             pasteReadyHint = PasteFollowUp.readyHint
             StopTrace.end("hold")
         }
