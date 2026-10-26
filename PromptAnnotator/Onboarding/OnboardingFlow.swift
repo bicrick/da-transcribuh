@@ -75,6 +75,9 @@ struct OnboardingFlow: View {
     @State private var practiceTask: Task<Void, Never>?
     @State private var practiceRunning = false
     @State private var practiceOutcome: String?
+    /// Only the real welcome window saves the step. Offscreen renders and tests
+    /// leave it off, so walking the steps never touches the user's saved step.
+    var persistsStep = false
     var onFinish: () -> Void
 
     var body: some View {
@@ -117,14 +120,40 @@ struct OnboardingFlow: View {
             }
         })
         .onAppear {
+            // After a Screen Recording quit + reopen this is the first read in the
+            // new process, so the checkmarks show what macOS granted.
             permissions.refresh()
+            persistStep()
             OnboardingSnapshotHarness.run { next in go(to: next) }
         }
+        .onChange(of: step) { _, _ in persistStep() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             permissions.refresh()
         }
+        .task(id: step) {
+            await watchPermissions()
+        }
         .onDisappear {
             cancelPractice()
+        }
+    }
+
+    private func persistStep() {
+        guard persistsStep else { return }
+        OnboardingStore.saveStep(step)
+    }
+
+    /// While Permissions is on screen and something is still off, re-read the
+    /// three grants once a second so a switch flipped in System Settings checks
+    /// its box without waiting for the window to come back to the front.
+    /// Stops on any other step or once all three are on. `refresh` only
+    /// publishes on a real change, so an idle poll costs no redraw.
+    private func watchPermissions() async {
+        guard step == .permissions else { return }
+        while !Task.isCancelled, !permissions.status.isReady {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            permissions.refresh()
         }
     }
 
@@ -350,6 +379,8 @@ struct OnboardingFlow: View {
                 }
                 .buttonStyle(InkSecondaryButtonStyle())
                 Button("Reopen") {
+                    // Save first: the new instance reads the step before this one quits.
+                    persistStep()
                     Permissions.relaunch()
                 }
                 .buttonStyle(InkSecondaryButtonStyle())
@@ -824,9 +855,14 @@ struct OnboardingFlow: View {
 }
 
 extension OnboardingFlow {
-    /// Opens on a later step. Used by offscreen renders.
-    init(settings: AppSettings, startAt: OnboardingStep, onFinish: @escaping () -> Void) {
-        self.init(settings: settings, onFinish: onFinish)
+    /// Opens on a given step: the resumed step for the welcome window, any step for offscreen renders.
+    init(
+        settings: AppSettings,
+        startAt: OnboardingStep,
+        persistsStep: Bool = false,
+        onFinish: @escaping () -> Void
+    ) {
+        self.init(settings: settings, persistsStep: persistsStep, onFinish: onFinish)
         _step = State(initialValue: startAt)
     }
 }
@@ -854,7 +890,15 @@ final class OnboardingPresenter {
 
     private func ensure() -> NSWindow {
         if let window { return window }
-        let root = OnboardingFlow(settings: AppSettings.shared) {
+        // A first-run user comes back to the step they left (Screen Recording
+        // relaunches the app mid-setup). Snapshot runs always walk from Welcome
+        // and never write the saved step.
+        let harness = OnboardingSnapshotHarness.isActive
+        let root = OnboardingFlow(
+            settings: AppSettings.shared,
+            startAt: harness ? .welcome : OnboardingStore.resumeStep(),
+            persistsStep: !harness
+        ) {
             OnboardingStore.finish()
             self.close()
             SettingsPresenter.shared.show()
