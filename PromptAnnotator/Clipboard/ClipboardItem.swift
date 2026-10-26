@@ -149,6 +149,14 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
         kind == .text && imageFileName != nil && !(text ?? "").isEmpty
     }
 
+    /// A dictation take's collage and transcript as one row. Same shape as a
+    /// mixed copy (so older builds still list and paste it), told apart by its
+    /// `.transcript` source. Pastes as two pasteboard items, or picture then
+    /// words when da transcribuh does the paste.
+    var isLinkedSession: Bool {
+        isMixed && source == .transcript
+    }
+
     /// Has an image file to preview (image items and mixed items).
     var hasImage: Bool {
         kind != .fileURL && imageFileName != nil

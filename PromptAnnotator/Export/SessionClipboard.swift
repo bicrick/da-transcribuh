@@ -1,24 +1,31 @@
 import AppKit
 
 enum SessionClipboard {
-    /// Stages the tile sheet by itself. Chat and browser text boxes take the
-    /// picture and drop the words when both are on the clipboard at once.
-    /// `PasteFollowUp` pastes the words on the next Paste.
+    /// Stages a finished take. A collage with words goes up as one linked entry:
+    /// two pasteboard items (picture, then words), so a manual ⌘V into an app
+    /// that reads every item gets both. When da transcribuh pastes for you it
+    /// does not rely on that: `PasteFollowUp` pastes the picture, then the words.
+    /// The ⌘V follow-up is not armed for linked boards, since an app that took
+    /// both items would get the words twice.
     @discardableResult
     static func copy(image: NSImage?, transcript: String, to board: NSPasteboard = .general) -> Bool {
         let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let png = pngData(from: image)
         if let png {
-            guard writeImage(png: png, tiff: image?.tiffRepresentation, to: board) else { return false }
+            let tiff = image?.tiffRepresentation
+            if !text.isEmpty {
+                guard writeLinked(png: png, tiff: tiff, text: text, to: board) else { return false }
+            } else {
+                guard writeImage(png: png, tiff: tiff, to: board) else { return false }
+            }
             if board === NSPasteboard.general {
                 let changeCount = board.changeCount
                 MainActor.assumeIsolated {
-                    PasteFollowUp.shared.arm(
-                        png: png,
-                        tiff: image?.tiffRepresentation,
-                        transcript: text,
-                        changeCount: changeCount
-                    )
+                    if text.isEmpty {
+                        PasteFollowUp.shared.arm(png: png, tiff: tiff, transcript: text, changeCount: changeCount)
+                    } else {
+                        PasteFollowUp.shared.armLinked(png: png, tiff: tiff, transcript: text, changeCount: changeCount)
+                    }
                     ClipboardHistoryController.shared.ingestSession(transcript: text, imagePNG: png)
                 }
             }
@@ -36,75 +43,34 @@ enum SessionClipboard {
         return true
     }
 
-    /// Stages image + text together for ⌘V into apps that accept RTFD/HTML, with
-    /// plain-text and PNG fallbacks. Used when auto-paste is held (no text field).
-    /// Does **not** arm the sequential ⌘V image→text follow-up (that would double-paste
-    /// in RTFD apps); `PasteFollowUp` still keeps the payload for ⌃⌥V / Copy Last Again.
+    /// Restages a take for a held paste (no text field had focus) or Copy Last
+    /// Again. Image plus words go up as the linked two-item board, so ⌘V keeps
+    /// both where the target reads every item. Does **not** arm the ⌘V
+    /// follow-up (that would double the words); `PasteFollowUp` keeps the
+    /// payload for ⌃⌥V, which pastes the picture and then the words.
     @discardableResult
     static func stageCombined(image: NSImage?, transcript: String, to board: NSPasteboard = .general) -> Bool {
         let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let png = pngData(from: image)
         guard png != nil || !text.isEmpty else { return false }
-
         let isGeneral = board === NSPasteboard.general
-        if isGeneral {
-            MainActor.assumeIsolated { ClipboardHistoryStore.shared.beginOwnWrite() }
-        }
-        defer {
-            if isGeneral {
-                MainActor.assumeIsolated { ClipboardHistoryStore.shared.endOwnWrite() }
-            }
-        }
-
-        board.clearContents()
-
-        if let png, let image, !text.isEmpty {
-            let item = NSPasteboardItem()
-            item.setData(png, forType: .png)
-            if let tiff = image.tiffRepresentation {
-                item.setData(tiff, forType: .tiff)
-            }
-            item.setString(text, forType: .string)
-            if let rtfd = rtfdData(image: image, text: text) {
-                item.setData(rtfd, forType: .rtfd)
-            }
-            if let html = htmlData(png: png, text: text) {
-                item.setData(html, forType: .html)
-            }
-            guard board.writeObjects([item]) else { return false }
-            if isGeneral {
-                MainActor.assumeIsolated {
-                    PasteFollowUp.shared.armPending(
-                        png: png,
-                        tiff: image.tiffRepresentation,
-                        transcript: text
-                    )
-                    ClipboardHistoryController.shared.ingestSession(transcript: text, imagePNG: png)
-                }
-            }
-            return true
-        }
+        let tiff = image?.tiffRepresentation
 
         if let png {
-            // Already inside own-write suppress; write without nested begin/end.
-            guard board.setData(png, forType: .png) else { return false }
-            if let tiff = image?.tiffRepresentation {
-                board.setData(tiff, forType: .tiff)
-            }
+            let wrote = text.isEmpty
+                ? writeImage(png: png, tiff: tiff, to: board)
+                : writeLinked(png: png, tiff: tiff, text: text, to: board)
+            guard wrote else { return false }
             if isGeneral {
                 MainActor.assumeIsolated {
-                    PasteFollowUp.shared.armPending(
-                        png: png,
-                        tiff: image?.tiffRepresentation,
-                        transcript: text
-                    )
+                    PasteFollowUp.shared.armPending(png: png, tiff: tiff, transcript: text)
                     ClipboardHistoryController.shared.ingestSession(transcript: text, imagePNG: png)
                 }
             }
             return true
         }
 
-        guard board.setString(text, forType: .string) else { return false }
+        guard writeTranscript(text, to: board) else { return false }
         if isGeneral {
             MainActor.assumeIsolated {
                 PasteFollowUp.shared.armPending(png: nil, tiff: nil, transcript: text)
@@ -112,6 +78,51 @@ enum SessionClipboard {
             }
         }
         return true
+    }
+
+    /// The linked collage + transcript entry as two pasteboard items.
+    ///
+    /// Item 1 is the picture: PNG, TIFF, and an image-only RTFD so rich Cocoa
+    /// editors (TextEdit, Notes) insert it. Item 2 is the words as plain text.
+    /// Measured on macOS 26: a rich NSTextView reads both items (picture, then
+    /// words), a plain field reads the words, and Chrome's paste event exposes
+    /// both `text/plain` and the PNG file. No HTML or RTF of the words: Chrome
+    /// prefers HTML over the image when either is present.
+    @discardableResult
+    static func writeLinked(png: Data, tiff: Data?, text: String, to board: NSPasteboard) -> Bool {
+        if board === NSPasteboard.general {
+            MainActor.assumeIsolated { ClipboardHistoryStore.shared.beginOwnWrite() }
+        }
+        defer {
+            if board === NSPasteboard.general {
+                MainActor.assumeIsolated { ClipboardHistoryStore.shared.endOwnWrite() }
+            }
+        }
+        board.clearContents()
+        let picture = NSPasteboardItem()
+        picture.setData(png, forType: .png)
+        if let tiff {
+            picture.setData(tiff, forType: .tiff)
+        }
+        if let rtfd = rtfdImageOnly(png: png) {
+            picture.setData(rtfd, forType: .rtfd)
+        }
+        let words = NSPasteboardItem()
+        words.setString(text, forType: .string)
+        return board.writeObjects([picture, words])
+    }
+
+    /// RTFD holding just the picture. Wraps the PNG bytes as-is (no TIFF
+    /// re-encode), so it costs about a copy of the PNG.
+    static func rtfdImageOnly(png: Data) -> Data? {
+        let wrapper = FileWrapper(regularFileWithContents: png)
+        wrapper.preferredFilename = "collage.png"
+        let attachment = NSTextAttachment(fileWrapper: wrapper)
+        let string = NSAttributedString(attachment: attachment)
+        return try? string.data(
+            from: NSRange(location: 0, length: string.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtfd]
+        )
     }
 
     @discardableResult
@@ -219,19 +230,5 @@ enum SessionClipboard {
                 .documentType: NSAttributedString.DocumentType.rtfd,
             ]
         )
-    }
-
-    static func htmlData(png: Data, text: String) -> Data? {
-        let base64 = png.base64EncodedString()
-        let escaped = text
-            .replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
-            .replacingOccurrences(of: "\n", with: "<br>\n")
-        let html = """
-        <meta charset="utf-8">
-        <img src="data:image/png;base64,\(base64)"><br>\(escaped)
-        """
-        return html.data(using: .utf8)
     }
 }

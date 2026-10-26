@@ -32,6 +32,10 @@ struct ClipboardHistoryView: View {
     /// Maccy Popup-ish width; Paint chrome around it.
     static let preferredSize = CGSize(width: 450, height: 480)
     private let rowHeight: CGFloat = 22
+    /// Linked take rows: a framed collage thumbnail beside two lines of words.
+    static let linkedRowHeight: CGFloat = 44
+    static let linkedThumbHeight: CGFloat = 36
+    static let linkedThumbWidth: CGFloat = 60
     private var imageMaxHeight: CGFloat { CGFloat(settings.clipboardImageHeight) }
     private let hPad: CGFloat = 5
 
@@ -171,7 +175,7 @@ struct ClipboardHistoryView: View {
             }
         }
         .padding(.horizontal, hPad + 4)
-        .frame(height: item.kind == .image ? max(rowHeight, imageMaxHeight + 4) : rowHeight)
+        .frame(height: rowHeight(for: item))
         // Short color ease so hover / arrow highlight glides instead of snapping.
         // A color fade is not motion, so it stays on with Reduce Motion.
         .background {
@@ -197,11 +201,35 @@ struct ClipboardHistoryView: View {
         }
     }
 
+    private func rowHeight(for item: ClipboardItem) -> CGFloat {
+        if item.isLinkedSession { return Self.linkedRowHeight }
+        return item.kind == .image ? max(rowHeight, imageMaxHeight + 4) : rowHeight
+    }
+
     @ViewBuilder
     private func rowBody(_ item: ClipboardItem, foreground: Color) -> some View {
         switch item.kind {
         case .image:
             ClipboardThumbnail(store: store, item: item, maxHeight: imageMaxHeight)
+        case .text where item.isLinkedSession:
+            // One take: the collage and its words are one entry.
+            HStack(spacing: 8) {
+                ClipboardThumbnail(
+                    store: store, item: item, maxHeight: Self.linkedThumbHeight - 2,
+                    maxWidth: Self.linkedThumbWidth - 2, fitsBox: true
+                )
+                .frame(width: Self.linkedThumbWidth, height: Self.linkedThumbHeight)
+                .background(Ink.window)
+                .overlay(Rectangle().strokeBorder(Ink.label, lineWidth: 1))
+                Text(String(item.previewLine.prefix(160)))
+                    .font(Ink.mono(12))
+                    .foregroundStyle(foreground)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Collage and words: \(item.previewLine)")
         case .text where item.isMixed:
             // Text and image from one copy: a small thumbnail keeps the row height.
             HStack(spacing: 6) {
@@ -457,7 +485,10 @@ struct ClipboardPreviewPopover: View {
             metaRow("First copy time:", Self.stamp.string(from: item.firstCopiedAt))
             metaRow("Last copy time:", Self.stamp.string(from: item.lastCopiedAt))
             metaRow("Number of copies:", "\(item.copyCount)")
-            if item.isMixed {
+            if item.isLinkedSession {
+                metaRow("Contents:", "collage + words")
+                metaRow("Paste:", "picture, then words")
+            } else if item.isMixed {
                 metaRow("Contents:", "text + image")
             }
             if let w = item.imageWidth, let h = item.imageHeight {
@@ -722,21 +753,30 @@ private struct ClipboardThumbnail: View {
     let store: ClipboardHistoryStore
     let item: ClipboardItem
     let maxHeight: CGFloat
+    var maxWidth: CGFloat = 120
+    /// Fit the whole picture inside `maxWidth` x `maxHeight` (linked rows).
+    var fitsBox = false
     @State private var loaded: NSImage?
 
     var body: some View {
-        if let image = loaded ?? store.cachedThumbnail(for: item, maxHeight: maxHeight) {
+        if fitsBox, let image = loaded ?? store.cachedThumbnail(for: item, maxHeight: maxHeight) {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: maxWidth, height: maxHeight)
+        } else if let image = loaded ?? store.cachedThumbnail(for: item, maxHeight: maxHeight) {
             Image(nsImage: image)
                 .resizable()
                 .interpolation(.high)
                 .aspectRatio(contentMode: .fit)
                 .frame(height: maxHeight)
-                .frame(maxWidth: 120, alignment: .leading)
+                .frame(maxWidth: maxWidth, alignment: .leading)
                 .clipped()
         } else {
             Rectangle()
                 .fill(Ink.fill)
-                .frame(width: 48, height: maxHeight)
+                .frame(width: fitsBox ? maxWidth : 48, height: maxHeight)
                 .overlay(Rectangle().strokeBorder(Ink.hairline, lineWidth: 1))
                 .task(id: item.imageFileName) {
                     loaded = await store.loadThumbnail(for: item, maxHeight: maxHeight)

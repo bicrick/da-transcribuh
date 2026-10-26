@@ -3,17 +3,29 @@ import XCTest
 @testable import PromptAnnotator
 
 final class SessionClipboardTests: XCTestCase {
-    func testClipboardStagesTheImageWithoutTheTranscript() throws {
+    func testClipboardStagesTheLinkedTwoItemBoard() throws {
         let image = try redImage()
         let board = NSPasteboard(name: NSPasteboard.Name("PromptAnnotatorClipboardTest"))
 
         XCTAssertTrue(SessionClipboard.copy(image: image, transcript: "hello there", to: board))
-        XCTAssertNotNil(board.data(forType: .png))
-        XCTAssertNil(board.string(forType: .string))
+        let items = try XCTUnwrap(board.pasteboardItems)
+        XCTAssertEqual(items.count, 2)
+        XCTAssertNotNil(items[0].data(forType: .png))
+        XCTAssertNil(items[0].string(forType: .string))
+        XCTAssertEqual(items[1].string(forType: .string), "hello there")
 
         XCTAssertTrue(SessionClipboard.writeTranscript("\nhello there", to: board))
         XCTAssertEqual(board.string(forType: .string), "\nhello there")
         XCTAssertNil(board.data(forType: .png))
+    }
+
+    func testClipboardStagesAnImageOnlyTakeByItself() throws {
+        let image = try redImage()
+        let board = NSPasteboard(name: NSPasteboard.Name("PromptAnnotatorClipboardImageOnlyTest"))
+        XCTAssertTrue(SessionClipboard.copy(image: image, transcript: "  ", to: board))
+        XCTAssertEqual(board.pasteboardItems?.count, 1)
+        XCTAssertNotNil(board.data(forType: .png))
+        XCTAssertNil(board.string(forType: .string))
     }
 
     func testCommandVIncludesShiftAndRejectsOtherModifiers() {

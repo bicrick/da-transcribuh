@@ -383,8 +383,12 @@ final class ClipboardHistoryStore: ObservableObject {
             items = []
             return
         }
-        items = decoded
+        let migrated = ClipboardSessionLinkMigration.merge(decoded)
+        items = migrated.items
         sortPinnedFirst()
+        if migrated.merged > 0 {
+            persist()
+        }
     }
 
     /// One serial queue for every store, so writes land in order and a store that
@@ -454,6 +458,17 @@ enum ClipboardFingerprint {
         "mixed:" + sha256(text) + ":" + sha256(png)
     }
 
+    /// A take's collage and transcript (one linked row). Built from the two
+    /// single-part hashes, so legacy pairs migrate without reading the image.
+    static func linked(text: String, png: Data) -> String {
+        linked(textFingerprint: Self.text(text), imageFingerprint: image(png))!
+    }
+
+    static func linked(textFingerprint: String, imageFingerprint: String) -> String? {
+        guard textFingerprint.hasPrefix("text:"), imageFingerprint.hasPrefix("image:") else { return nil }
+        return "linked:" + textFingerprint.dropFirst(5) + ":" + imageFingerprint.dropFirst(6)
+    }
+
     static func files(_ paths: [String]) -> String {
         "files:" + sha256(paths.sorted().joined(separator: "\n"))
     }
@@ -470,5 +485,61 @@ enum ClipboardFingerprint {
             hash = hash &* 0x100000001b3
         }
         return String(hash, radix: 16)
+    }
+}
+
+// MARK: - Legacy session pairs → one linked row (pure, testable)
+
+/// Builds before 0.9.8 stored a take as two rows: the collage (`.image` /
+/// `.screenshot`) and the words (`.text` / `.transcript`), ingested a few
+/// milliseconds apart. On load, each such pair becomes one linked row. The
+/// words row keeps its id and gains the collage file; no image file is touched.
+/// Conservative: pairs only by first-copy time within `window`, one to one,
+/// and never when both rows carry a different pin key.
+enum ClipboardSessionLinkMigration {
+    static let window: TimeInterval = 1.5
+
+    static func merge(_ items: [ClipboardItem]) -> (items: [ClipboardItem], merged: Int) {
+        let words = items.indices.filter {
+            items[$0].kind == .text && items[$0].source == .transcript && items[$0].imageFileName == nil
+        }
+        var pictures = items.indices.filter {
+            items[$0].kind == .image && items[$0].source == .screenshot && items[$0].imageFileName != nil
+        }
+        guard !words.isEmpty, !pictures.isEmpty else { return (items, 0) }
+
+        var result = items
+        var drop = Set<Int>()
+        for w in words {
+            let text = items[w]
+            let best = pictures
+                .map { ($0, abs(items[$0].firstCopiedAt.timeIntervalSince(text.firstCopiedAt))) }
+                .filter { $0.1 <= window }
+                .min { $0.1 < $1.1 }
+            guard let (p, _) = best else { continue }
+            let picture = items[p]
+            if let a = text.pinKey, let b = picture.pinKey, a != b { continue }
+            guard let fingerprint = ClipboardFingerprint.linked(
+                textFingerprint: text.fingerprint, imageFingerprint: picture.fingerprint
+            ) else { continue }
+            var linked = text
+            linked.imageFileName = picture.imageFileName
+            linked.imageWidth = picture.imageWidth
+            linked.imageHeight = picture.imageHeight
+            linked.fingerprint = fingerprint
+            linked.pinned = text.pinned || picture.pinned
+            linked.pinKey = text.pinKey ?? picture.pinKey
+            linked.pinTitle = text.pinTitle ?? picture.pinTitle
+            linked.createdAt = max(text.createdAt, picture.createdAt)
+            linked.firstCopiedAt = min(text.firstCopiedAt, picture.firstCopiedAt)
+            linked.lastCopiedAt = max(text.lastCopiedAt, picture.lastCopiedAt)
+            linked.copyCount = max(text.copyCount, picture.copyCount)
+            result[w] = linked
+            drop.insert(p)
+            pictures.removeAll { $0 == p }
+        }
+        guard !drop.isEmpty else { return (items, 0) }
+        let kept = result.indices.filter { !drop.contains($0) }.map { result[$0] }
+        return (kept, drop.count)
     }
 }
