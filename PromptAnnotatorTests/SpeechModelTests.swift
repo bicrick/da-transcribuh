@@ -72,7 +72,9 @@ final class WhisperModelLocatorTests: XCTestCase {
         XCTAssertEqual(tiny.variant, "tiny.en")
         let balanced = try XCTUnwrap(WhisperModelLocator.locate(in: root, variant: "small.en_217MB"))
         XCTAssertEqual(balanced.url.lastPathComponent, "openai_whisper-small.en_217MB")
+        // Highest is no longer a WhisperKit variant; leftover turbo folders are ignored.
         XCTAssertNil(WhisperModelLocator.locate(in: root, variant: "large-v3_turbo"))
+        XCTAssertNil(WhisperModelLocator.locate(in: root, variant: SpeechModelChoice.parakeetVariant))
     }
 
     private func writeCompleteModel(named name: String, in root: URL) throws {

@@ -1049,9 +1049,9 @@ final class SessionController: ObservableObject {
         if heardSpeech, let audioURL {
             if AppSettings.shared.speechEngine == .openAICompatible {
                 setPhase(.transcribing)
-            } else if WhisperKitTranscriber.isModelReady {
+            } else if SpeechModelStatus.isModelReady {
                 setPhase(.transcribing)
-            } else if WhisperKitTranscriber.modelIsInstalled() {
+            } else if SpeechModelStatus.modelIsInstalled() {
                 setPhase(.preparingModel)
             } else {
                 setPhase(.downloading(0))

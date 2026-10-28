@@ -8,6 +8,7 @@
 /* Begin PBXBuildFile section */
 		A1000000000000000000000E /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000014 /* WhisperKit */; };
 		A10000000000000000000022 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000021 /* Sparkle */; };
+		A10000000000000000000030 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000031 /* FluidAudio */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -45,6 +46,7 @@
 			files = (
 				A1000000000000000000000E /* WhisperKit in Frameworks */,
 				A10000000000000000000022 /* Sparkle in Frameworks */,
+				A10000000000000000000030 /* FluidAudio in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -98,6 +100,7 @@
 			packageProductDependencies = (
 				A10000000000000000000014 /* WhisperKit */,
 				A10000000000000000000021 /* Sparkle */,
+				A10000000000000000000031 /* FluidAudio */,
 			);
 			productName = PromptAnnotator;
 			productReference = A1000000000000000000000F /* da transcribuh.app */;
@@ -157,6 +160,7 @@
 			packageReferences = (
 				A10000000000000000000013 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */,
 				A10000000000000000000020 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				A10000000000000000000032 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000003 /* Products */;
@@ -488,6 +492,14 @@
 				version = 2.10.0;
 			};
 		};
+		A10000000000000000000032 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.17.7;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -500,6 +512,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000020 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		A10000000000000000000031 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000032 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

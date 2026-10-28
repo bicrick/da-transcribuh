@@ -102,6 +102,21 @@ final class WhisperSourceResolverTests: XCTestCase {
         XCTAssertEqual(variant, "large-v3_turbo")
         defaults.removePersistentDomain(forName: name)
     }
+
+    func testParakeetSelectionDoesNotBecomeWhisperKitBuiltIn() {
+        let name = "PromptAnnotatorTests.sourceParakeet.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        defaults.set(SpeechModelChoice.parakeetVariant, forKey: SpeechModelChoice.defaultsKey)
+        let source = WhisperSourceResolver.resolve(defaults: defaults)
+        guard case .builtIn(let variant, let repo) = source else {
+            return XCTFail("expected built-in WhisperKit fallback")
+        }
+        // RoutingTranscriber owns Parakeet; WhisperKit resolver stays on the recommended Whisper weights.
+        XCTAssertEqual(variant, "small.en_217MB")
+        XCTAssertEqual(repo, WhisperKitTranscriber.modelRepo)
+        defaults.removePersistentDomain(forName: name)
+    }
 }
 
 final class OpenAICompatibleParsingTests: XCTestCase {

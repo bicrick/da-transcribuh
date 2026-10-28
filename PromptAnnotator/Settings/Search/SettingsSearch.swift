@@ -59,7 +59,7 @@ enum SettingsSearch {
     private static let settingHits: [SettingsSearchHit] = [
         // Home
         hit("home.permissions", .home, "Permissions", "Screen Recording, Microphone, Accessibility"),
-        hit("home.model", .home, "Speech model", "WhisperKit on this Mac"),
+        hit("home.model", .home, "Speech model", "WhisperKit or Parakeet on this Mac"),
         hit("home.first", .home, "First take", "Start a session"),
         hit("home.shortcut", .home, "Change recording shortcut", "Edit Start/Stop chord on Home"),
         // Appearance (theme + former Recording page)
@@ -68,8 +68,8 @@ enum SettingsSearch {
         hit("app.tool", .appearance, "Annotation tool", "Shift-drag defaults"),
         hit("app.color", .appearance, "Annotation color", "Ink swatch defaults"),
         // Models
-        hit("model.engine", .model, "Engine", "WhisperKit or server"),
-        hit("model.builtin", .model, "Built-in WhisperKit", "Download English weights"),
+        hit("model.engine", .model, "Engine", "On this Mac or server"),
+        hit("model.builtin", .model, "Built-in models", "WhisperKit Fast/Balanced or Parakeet Highest"),
         hit("model.custom", .model, "Your models", "Core ML folders"),
         hit("model.hf", .model, "Add from Hugging Face", "Bring your own model"),
         hit("model.server", .model, "Server", "OpenAI-compatible final pass"),

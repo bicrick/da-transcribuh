@@ -535,7 +535,7 @@ struct HomePage: View {
                 ? "Server model ready"
                 : "Server key missing"
         }
-        if WhisperKitTranscriber.modelIsInstalled() {
+        if SpeechModelStatus.modelIsInstalled() {
             return settings.speechModel
         }
         return "Model not downloaded"
@@ -573,7 +573,7 @@ struct HomePage: View {
                     action: onOpenModels
                 )
             }
-        } else if !WhisperKitTranscriber.modelIsInstalled() {
+        } else if !SpeechModelStatus.modelIsInstalled() {
             return HomeStatusIssue(
                 message: "Download a speech model on Models.",
                 actionTitle: "Models",
@@ -702,7 +702,7 @@ struct HomePage: View {
         if settings.speechEngine == .openAICompatible {
             return OpenAICompatibleTranscriber.isConfigured()
         }
-        return WhisperKitTranscriber.modelIsInstalled()
+        return SpeechModelStatus.modelIsInstalled()
     }
 
     private var modelDetail: String {
@@ -711,7 +711,7 @@ struct HomePage: View {
                 ? "OpenAI-compatible server is configured."
                 : "Add a server API key on the Models page."
         }
-        if WhisperKitTranscriber.modelIsInstalled() {
+        if SpeechModelStatus.modelIsInstalled() {
             let choice = SpeechModelChoice.stored(settings.speechModel)
             return "\(choice.title) (\(choice.variant)) is on this Mac."
         }
@@ -734,7 +734,7 @@ struct HomePage: View {
             }
             return "Press Start or \(settings.chord.display), speak, then stop."
         }
-        if !WhisperKitTranscriber.modelIsInstalled() {
+        if !SpeechModelStatus.modelIsInstalled() {
             return "Download a speech model on the Models page, then press Start or \(settings.chord.display)."
         }
         return "Press Start or \(settings.chord.display), speak, then stop. History fills in after your first take."

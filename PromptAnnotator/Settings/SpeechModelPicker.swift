@@ -16,6 +16,11 @@ final class ModelTransfer: ObservableObject {
             message = "Enter a model variant to download."
             return
         }
+        let choice = SpeechModelChoice.all.first { $0.variant == trimmedVariant }
+        if let choice, !choice.isSupportedOnThisMac {
+            message = "Parakeet needs an Apple Silicon Mac. Pick Fast or Balanced instead."
+            return
+        }
         generation += 1
         let generation = generation
         task?.cancel()
@@ -24,10 +29,19 @@ final class ModelTransfer: ObservableObject {
         workingVariant = trimmedVariant
         task = Task { [weak self] in
             do {
-                _ = try await WhisperKitTranscriber.fetch(variant: trimmedVariant, repo: repo) { value in
-                    Task { @MainActor in
-                        guard self?.generation == generation else { return }
-                        self?.fraction = value
+                if choice?.backend == .fluidAudio {
+                    _ = try await ParakeetTranscriber.fetch { value in
+                        Task { @MainActor in
+                            guard self?.generation == generation else { return }
+                            self?.fraction = value
+                        }
+                    }
+                } else {
+                    _ = try await WhisperKitTranscriber.fetch(variant: trimmedVariant, repo: repo) { value in
+                        Task { @MainActor in
+                            guard self?.generation == generation else { return }
+                            self?.fraction = value
+                        }
                     }
                 }
                 guard !Task.isCancelled, self?.generation == generation else { return }
@@ -73,6 +87,12 @@ struct SpeechModelPicker: View {
                     modelTile(choice)
                 }
             }
+            if !AppleSilicon.isCurrent {
+                Text("Highest (Parakeet) needs Apple Silicon. Fast and Balanced stay available on Intel.")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let message = transfer.message {
                 InkErrorBanner(message: message)
             }
@@ -87,7 +107,9 @@ struct SpeechModelPicker: View {
         let selected = settings.customModelID == nil && settings.speechModel == choice.variant
         let onDisk = installed.contains(choice.variant)
         let downloading = transfer.workingVariant == choice.variant
+        let supported = choice.isSupportedOnThisMac
         return Button {
+            guard supported else { return }
             settings.setSpeechModel(choice.variant)
             transfer.message = nil
         } label: {
@@ -117,7 +139,7 @@ struct SpeechModelPicker: View {
                             .foregroundStyle(Ink.secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                        Text(choice.detail)
+                        Text(supported ? choice.detail : "Needs Apple Silicon. Use Fast or Balanced on this Mac.")
                             .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -132,18 +154,28 @@ struct SpeechModelPicker: View {
 
                     Spacer(minLength: 0)
 
-                    footer(for: choice, onDisk: onDisk, downloading: downloading)
+                    footer(for: choice, onDisk: onDisk, downloading: downloading, supported: supported)
                 }
                 .frame(maxWidth: .infinity, minHeight: tileMinHeight - 40, alignment: .topLeading)
+                .opacity(supported ? 1 : 0.45)
             }
         }
         .buttonStyle(.plain)
-        .disabled(transfer.isWorking && !downloading)
+        .disabled(!supported || (transfer.isWorking && !downloading))
     }
 
     @ViewBuilder
-    private func footer(for choice: SpeechModelChoice, onDisk: Bool, downloading: Bool) -> some View {
-        if downloading, let fraction = transfer.fraction {
+    private func footer(
+        for choice: SpeechModelChoice,
+        onDisk: Bool,
+        downloading: Bool,
+        supported: Bool
+    ) -> some View {
+        if !supported {
+            Text("Apple Silicon only")
+                .font(Ink.buttonSmallFont)
+                .foregroundStyle(Ink.secondary)
+        } else if downloading, let fraction = transfer.fraction {
             VStack(alignment: .leading, spacing: Ink.space1) {
                 InkProgressBar(fraction: fraction)
                 Text("Downloading \(Int((fraction * 100).rounded()))%")
@@ -182,9 +214,20 @@ struct SpeechModelPicker: View {
     }
 
     private func refresh() {
-        let root = WhisperKitTranscriber.modelsFolder()
-        installed = Set(SpeechModelChoice.all.compactMap { choice in
-            WhisperModelLocator.locate(in: root, variant: choice.variant) == nil ? nil : choice.variant
-        })
+        let whisperRoot = WhisperKitTranscriber.modelsFolder()
+        var next = Set<String>()
+        for choice in SpeechModelChoice.all {
+            switch choice.backend {
+            case .whisperKit:
+                if WhisperModelLocator.locate(in: whisperRoot, variant: choice.variant) != nil {
+                    next.insert(choice.variant)
+                }
+            case .fluidAudio:
+                if ParakeetTranscriber.modelIsInstalled() {
+                    next.insert(choice.variant)
+                }
+            }
+        }
+        installed = next
     }
 }

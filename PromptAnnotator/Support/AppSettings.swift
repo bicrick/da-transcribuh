@@ -179,7 +179,12 @@ final class AppSettings: ObservableObject {
         pasteOnStop = defaults.object(forKey: Keys.pasteOnStop) as? Bool ?? true
         returnOnShift = defaults.bool(forKey: Keys.returnOnShift)
         capitalizeTranscript = defaults.bool(forKey: Keys.capitalize)
-        speechModel = SpeechModelChoice.stored(defaults.string(forKey: Keys.speechModel)).variant
+        let rawSpeechModel = defaults.string(forKey: Keys.speechModel)
+        speechModel = SpeechModelChoice.stored(rawSpeechModel).variant
+        // Persist turbo → Parakeet (or Intel fallback) so the key matches the resolved choice.
+        if rawSpeechModel != speechModel {
+            defaults.set(speechModel, forKey: Keys.speechModel)
+        }
         speechEngine = SpeechEngineKind.stored(defaults.string(forKey: Keys.speechEngine))
         let loadedModels = CustomWhisperCatalog.load(defaults: defaults)
         customModels = loadedModels
@@ -544,7 +549,7 @@ final class AppSettings: ObservableObject {
     }
 
     var liveCaptionsEnabled: Bool {
-        speechEngine == .whisperKit
+        SpeechModelStatus.liveCaptionsEnabled(defaults: defaults)
     }
 
     /// Clears a broken custom selection and restores the built-in balanced model (no reload notify).

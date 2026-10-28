@@ -15,7 +15,7 @@ struct ModelPage: View {
     var body: some View {
         SettingsPageStack(
             title: "Models",
-            subtitle: "On-device WhisperKit, your Core ML folders, or an OpenAI-compatible server for the final pass."
+            subtitle: "On-device WhisperKit or Parakeet, your Core ML folders, or an OpenAI-compatible server for the final pass."
         ) {
             engineSection
             if settings.speechEngine == .whisperKit {
@@ -89,8 +89,8 @@ struct ModelPage: View {
 
     private var builtInSection: some View {
         SettingsSection(
-            title: "Built-in WhisperKit",
-            footer: "English weights from argmaxinc/whisperkit-coreml. Size is the download."
+            title: "Built-in models",
+            footer: "Fast and Balanced are WhisperKit (argmaxinc/whisperkit-coreml). Highest is NVIDIA Parakeet TDT 0.6B v2 via FluidAudio (English, Apple Silicon). Size is the download. Highest has no live captions — the final transcript still pastes on stop."
         ) {
             SpeechModelPicker(settings: settings, transfer: transfer)
         }
@@ -286,11 +286,17 @@ struct ModelPage: View {
                 HStack(alignment: .top, spacing: Ink.space3) {
                     InkIconChip(systemName: "internaldrive")
                     VStack(alignment: .leading, spacing: Ink.space2) {
-                        Text("Downloaded WhisperKit weights live here. Custom folders you add stay in place and are remembered with a bookmark.")
+                        Text("WhisperKit weights and Parakeet (FluidAudio) caches live under Application Support. Custom folders you add stay in place and are remembered with a bookmark.")
                             .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Text(WhisperKitTranscriber.modelsFolder().path)
+                            .font(Ink.captionFont)
+                            .foregroundStyle(Ink.secondary)
+                            .lineLimit(2)
+                            .textSelection(.enabled)
+                            .inkFieldStyle()
+                        Text(ParakeetTranscriber.modelsFolder().path)
                             .font(Ink.captionFont)
                             .foregroundStyle(Ink.secondary)
                             .lineLimit(2)
