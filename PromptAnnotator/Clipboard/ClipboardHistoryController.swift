@@ -10,6 +10,8 @@ final class ClipboardHistoryController {
     let store = ClipboardHistoryStore.shared
     private let watcher = ClipboardWatcher()
     private var hotKey: EventHotKeyRef?
+    /// The chord `hotKey` was registered with, so a failed change can put it back.
+    private var registeredChord: HotkeyChord?
     private var eventHandler: EventHandlerRef?
     private let signature: OSType = 0x5041_6E6E // 'PAnn'
     /// Carbon id under `'PAnn'`: record=1, paste=2, cancel=3, clipboard=4.
@@ -58,6 +60,7 @@ final class ClipboardHistoryController {
             UnregisterEventHotKey(hotKey)
             self.hotKey = nil
         }
+        registeredChord = nil
     }
 
     @discardableResult
@@ -65,11 +68,18 @@ final class ClipboardHistoryController {
         guard chord.canRegister(allowingShift: true) else { return false }
         // Persist settings in tests without registering a Carbon hotkey.
         if Runtime.isUnitTest { return true }
-        if let hotKey {
-            UnregisterEventHotKey(hotKey)
-            self.hotKey = nil
-        }
+        let previous = registeredChord
+        unregisterHotKey()
         installHandlerIfNeeded()
+        guard register(chord) else {
+            // Put the old chord back; the caller keeps the old setting on failure.
+            if let previous { _ = register(previous) }
+            return false
+        }
+        return true
+    }
+
+    private func register(_ chord: HotkeyChord) -> Bool {
         var registered: EventHotKeyRef?
         let id = EventHotKeyID(signature: signature, id: hotKeyID)
         let status = RegisterEventHotKey(
@@ -80,8 +90,9 @@ final class ClipboardHistoryController {
             0,
             &registered
         )
-        guard status == noErr else { return false }
+        guard status == noErr, let registered else { return false }
         hotKey = registered
+        registeredChord = chord
         return true
     }
 
