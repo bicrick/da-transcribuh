@@ -21,6 +21,7 @@ struct ModelPage: View {
             if settings.speechEngine == .whisperKit {
                 builtInSection
                 customSection
+                languageSection
                 addHuggingFaceSection
                 diskSection
             } else {
@@ -197,6 +198,29 @@ struct ModelPage: View {
             .padding(.trailing, Ink.rowHPad)
             .padding(.top, Ink.rowVPad)
             .disabled(transfer.isWorking)
+        }
+    }
+
+    private var languageSection: some View {
+        SettingsSection(
+            title: "Language",
+            footer: "Only multilingual weights (large-v3 turbo, many custom models) use this. English-only .en models always transcribe English."
+        ) {
+            InkCard {
+                InkSettingRow(
+                    title: "Transcription language",
+                    detail: "Auto-detect guesses per chunk. Pick a language if it guesses wrong."
+                ) {
+                    InkMenuPicker(
+                        title: "Transcription language",
+                        selection: Binding(
+                            get: { settings.transcriptionLanguage },
+                            set: { settings.setTranscriptionLanguage($0) }
+                        ),
+                        options: TranscriptionLanguage.choices
+                    )
+                }
+            }
         }
     }
 

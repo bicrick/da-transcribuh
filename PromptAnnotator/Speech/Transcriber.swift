@@ -555,11 +555,17 @@ actor WhisperKitTranscriber: Transcribing {
         windowClipTime: Float,
         workers: Int
     ) -> DecodingOptions {
-        DecodingOptions(
-            language: "en",
+        // Settings → Models → Language. `auto` lets multilingual weights detect per window;
+        // English-only (`.en`) weights ignore both fields inside WhisperKit.
+        let stored = TranscriptionLanguage.stored(
+            UserDefaults.standard.string(forKey: TranscriptionLanguage.defaultsKey)
+        )
+        let autoDetect = stored == TranscriptionLanguage.auto
+        return DecodingOptions(
+            language: autoDetect ? nil : stored,
             temperatureFallbackCount: 1,
             usePrefillPrompt: true,
-            detectLanguage: false,
+            detectLanguage: autoDetect,
             skipSpecialTokens: true,
             wordTimestamps: true,
             windowClipTime: windowClipTime,
