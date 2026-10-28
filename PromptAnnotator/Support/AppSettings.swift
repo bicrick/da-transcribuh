@@ -70,6 +70,37 @@ enum IslandStyle: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+/// Whisper decode language. Only multilingual weights use it; WhisperKit skips the
+/// language token and detection for English-only (`.en`) models, so those stay English.
+enum TranscriptionLanguage {
+    static let defaultsKey = "speech.language"
+    static let auto = "auto"
+    static let english = "en"
+
+    /// `auto` plus common Whisper language codes. English stays the default.
+    static let choices: [(String, String)] = [
+        ("auto", "Auto-detect"),
+        ("en", "English"),
+        ("es", "Spanish"),
+        ("fr", "French"),
+        ("de", "German"),
+        ("it", "Italian"),
+        ("pt", "Portuguese"),
+        ("nl", "Dutch"),
+        ("ru", "Russian"),
+        ("hi", "Hindi"),
+        ("ja", "Japanese"),
+        ("ko", "Korean"),
+        ("zh", "Chinese"),
+    ]
+
+    /// Empty / unknown → English, so existing installs decode exactly as before.
+    static func stored(_ raw: String?) -> String {
+        guard let raw, choices.contains(where: { $0.0 == raw }) else { return english }
+        return raw
+    }
+}
+
 @MainActor
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
@@ -121,6 +152,7 @@ final class AppSettings: ObservableObject {
     @Published var returnOnShift: Bool
     @Published var capitalizeTranscript: Bool
     @Published var speechModel: String
+    @Published var transcriptionLanguage: String
     @Published var speechEngine: SpeechEngineKind
     @Published var customModelID: String?
     @Published var customModels: [CustomWhisperModel]
@@ -180,6 +212,7 @@ final class AppSettings: ObservableObject {
         returnOnShift = defaults.bool(forKey: Keys.returnOnShift)
         capitalizeTranscript = defaults.bool(forKey: Keys.capitalize)
         speechModel = SpeechModelChoice.stored(defaults.string(forKey: Keys.speechModel)).variant
+        transcriptionLanguage = TranscriptionLanguage.stored(defaults.string(forKey: Keys.transcriptionLanguage))
         speechEngine = SpeechEngineKind.stored(defaults.string(forKey: Keys.speechEngine))
         let loadedModels = CustomWhisperCatalog.load(defaults: defaults)
         customModels = loadedModels
@@ -482,6 +515,11 @@ final class AppSettings: ObservableObject {
         persist(Keys.capitalize, enabled)
     }
 
+    func setTranscriptionLanguage(_ code: String) {
+        transcriptionLanguage = TranscriptionLanguage.stored(code)
+        persist(Keys.transcriptionLanguage, transcriptionLanguage)
+    }
+
     func setSpeechModel(_ variant: String) {
         speechModel = SpeechModelChoice.stored(variant).variant
         customModelID = nil
@@ -638,6 +676,7 @@ final class AppSettings: ObservableObject {
         static let returnOnShift = "session.returnOnShift"
         static let capitalize = "session.capitalize"
         static let speechModel = SpeechModelChoice.defaultsKey
+        static let transcriptionLanguage = TranscriptionLanguage.defaultsKey
         static let speechEngine = SpeechEngineKind.defaultsKey
         static let openAIBaseURL = OpenAICompatibleTranscriber.baseURLKey
         static let openAIModel = OpenAICompatibleTranscriber.modelKey
