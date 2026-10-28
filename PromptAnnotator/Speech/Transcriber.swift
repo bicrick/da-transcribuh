@@ -448,7 +448,9 @@ actor WhisperKitTranscriber: Transcribing {
             }
         }
         loading = task
-        defer { loading = nil }
+        // Only clear our own handle: a caller for a different folder may have
+        // replaced `loading` while this one was suspended.
+        defer { if loading == task { loading = nil } }
         return try await task.value
     }
 
