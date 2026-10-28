@@ -87,14 +87,20 @@ final class ClipboardWatcher {
     }
 
     private func tick() {
-        guard isEnabled() else { return }
+        // Skipped changes are acknowledged so re-enabling (or unpausing) does not
+        // capture whatever was copied while history was off, and the rate drops
+        // back to quiet so a skipped burst does not keep the 0.5 s poll forever.
+        guard isEnabled() else {
+            skip()
+            return
+        }
         let settings = AppSettings.shared
         guard !settings.clipboardCapturePaused else {
-            acknowledgePasteboard()
+            skip()
             return
         }
         guard store.suppressWatcher == 0 else {
-            acknowledgePasteboard()
+            skip()
             return
         }
         let board = NSPasteboard.general
@@ -106,6 +112,11 @@ final class ClipboardWatcher {
         lastChangeCount = count
         adjustRate(changed: true)
         capture(from: board)
+    }
+
+    private func skip() {
+        acknowledgePasteboard()
+        adjustRate(changed: false)
     }
 
     /// PNG bytes for the board's image. Screenshots and most apps already offer
