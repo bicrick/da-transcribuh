@@ -1,0 +1,29 @@
+name: feature request
+description: an idea for something da transcribuh should do
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: the problem
+      description: what are you trying to do, and what gets in the way today
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: what you'd like
+      description: how it could work. rough is fine
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: other options
+      description: workarounds you use now, or how other apps handle it
+  - type: checkboxes
+    id: help
+    attributes:
+      label: helping out
+      options:
+        - label: i'd like to work on this myself

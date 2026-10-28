@@ -119,7 +119,7 @@ the app embeds Sparkle 2.10.0 (SwiftPM, exact version). `UpdateController` owns 
 `SPUStandardUpdaterController`. it never starts under unit tests. "Check for Updates…" sits in the
 menu bar menu and on General → Updates.
 
-**what ships now (beta, private repo):**
+**what ships now (beta):**
 
 | Info.plist key | value | why |
 |---|---|---|
@@ -130,8 +130,8 @@ menu bar menu and on General → Updates.
 | `SURequireSignedFeed` | `true` | rejects an appcast that is not signed by our key |
 | `SUVerifyUpdateBeforeExtraction` | `true` | checks the DMG signature before unpacking it |
 
-the feed and the DMGs live on the public website (`bicrick/da-transcribuh-site`), so updates work while
-this repo stays private. 0.9.4 and older builds still point at the old GitHub feed and never see updates.
+the feed and the DMGs live on the public website (`bicrick/da-transcribuh-site`), so updates don't depend on this
+repo. it started private and is public now, and the feed did not change. 0.9.4 and older builds still point at the old GitHub feed and never see updates.
 
 **the appcast.** `scripts/release.sh` runs `scripts/make-appcast.sh` after the DMG is notarized and stapled.
 it calls Sparkle's `generate_appcast` on a folder holding just `da-transcribuh-<version>.dmg`, with enclosure URL
