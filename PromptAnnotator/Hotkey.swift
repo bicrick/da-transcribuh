@@ -16,6 +16,8 @@ final class HotkeyCenter {
 
     private var hotKey: EventHotKeyRef?
     private var cancelKey: EventHotKeyRef?
+    /// The cancel chord currently registered, so a failed change can put it back.
+    private var cancelChord: HotkeyChord?
     private var eventHandler: EventHandlerRef?
     private var chord = HotkeyChord.default
     private let signature: OSType = 0x5041_6E6E // 'PAnn'
@@ -46,12 +48,27 @@ final class HotkeyCenter {
     @discardableResult
     func applyCancel(_ chord: HotkeyChord?) -> Bool {
         installHandlerIfNeeded()
+        if let chord, !chord.isRegistrable { return false }
+        let previous = cancelChord
+        unregisterCancel()
+        guard let chord else { return true }
+        guard registerCancel(chord) else {
+            // Put the old cancel key back; the caller keeps the old setting on failure.
+            if let previous { _ = registerCancel(previous) }
+            return false
+        }
+        return true
+    }
+
+    private func unregisterCancel() {
         if let cancelKey {
             UnregisterEventHotKey(cancelKey)
             self.cancelKey = nil
         }
-        guard let chord else { return true }
-        guard chord.isRegistrable else { return false }
+        cancelChord = nil
+    }
+
+    private func registerCancel(_ chord: HotkeyChord) -> Bool {
         var registered: EventHotKeyRef?
         let id = EventHotKeyID(signature: signature, id: cancelID)
         let status = RegisterEventHotKey(
@@ -62,8 +79,9 @@ final class HotkeyCenter {
             0,
             &registered
         )
-        guard status == noErr else { return false }
+        guard status == noErr, let registered else { return false }
         cancelKey = registered
+        cancelChord = chord
         return true
     }
 
@@ -144,10 +162,7 @@ final class HotkeyCenter {
             UnregisterEventHotKey(hotKey)
             self.hotKey = nil
         }
-        if let cancelKey {
-            UnregisterEventHotKey(cancelKey)
-            self.cancelKey = nil
-        }
+        unregisterCancel()
         if let eventHandler {
             RemoveEventHandler(eventHandler)
             self.eventHandler = nil
