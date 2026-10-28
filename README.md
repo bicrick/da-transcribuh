@@ -38,6 +38,25 @@
   </picture>
 </p>
 
+## what it does
+
+- **live captions.** words show up in the island while u talk, so stop only has to finish the last second
+- **paste where ur cursor is.** on by default when u stop. hold shift as u stop and it hits return too
+- **push to talk.** optional. let go of the key and it stops
+- **grab the screen while u talk.** hold the screenshot key and drag over what u wanna show. each grab gets a numbered tile
+- **draw on it.** hold the annotate key for pen, highlighter, arrow, box, and text
+- **collage paste.** grabs + words go out as one linked paste: the picture, then the words. made for pasting into an ai agent
+- **clipboard history.** searchable, with its own shortcut
+- **every take saved.** a folder per session with `session.md`, `session.json`, and a contact sheet
+- **pick ur model.** `tiny.en`, `small.en` (default), `large-v3 turbo`, or ur own WhisperKit model from a folder or hugging face
+- **or ur own server.** point it at any OpenAI-compatible `/v1/audio/transcriptions` endpoint (live captions are off in that mode)
+- **rebind everything.** start/stop, cancel, screenshot, annotate, and history keys. plus stop-after-silence, a max session length, and launch at login
+- **filler tags stripped.** whisper's `[BLANK_AUDIO]`, `(silence)`, `[Music]` and friends get dropped
+
+## vs the paid ones
+
+free, MIT, on-device by default, and it can paste a screen-grab collage with ur words.
+
 ## install
 
 grab the dmg from the [download page](https://da-transcribuh-site.vercel.app/download), drag it into applications, open it.
@@ -67,13 +86,16 @@ open "build/Build/Products/Debug/da transcribuh.app"
 `CODE_SIGN_IDENTITY=-` ad-hoc signs it so u don't need my cert. in Xcode, set signing to "sign to run locally".
 heads up: macOS may ask for permissions again after each rebuild.
 
-more in [CONTRIBUTING.md](CONTRIBUTING.md).
+## contributing
+
+help is very welcome: bug fixes, models, docs, whatever u find annoying.
+start with [CONTRIBUTING.md](CONTRIBUTING.md), then [docs/architecture.md](docs/architecture.md) for a map of the code.
 
 ## privacy
 
-transcription runs on ur mac with [WhisperKit](https://github.com/argmaxinc/WhisperKit). no account, no cloud, nothing gets uploaded.
+by default, transcription runs on ur mac with [WhisperKit](https://github.com/argmaxinc/WhisperKit). ur audio and screen grabs stay local.
 
-it only touches the network to download a model, check for updates, or talk to ur own server if u [set one up](docs/BRING_YOUR_OWN_MODEL.md).
+it only touches the network to download a model, check for updates (Sparkle), or send audio to ur own OpenAI-compatible server if u [set one up](docs/BRING_YOUR_OWN_MODEL.md). that server's API key lives in ur keychain.
 
 ## license
 
