@@ -65,11 +65,11 @@ final class SilenceWatchEdgeTests: XCTestCase {
 
     func testLoudBufferResetsTheQuietClock() {
         var watch = SilenceWatch()
-        XCTAssertFalse(watch.tick(level: 0, heardSpeech: true, limit: 1, delta: 0.9))
+        XCTAssertFalse(watch.tick(level: 0, heardSpeech: true, limit: 1, delta: 0.75))
         XCTAssertFalse(watch.tick(level: 0.9, heardSpeech: true, limit: 1, delta: 0.5))
         XCTAssertEqual(watch.accumulated, 0)
-        XCTAssertFalse(watch.tick(level: 0, heardSpeech: true, limit: 1, delta: 0.9))
-        XCTAssertTrue(watch.tick(level: 0, heardSpeech: true, limit: 1, delta: 0.1))
+        XCTAssertFalse(watch.tick(level: 0, heardSpeech: true, limit: 1, delta: 0.5))
+        XCTAssertTrue(watch.tick(level: 0, heardSpeech: true, limit: 1, delta: 0.5))
     }
 
     func testMaxSessionBoundaries() {
