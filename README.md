@@ -49,7 +49,7 @@ it'll ask for a few permissions:
 - **accessibility**: to paste where ur cursor is
 - **screen recording**: only for screen grabs
 
-default model is `small.en`. u can swap to `tiny.en`, **Highest** (NVIDIA Parakeet TDT 0.6B v2 via [FluidAudio](https://github.com/FluidInference/FluidAudio), Apple Silicon), or [bring ur own](docs/BRING_YOUR_OWN_MODEL.md).
+default model on Apple Silicon is **Parakeet TDT 0.6B v2** via [FluidAudio](https://github.com/FluidInference/FluidAudio). Intel Macs default to WhisperKit `small.en`. Settings lists every built-in model with download size, Open ASR stats, languages, live-captions support, and license — including Parakeet v3 / Ultra and Whisper `tiny.en` / `base.en` / `small.en` / `large-v3_turbo`. or [bring ur own](docs/BRING_YOUR_OWN_MODEL.md).
 
 ## build from source
 
@@ -71,7 +71,7 @@ more in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## privacy
 
-transcription runs on ur mac with [WhisperKit](https://github.com/argmaxinc/WhisperKit) (Fast / Balanced) or [FluidAudio](https://github.com/FluidInference/FluidAudio) Parakeet (Highest). no account, no cloud, nothing gets uploaded.
+transcription runs on ur mac with [WhisperKit](https://github.com/argmaxinc/WhisperKit) or [FluidAudio](https://github.com/FluidInference/FluidAudio) Parakeet. no account, no cloud, nothing gets uploaded.
 
 it only touches the network to download a model, check for updates, or talk to ur own server if u [set one up](docs/BRING_YOUR_OWN_MODEL.md).
 
@@ -81,7 +81,7 @@ it only touches the network to download a model, check for updates, or talk to u
 
 ### acknowledgements
 
-- [WhisperKit](https://github.com/argmaxinc/WhisperKit) (Argmax) — Fast / Balanced on-device ASR.
-- [FluidAudio](https://github.com/FluidInference/FluidAudio) (Apache-2.0) — Parakeet Core ML runtime for Highest.
-- [NVIDIA Parakeet TDT 0.6B v2](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml) weights — CC-BY-4.0. Highest uses the FluidInference Core ML conversion of NVIDIA’s English Parakeet model; attribution required by that license.
-- Parakeet (Highest) needs **Apple Silicon**. Intel Macs keep Fast / Balanced (WhisperKit).
+- [WhisperKit](https://github.com/argmaxinc/WhisperKit) (Argmax) — on-device ASR (`tiny.en`, `base.en`, `small.en`, `large-v3_turbo`, …).
+- [FluidAudio](https://github.com/FluidInference/FluidAudio) (Apache-2.0) — Parakeet Core ML runtime (v2 / v3 / Ultra).
+- [NVIDIA Parakeet TDT 0.6B](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml) weights — CC-BY-4.0 (FluidInference Core ML conversions). Attribution required by that license.
+- Parakeet needs **Apple Silicon**. Intel Macs use WhisperKit only.

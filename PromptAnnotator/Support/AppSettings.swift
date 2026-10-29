@@ -182,7 +182,7 @@ final class AppSettings: ObservableObject {
         let rawSpeechModel = defaults.string(forKey: Keys.speechModel)
         let resolvedSpeechModel = SpeechModelChoice.stored(rawSpeechModel).variant
         speechModel = resolvedSpeechModel
-        // Persist turbo → Parakeet (or Intel fallback) so the key matches the resolved choice.
+        // Persist resolved choice (e.g. Intel + Parakeet → Whisper fallback) so the key matches.
         // Use the local so we do not touch `self` before the remaining stored properties init.
         if rawSpeechModel != resolvedSpeechModel {
             defaults.set(resolvedSpeechModel, forKey: Keys.speechModel)
@@ -554,11 +554,12 @@ final class AppSettings: ObservableObject {
         SpeechModelStatus.liveCaptionsEnabled(defaults: defaults)
     }
 
-    /// Clears a broken custom selection and restores the built-in balanced model (no reload notify).
+    /// Clears a broken custom/Parakeet selection and restores Whisper small.en for an on-device retry.
+    /// Always a WhisperKit variant — not `recommended` (which may be Parakeet on Apple Silicon).
     func fallBackToDefaultWhisperModel() {
         customModelID = nil
         CustomWhisperCatalog.setSelectedCustomID(nil, defaults: defaults)
-        speechModel = SpeechModelChoice.recommended.variant
+        speechModel = SpeechModelChoice.whisperFallback.variant
         persist(Keys.speechModel, speechModel)
         customModels = CustomWhisperCatalog.load(defaults: defaults)
     }

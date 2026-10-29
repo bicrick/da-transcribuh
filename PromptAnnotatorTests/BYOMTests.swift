@@ -112,7 +112,7 @@ final class WhisperSourceResolverTests: XCTestCase {
         guard case .builtIn(let variant, let repo) = source else {
             return XCTFail("expected built-in WhisperKit fallback")
         }
-        // RoutingTranscriber owns Parakeet; WhisperKit resolver stays on the recommended Whisper weights.
+        // RoutingTranscriber owns Parakeet; WhisperKit resolver stays on whisperFallback (small.en).
         XCTAssertEqual(variant, "small.en_217MB")
         XCTAssertEqual(repo, WhisperKitTranscriber.modelRepo)
         defaults.removePersistentDomain(forName: name)
