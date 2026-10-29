@@ -29,6 +29,7 @@ enum OnboardingSnapshotHarness {
             // Forward through every step, then two steps back to cover retreat.
             var order = OnboardingStep.allCases
             order.append(.model)
+            order.append(.language)
             order.append(.appearance)
             var seen = Set<OnboardingStep>()
             var previous: OnboardingStep = .welcome

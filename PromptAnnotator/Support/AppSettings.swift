@@ -121,6 +121,7 @@ final class AppSettings: ObservableObject {
     @Published var returnOnShift: Bool
     @Published var capitalizeTranscript: Bool
     @Published var speechModel: String
+    @Published var transcriptionLanguage: String
     @Published var speechEngine: SpeechEngineKind
     @Published var customModelID: String?
     @Published var customModels: [CustomWhisperModel]
@@ -187,6 +188,7 @@ final class AppSettings: ObservableObject {
         if rawSpeechModel != resolvedSpeechModel {
             defaults.set(resolvedSpeechModel, forKey: Keys.speechModel)
         }
+        transcriptionLanguage = TranscriptionLanguage.stored(defaults.string(forKey: Keys.transcriptionLanguage))
         speechEngine = SpeechEngineKind.stored(defaults.string(forKey: Keys.speechEngine))
         let loadedModels = CustomWhisperCatalog.load(defaults: defaults)
         customModels = loadedModels
@@ -489,6 +491,17 @@ final class AppSettings: ObservableObject {
         persist(Keys.capitalize, enabled)
     }
 
+    func setTranscriptionLanguage(_ code: String) {
+        transcriptionLanguage = TranscriptionLanguage.stored(code)
+        persist(Keys.transcriptionLanguage, transcriptionLanguage)
+    }
+
+    /// Persists the language and selects the recommended on-device model for it.
+    func applyLanguageRecommendation(_ code: String, appleSilicon: Bool = AppleSilicon.isCurrent) {
+        setTranscriptionLanguage(code)
+        setSpeechModel(TranscriptionLanguage.recommendedVariant(for: code, appleSilicon: appleSilicon))
+    }
+
     func setSpeechModel(_ variant: String) {
         speechModel = SpeechModelChoice.stored(variant).variant
         customModelID = nil
@@ -646,6 +659,7 @@ final class AppSettings: ObservableObject {
         static let returnOnShift = "session.returnOnShift"
         static let capitalize = "session.capitalize"
         static let speechModel = SpeechModelChoice.defaultsKey
+        static let transcriptionLanguage = TranscriptionLanguage.defaultsKey
         static let speechEngine = SpeechEngineKind.defaultsKey
         static let openAIBaseURL = OpenAICompatibleTranscriber.baseURLKey
         static let openAIModel = OpenAICompatibleTranscriber.modelKey
