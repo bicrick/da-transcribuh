@@ -180,10 +180,12 @@ final class AppSettings: ObservableObject {
         returnOnShift = defaults.bool(forKey: Keys.returnOnShift)
         capitalizeTranscript = defaults.bool(forKey: Keys.capitalize)
         let rawSpeechModel = defaults.string(forKey: Keys.speechModel)
-        speechModel = SpeechModelChoice.stored(rawSpeechModel).variant
+        let resolvedSpeechModel = SpeechModelChoice.stored(rawSpeechModel).variant
+        speechModel = resolvedSpeechModel
         // Persist turbo → Parakeet (or Intel fallback) so the key matches the resolved choice.
-        if rawSpeechModel != speechModel {
-            defaults.set(speechModel, forKey: Keys.speechModel)
+        // Use the local so we do not touch `self` before the remaining stored properties init.
+        if rawSpeechModel != resolvedSpeechModel {
+            defaults.set(resolvedSpeechModel, forKey: Keys.speechModel)
         }
         speechEngine = SpeechEngineKind.stored(defaults.string(forKey: Keys.speechEngine))
         let loadedModels = CustomWhisperCatalog.load(defaults: defaults)

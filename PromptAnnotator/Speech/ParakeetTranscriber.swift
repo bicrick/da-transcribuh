@@ -23,8 +23,10 @@ actor ParakeetTranscriber: Transcribing {
     nonisolated func abandonLiveDecode() {}
 
     /// Drops the resident manager so the next prepare/transcribe reloads weights.
-    func unload() {
-        manager?.cleanup()
+    func unload() async {
+        if let manager {
+            await manager.cleanup()
+        }
         manager = nil
         loading = nil
         Self.readyFlag.set(false)
@@ -58,7 +60,7 @@ actor ParakeetTranscriber: Transcribing {
         let active = try await ensureManager(onProgress: onProgress)
         onProgress(.transcribing)
 
-        var decoderState = TdtDecoderState.make(decoderLayers: active.decoderLayerCount)
+        var decoderState = TdtDecoderState.make(decoderLayers: await active.decoderLayerCount)
         let result: ASRResult
         if useSamples {
             result = try await active.transcribe(samples, decoderState: &decoderState)
@@ -100,7 +102,7 @@ actor ParakeetTranscriber: Transcribing {
     private func ensureManager(
         onProgress: (@Sendable (SpeechProgress) -> Void)?
     ) async throws -> AsrManager {
-        if let manager, manager.isAvailable {
+        if let manager, await manager.isAvailable {
             Self.readyFlag.set(true)
             return manager
         }
