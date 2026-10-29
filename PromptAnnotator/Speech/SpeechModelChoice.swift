@@ -18,6 +18,18 @@ struct SpeechModelChoice: Identifiable, Equatable {
     /// Relative quality bar 0…1 derived from avg WER when known; nil otherwise.
     var quality: Double?
     var languages: String
+    /// Compact flag chips shown on the model row (emoji). Overflow goes in `languageOverflowCount`.
+    var languageFlagEmojis: [String]
+    /// Names matching `languageFlagEmojis` (same order) for tooltips.
+    var languageFlagNames: [String]
+    /// Extra languages beyond the preview chips (shown as "+N").
+    var languageOverflowCount: Int
+    /// Full language list for hover help.
+    var languageTooltip: String
+    /// Short line under the flags: English-only vs auto-detect.
+    var languageBehavior: String
+    /// True only for multilingual WhisperKit — future #66 language picker should gate on this.
+    var benefitsFromLanguagePicker: Bool
     var license: String
     var appleSiliconOnly: Bool
     var backend: OnDeviceSpeechBackend
@@ -74,6 +86,12 @@ struct SpeechModelChoice: Identifiable, Equatable {
                 speed: nil,
                 quality: nil,
                 languages: "English",
+                languageFlagEmojis: ["🇺🇸"],
+                languageFlagNames: ["English"],
+                languageOverflowCount: 0,
+                languageTooltip: "English",
+                languageBehavior: "English only",
+                benefitsFromLanguagePicker: false,
                 license: "CC-BY-4.0",
                 appleSiliconOnly: true,
                 backend: .fluidAudio,
@@ -82,13 +100,19 @@ struct SpeechModelChoice: Identifiable, Equatable {
             SpeechModelChoice(
                 variant: parakeetV3Variant,
                 title: "Parakeet TDT 0.6B v3",
-                detail: "25 European languages. Slightly higher English WER than v2. Batch final transcript.",
+                detail: "25 European languages; auto-detects language. Slightly higher English WER than v2. Batch final transcript.",
                 megabytes: 467,
                 openASRAvgWER: 6.32,
                 openASRRTFx: 3333,
                 speed: nil,
                 quality: nil,
                 languages: "25 European",
+                languageFlagEmojis: ["🇬🇧", "🇪🇸", "🇫🇷", "🇩🇪", "🇮🇹", "🇵🇱"],
+                languageFlagNames: ["English", "Spanish", "French", "German", "Italian", "Polish"],
+                languageOverflowCount: 19,
+                languageTooltip: "Bulgarian, Croatian, Czech, Danish, Dutch, English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, Latvian, Lithuanian, Maltese, Polish, Portuguese, Romanian, Slovak, Slovenian, Spanish, Swedish, Russian, Ukrainian (25). Auto-detects language.",
+                languageBehavior: "Auto-detects language",
+                benefitsFromLanguagePicker: false,
                 license: "CC-BY-4.0",
                 appleSiliconOnly: true,
                 backend: .fluidAudio,
@@ -97,13 +121,19 @@ struct SpeechModelChoice: Identifiable, Equatable {
             SpeechModelChoice(
                 variant: parakeetUltraVariant,
                 title: "Parakeet Ultra",
-                detail: "Full-precision post-training of v3 (FluidAudio). Same multilingual contract; larger download.",
+                detail: "Full-precision post-training of v3 (FluidAudio). Same 25 languages; auto-detects. Larger download.",
                 megabytes: 600,
                 openASRAvgWER: nil,
                 openASRRTFx: nil,
                 speed: nil,
                 quality: nil,
                 languages: "25 European",
+                languageFlagEmojis: ["🇬🇧", "🇪🇸", "🇫🇷", "🇩🇪", "🇮🇹", "🇵🇱"],
+                languageFlagNames: ["English", "Spanish", "French", "German", "Italian", "Polish"],
+                languageOverflowCount: 19,
+                languageTooltip: "Bulgarian, Croatian, Czech, Danish, Dutch, English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, Latvian, Lithuanian, Maltese, Polish, Portuguese, Romanian, Slovak, Slovenian, Spanish, Swedish, Russian, Ukrainian (25). Auto-detects language.",
+                languageBehavior: "Auto-detects language",
+                benefitsFromLanguagePicker: false,
                 license: "CC-BY-4.0",
                 appleSiliconOnly: true,
                 backend: .fluidAudio,
@@ -119,6 +149,12 @@ struct SpeechModelChoice: Identifiable, Equatable {
                 speed: nil,
                 quality: nil,
                 languages: "English",
+                languageFlagEmojis: ["🇺🇸"],
+                languageFlagNames: ["English"],
+                languageOverflowCount: 0,
+                languageTooltip: "English",
+                languageBehavior: "English only",
+                benefitsFromLanguagePicker: false,
                 license: "MIT",
                 appleSiliconOnly: false,
                 backend: .whisperKit,
@@ -134,6 +170,12 @@ struct SpeechModelChoice: Identifiable, Equatable {
                 speed: nil,
                 quality: nil,
                 languages: "English",
+                languageFlagEmojis: ["🇺🇸"],
+                languageFlagNames: ["English"],
+                languageOverflowCount: 0,
+                languageTooltip: "English",
+                languageBehavior: "English only",
+                benefitsFromLanguagePicker: false,
                 license: "MIT",
                 appleSiliconOnly: false,
                 backend: .whisperKit,
@@ -149,6 +191,12 @@ struct SpeechModelChoice: Identifiable, Equatable {
                 speed: nil,
                 quality: nil,
                 languages: "English",
+                languageFlagEmojis: ["🇺🇸"],
+                languageFlagNames: ["English"],
+                languageOverflowCount: 0,
+                languageTooltip: "English",
+                languageBehavior: "English only",
+                benefitsFromLanguagePicker: false,
                 license: "MIT",
                 appleSiliconOnly: false,
                 backend: .whisperKit,
@@ -157,13 +205,19 @@ struct SpeechModelChoice: Identifiable, Equatable {
             SpeechModelChoice(
                 variant: legacyHighestVariant,
                 title: "Whisper large-v3 turbo",
-                detail: "Multilingual WhisperKit. Heavier download; live captions supported.",
+                detail: "Multilingual WhisperKit (~99 languages); auto-detects. Heavier download; live captions supported.",
                 megabytes: 954,
                 openASRAvgWER: 7.83,
                 openASRRTFx: 200,
                 speed: nil,
                 quality: nil,
                 languages: "Multilingual",
+                languageFlagEmojis: ["🇺🇸", "🇪🇸", "🇫🇷", "🇩🇪", "🇯🇵", "🇨🇳"],
+                languageFlagNames: ["English", "Spanish", "French", "German", "Japanese", "Chinese"],
+                languageOverflowCount: 93,
+                languageTooltip: "Whisper multilingual (~99 languages). Auto-detects by default; an explicit language picker (#66) should only apply to this family.",
+                languageBehavior: "Auto-detects language",
+                benefitsFromLanguagePicker: true,
                 license: "MIT",
                 appleSiliconOnly: false,
                 backend: .whisperKit,

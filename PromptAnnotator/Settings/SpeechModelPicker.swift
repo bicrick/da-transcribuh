@@ -156,6 +156,8 @@ struct SpeechModelPicker: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
 
+                    languageFlags(for: choice)
+
                     Text(statsLine(for: choice))
                         .font(Ink.captionFont)
                         .foregroundStyle(Ink.secondary)
@@ -187,7 +189,7 @@ struct SpeechModelPicker: View {
         var parts: [String] = [
             choice.backend == .fluidAudio ? "FluidAudio" : "WhisperKit",
             "\(choice.megabytes) MB",
-            choice.languages,
+            choice.languageBehavior,
         ]
         if let wer = choice.openASRAvgWER {
             parts.append(String(format: "WER %.2f", wer))
@@ -195,6 +197,30 @@ struct SpeechModelPicker: View {
         parts.append(choice.supportsLiveCaptions ? "Live captions" : "No live captions")
         parts.append(choice.license)
         return parts.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    private func languageFlags(for choice: SpeechModelChoice) -> some View {
+        HStack(spacing: 4) {
+            ForEach(Array(choice.languageFlagEmojis.enumerated()), id: \.offset) { _, emoji in
+                Text(emoji)
+                    .font(.system(size: 12))
+                    .accessibilityHidden(true)
+            }
+            if choice.languageOverflowCount > 0 {
+                Text("+\(choice.languageOverflowCount)")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+            }
+            Text(choice.languages)
+                .font(Ink.captionFont)
+                .foregroundStyle(Ink.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .help(choice.languageTooltip)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(choice.languageTooltip)
     }
 
     @ViewBuilder

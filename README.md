@@ -49,7 +49,7 @@ it'll ask for a few permissions:
 - **accessibility**: to paste where ur cursor is
 - **screen recording**: only for screen grabs
 
-default model on Apple Silicon is **Parakeet TDT 0.6B v2** via [FluidAudio](https://github.com/FluidInference/FluidAudio). Intel Macs default to WhisperKit `small.en`. Settings lists every built-in model with download size, Open ASR stats, languages, live-captions support, and license — including Parakeet v3 / Ultra and Whisper `tiny.en` / `base.en` / `small.en` / `large-v3_turbo`. or [bring ur own](docs/BRING_YOUR_OWN_MODEL.md).
+default model on Apple Silicon is **Parakeet TDT 0.6B v2** via [FluidAudio](https://github.com/FluidInference/FluidAudio). Intel Macs default to WhisperKit `small.en`. Settings shows a stats list of every built-in model (size, Open ASR WER/speed, language flags, live captions, license) — Parakeet v2 / v3 / Ultra and Whisper `tiny.en` / `base.en` / `small.en` / `large-v3_turbo`. Parakeet v3 and multilingual Whisper auto-detect language; `*.en` / Parakeet v2 are English-only. or [bring ur own](docs/BRING_YOUR_OWN_MODEL.md).
 
 ## build from source
 

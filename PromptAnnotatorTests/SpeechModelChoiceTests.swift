@@ -62,6 +62,11 @@ final class SpeechModelChoiceTests: XCTestCase {
         let v3 = try XCTUnwrap(SpeechModelChoice.choice(for: SpeechModelChoice.parakeetV3Variant))
         XCTAssertEqual(v3.openASRAvgWER, 6.32)
         XCTAssertEqual(v3.languages, "25 European")
+        XCTAssertEqual(v3.languageBehavior, "Auto-detects language")
+        XCTAssertFalse(v3.benefitsFromLanguagePicker)
+        XCTAssertEqual(v3.languageFlagEmojis.count, 6)
+        XCTAssertEqual(v3.languageOverflowCount, 19)
+        XCTAssertEqual(v3.languageFlagEmojis.count + v3.languageOverflowCount, 25)
 
         let ultra = try XCTUnwrap(SpeechModelChoice.choice(for: SpeechModelChoice.parakeetUltraVariant))
         XCTAssertNil(ultra.openASRAvgWER) // not published separately on Open ASR short-form
@@ -159,6 +164,28 @@ final class SpeechModelChoiceTests: XCTestCase {
         settings.fallBackToDefaultWhisperModel()
         XCTAssertEqual(settings.speechModel, "small.en_217MB")
         defaults.removePersistentDomain(forName: name)
+    }
+
+    func testLanguageFlagsAndBehavior() throws {
+        let v2 = SpeechModelChoice.parakeet
+        XCTAssertEqual(v2.languageBehavior, "English only")
+        XCTAssertEqual(v2.languageFlagEmojis, ["🇺🇸"])
+        XCTAssertEqual(v2.languageOverflowCount, 0)
+        XCTAssertFalse(v2.benefitsFromLanguagePicker)
+
+        let tiny = try XCTUnwrap(SpeechModelChoice.choice(for: "tiny.en"))
+        XCTAssertEqual(tiny.languageBehavior, "English only")
+        XCTAssertFalse(tiny.benefitsFromLanguagePicker)
+
+        let turbo = try XCTUnwrap(SpeechModelChoice.choice(for: "large-v3_turbo"))
+        XCTAssertEqual(turbo.languageBehavior, "Auto-detects language")
+        XCTAssertTrue(turbo.benefitsFromLanguagePicker)
+        XCTAssertEqual(turbo.languageFlagEmojis.count + turbo.languageOverflowCount, 99)
+
+        for model in SpeechModelChoice.all {
+            XCTAssertEqual(model.languageFlagEmojis.count, model.languageFlagNames.count)
+            XCTAssertFalse(model.languageTooltip.isEmpty)
+        }
     }
 
     @MainActor
