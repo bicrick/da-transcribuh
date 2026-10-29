@@ -49,11 +49,11 @@ it'll ask for a few permissions:
 - **accessibility**: to paste where ur cursor is
 - **screen recording**: only for screen grabs
 
-default model is `small.en`. u can swap to `tiny.en`, `large-v3 turbo`, or [bring ur own](docs/BRING_YOUR_OWN_MODEL.md).
+default model is `small.en`. u can swap to `tiny.en`, **Highest** (NVIDIA Parakeet TDT 0.6B v2 via [FluidAudio](https://github.com/FluidInference/FluidAudio), Apple Silicon), or [bring ur own](docs/BRING_YOUR_OWN_MODEL.md).
 
 ## build from source
 
-needs Xcode 16+. the first build pulls WhisperKit and Sparkle through swift package manager.
+needs Xcode 16+. the first build pulls WhisperKit, FluidAudio, and Sparkle through swift package manager.
 
 ```sh
 git clone https://github.com/bicrick/da-transcribuh.git
@@ -71,10 +71,17 @@ more in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## privacy
 
-transcription runs on ur mac with [WhisperKit](https://github.com/argmaxinc/WhisperKit). no account, no cloud, nothing gets uploaded.
+transcription runs on ur mac with [WhisperKit](https://github.com/argmaxinc/WhisperKit) (Fast / Balanced) or [FluidAudio](https://github.com/FluidInference/FluidAudio) Parakeet (Highest). no account, no cloud, nothing gets uploaded.
 
 it only touches the network to download a model, check for updates, or talk to ur own server if u [set one up](docs/BRING_YOUR_OWN_MODEL.md).
 
 ## license
 
 [MIT](LICENSE). the font is [Departure Mono](https://departuremono.com) (SIL OFL).
+
+### acknowledgements
+
+- [WhisperKit](https://github.com/argmaxinc/WhisperKit) (Argmax) — Fast / Balanced on-device ASR.
+- [FluidAudio](https://github.com/FluidInference/FluidAudio) (Apache-2.0) — Parakeet Core ML runtime for Highest.
+- [NVIDIA Parakeet TDT 0.6B v2](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml) weights — CC-BY-4.0. Highest uses the FluidInference Core ML conversion of NVIDIA’s English Parakeet model; attribution required by that license.
+- Parakeet (Highest) needs **Apple Silicon**. Intel Macs keep Fast / Balanced (WhisperKit).

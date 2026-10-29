@@ -1,17 +1,20 @@
 import Foundation
 import os
 
-/// Routes `Transcribing` calls to WhisperKit or an OpenAI-compatible final engine.
+/// Routes `Transcribing` calls to WhisperKit, FluidAudio Parakeet, or an OpenAI-compatible final engine.
 actor RoutingTranscriber: Transcribing {
     private let whisper: WhisperKitTranscriber
+    private let parakeet: ParakeetTranscriber
     private let openAI: OpenAICompatibleTranscriber
     private let log = Logger(subsystem: "com.bicrick.PromptAnnotator", category: "speech-router")
 
     init(
         whisper: WhisperKitTranscriber = WhisperKitTranscriber(),
+        parakeet: ParakeetTranscriber = ParakeetTranscriber(),
         openAI: OpenAICompatibleTranscriber = OpenAICompatibleTranscriber()
     ) {
         self.whisper = whisper
+        self.parakeet = parakeet
         self.openAI = openAI
     }
 
@@ -20,13 +23,23 @@ actor RoutingTranscriber: Transcribing {
             == .openAICompatible
     }
 
+    /// Built-in Parakeet selection (not custom WhisperKit, not OpenAI).
+    nonisolated var usesParakeet: Bool {
+        guard !usesOpenAI else { return false }
+        if CustomWhisperCatalog.selectedCustomID() != nil { return false }
+        return SpeechModelChoice.stored(
+            UserDefaults.standard.string(forKey: SpeechModelChoice.defaultsKey)
+        ).backend == .fluidAudio
+    }
+
     nonisolated func resetLive() {
         whisper.resetLive()
-        // OpenAI has no live buffer.
+        parakeet.resetLive()
     }
 
     nonisolated func abandonLiveDecode() {
         whisper.abandonLiveDecode()
+        parakeet.abandonLiveDecode()
     }
 
     func prepare() async {
@@ -34,11 +47,17 @@ actor RoutingTranscriber: Transcribing {
             await openAI.prepare()
             return
         }
+        if usesParakeet {
+            await whisper.unload()
+            await parakeet.prepare()
+            return
+        }
+        await parakeet.unload()
         await whisper.prepare()
     }
 
     func consume(samples: [Float], bufferStart: TimeInterval, absoluteEndCount: Int) async {
-        guard !usesOpenAI else { return }
+        guard !usesOpenAI, !usesParakeet else { return }
         await whisper.consume(
             samples: samples,
             bufferStart: bufferStart,
@@ -65,6 +84,7 @@ actor RoutingTranscriber: Transcribing {
                     AppSettings.shared.fallBackToDefaultWhisperModel()
                 }
                 await whisper.unload()
+                await parakeet.unload()
                 return try await whisper.transcribe(
                     audioURL: audioURL,
                     samples: samples,
@@ -72,6 +92,29 @@ actor RoutingTranscriber: Transcribing {
                 )
             }
         }
+
+        if usesParakeet {
+            do {
+                return try await parakeet.transcribe(
+                    audioURL: audioURL,
+                    samples: samples,
+                    onProgress: onProgress
+                )
+            } catch {
+                log.error("Parakeet transcription failed, falling back to default WhisperKit: \(error.localizedDescription, privacy: .public)")
+                await MainActor.run {
+                    AppSettings.shared.fallBackToDefaultWhisperModel()
+                }
+                await parakeet.unload()
+                await whisper.unload()
+                return try await whisper.transcribe(
+                    audioURL: audioURL,
+                    samples: samples,
+                    onProgress: onProgress
+                )
+            }
+        }
+
         do {
             return try await whisper.transcribe(
                 audioURL: audioURL,
@@ -97,6 +140,7 @@ actor RoutingTranscriber: Transcribing {
 
     func reloadSelection() async {
         await whisper.unload()
+        await parakeet.unload()
         await prepare()
     }
 }

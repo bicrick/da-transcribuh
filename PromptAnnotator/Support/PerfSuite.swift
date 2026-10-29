@@ -235,7 +235,7 @@ enum PerfSuite {
                     settings = true
                     launchMark("settingsVisible")
                 }
-                if !model, WhisperKitTranscriber.isModelReady {
+                if !model, SpeechModelStatus.isModelReady {
                     model = true
                     launchMark("modelReady")
                     log(String(format: "launch footprintModelReady %.1f", footprintMB()))
@@ -257,7 +257,7 @@ enum PerfSuite {
         // AppDelegate starts prepareModel after 450 ms. Wait for it so run 1 is not a cold load
         // unless `-DTPerfColdModel YES` asks to measure exactly that.
         if !args.bool(forKey: "DTPerfColdModel") {
-            while !WhisperKitTranscriber.isModelReady, CACurrentMediaTime() - firstWait < 180 {
+            while !SpeechModelStatus.isModelReady, CACurrentMediaTime() - firstWait < 180 {
                 await sleep(ms: 20)
             }
             log(String(format: "speech modelReady %.1f footprint=%.1fMB", msSinceProcessStart(), footprintMB()))

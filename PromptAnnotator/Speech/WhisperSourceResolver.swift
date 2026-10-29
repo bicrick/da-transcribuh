@@ -63,7 +63,11 @@ enum WhisperSourceResolver {
             }
         }
 
-        let variant = SpeechModelChoice.stored(defaults.string(forKey: SpeechModelChoice.defaultsKey)).variant
+        let choice = SpeechModelChoice.stored(defaults.string(forKey: SpeechModelChoice.defaultsKey))
+        // Parakeet is routed by RoutingTranscriber; WhisperKit only sees Whisper backends.
+        let variant = choice.backend == .whisperKit
+            ? choice.variant
+            : SpeechModelChoice.recommended.variant
         return .builtIn(variant: variant, repo: WhisperKitTranscriber.modelRepo)
     }
 

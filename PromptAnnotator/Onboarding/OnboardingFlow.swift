@@ -648,7 +648,7 @@ struct OnboardingFlow: View {
     }
 
     private var modelIsReady: Bool {
-        WhisperKitTranscriber.modelIsInstalled()
+        SpeechModelStatus.modelIsInstalled()
     }
 
     private var primaryTitle: String {

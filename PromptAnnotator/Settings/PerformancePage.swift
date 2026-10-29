@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PerformancePage: View {
     @State private var snapshot = MachineLoad.capture(
-        modelReady: WhisperKitTranscriber.isModelReady,
+        modelReady: SpeechModelStatus.isModelReady,
         modelFolder: WhisperKitTranscriber.modelsFolder()
     )
     /// Disk walk of the model folder is relatively expensive — refresh it less often than RSS.
@@ -103,9 +103,11 @@ struct PerformancePage: View {
     }
 
     private func refresh(forceModelBytes: Bool) {
-        let ready = WhisperKitTranscriber.isModelReady
+        let ready = SpeechModelStatus.isModelReady
         if forceModelBytes || modelBytesAt.timeIntervalSinceNow < -30 {
-            modelBytes = MachineLoad.modelFolderBytes(WhisperKitTranscriber.modelsFolder())
+            let whisperBytes = MachineLoad.modelFolderBytes(WhisperKitTranscriber.modelsFolder())
+            let parakeetBytes = MachineLoad.modelFolderBytes(ParakeetTranscriber.modelsFolder())
+            modelBytes = whisperBytes + parakeetBytes
             modelBytesAt = Date()
         }
         snapshot = MachineLoad.capture(modelReady: ready, modelBytes: modelBytes)

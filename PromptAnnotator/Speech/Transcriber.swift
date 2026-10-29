@@ -264,8 +264,7 @@ actor WhisperKitTranscriber: Transcribing {
     }
 
     nonisolated static func liveCaptionsEnabled() -> Bool {
-        SpeechEngineKind.stored(UserDefaults.standard.string(forKey: SpeechEngineKind.defaultsKey))
-            == .whisperKit
+        SpeechModelStatus.liveCaptionsEnabled()
     }
 
     nonisolated private static func installedModel(for source: WhisperSource) -> WhisperModelFolder? {
