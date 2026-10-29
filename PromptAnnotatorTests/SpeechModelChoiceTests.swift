@@ -49,7 +49,7 @@ final class SpeechModelChoiceTests: XCTestCase {
         XCTAssertEqual(SpeechModelChoice.stored("large-v3_turbo").variant, "large-v3_turbo")
     }
 
-    func testParakeetRowsCarryFluidAudioStats() {
+    func testParakeetRowsCarryFluidAudioStats() throws {
         let v2 = SpeechModelChoice.parakeet
         XCTAssertEqual(v2.backend, .fluidAudio)
         XCTAssertEqual(v2.megabytes, 443)
@@ -68,7 +68,7 @@ final class SpeechModelChoiceTests: XCTestCase {
         XCTAssertEqual(ultra.megabytes, 600)
     }
 
-    func testWhisperRowsAndOmittedUnknownStats() {
+    func testWhisperRowsAndOmittedUnknownStats() throws {
         let tiny = try XCTUnwrap(SpeechModelChoice.choice(for: "tiny.en"))
         XCTAssertEqual(tiny.openASRAvgWER, 12.81)
         XCTAssertTrue(tiny.supportsLiveCaptions)
@@ -83,7 +83,7 @@ final class SpeechModelChoiceTests: XCTestCase {
         XCTAssertEqual(small.openASRAvgWER, 8.59)
     }
 
-    func testBarsStayInRangeWhenPresent() {
+    func testBarsStayInRangeWhenPresent() throws {
         for model in SpeechModelChoice.all {
             XCTAssertGreaterThan(model.size, 0)
             XCTAssertLessThanOrEqual(model.size, 1)
