@@ -69,7 +69,7 @@ enum SettingsSearch {
         hit("app.color", .appearance, "Annotation color", "Ink swatch defaults"),
         // Models
         hit("model.engine", .model, "Engine", "On this Mac or server"),
-        hit("model.builtin", .model, "Built-in models", "WhisperKit Fast/Balanced or Parakeet Highest"),
+        hit("model.builtin", .model, "Built-in models", "WhisperKit or FluidAudio Parakeet list"),
         hit("model.custom", .model, "Your models", "Core ML folders"),
         hit("model.hf", .model, "Add from Hugging Face", "Bring your own model"),
         hit("model.server", .model, "Server", "OpenAI-compatible final pass"),

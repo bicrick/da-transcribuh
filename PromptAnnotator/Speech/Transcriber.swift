@@ -359,6 +359,16 @@ actor WhisperKitTranscriber: Transcribing {
         return try await fetchResult(variant: variant, repo: repo, into: directory, onProgress: report).url
     }
 
+    /// Removes a built-in WhisperKit variant folder from disk when present.
+    nonisolated static func deleteInstalled(variant: String) throws {
+        let trimmed = variant.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let installed = WhisperModelLocator.locate(in: modelsFolder(), variant: trimmed) else {
+            return
+        }
+        try FileManager.default.removeItem(at: installed.url)
+    }
+
     private static func fetchResult(
         variant: String,
         repo: String,
@@ -554,11 +564,17 @@ actor WhisperKitTranscriber: Transcribing {
         windowClipTime: Float,
         workers: Int
     ) -> DecodingOptions {
-        DecodingOptions(
-            language: "en",
+        // Settings / onboarding language. `auto` lets multilingual weights detect per window;
+        // English-only (`.en`) weights ignore both fields inside WhisperKit.
+        let stored = TranscriptionLanguage.stored(
+            UserDefaults.standard.string(forKey: TranscriptionLanguage.defaultsKey)
+        )
+        let autoDetect = stored == TranscriptionLanguage.auto
+        return DecodingOptions(
+            language: autoDetect ? nil : stored,
             temperatureFallbackCount: 1,
             usePrefillPrompt: true,
-            detectLanguage: false,
+            detectLanguage: autoDetect,
             skipSpecialTokens: true,
             wordTimestamps: true,
             windowClipTime: windowClipTime,

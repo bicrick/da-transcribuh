@@ -7,6 +7,7 @@ enum OnboardingStep: Int, CaseIterable {
     case shortcut
     case clipboard
     case appearance
+    case language
     case model
     case practice
     case ready
@@ -18,6 +19,7 @@ enum OnboardingStep: Int, CaseIterable {
         case .shortcut: return "Keybinds"
         case .clipboard: return "Clipboard history"
         case .appearance: return "Appearance"
+        case .language: return "Language"
         case .model: return "Model"
         case .practice: return "Try a session"
         case .ready: return "Ready"
@@ -29,7 +31,7 @@ enum OnboardingStep: Int, CaseIterable {
     }
 
     /// Short labels for the Paint step rail.
-    static let railLabels = ["Hi", "Perm", "Rec", "Clip", "Look", "Model", "Try", "Go"]
+    static let railLabels = ["Hi", "Perm", "Rec", "Clip", "Look", "Lang", "Model", "Try", "Go"]
 
     var blurb: String? {
         switch self {
@@ -43,8 +45,10 @@ enum OnboardingStep: Int, CaseIterable {
             return "Maccy-style history of text, images, and files. Default shortcut ⇧⌘C. Tune capture and paste on the Clipboard settings tab."
         case .appearance:
             return "Light, dark graphite, or follow the system. Same control as the Appearance tab."
+        case .language:
+            return "Pick the language you dictate in. We'll recommend a model — change it on the next step if you want."
         case .model:
-            return "Download an English speech model before the first session. Pick one on this step (same list as Models)."
+            return "Download the selected model before the first session. Parakeet v2 is the default on Apple Silicon; same list as Models."
         case .practice:
             return "A short take now — or skip and try later from Home."
         case .ready:
@@ -231,6 +235,8 @@ struct OnboardingFlow: View {
             clipboardCard
         case .appearance:
             appearanceCard
+        case .language:
+            languageCard
         case .model:
             modelCard
         case .practice:
@@ -549,9 +555,116 @@ struct OnboardingFlow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var languageCard: some View {
+        VStack(alignment: .leading, spacing: Ink.space3) {
+            Text("English gets Parakeet v2. European languages get Parakeet v3. Everything else gets Whisper turbo.")
+                .font(Ink.bodyFont)
+                .foregroundStyle(Ink.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            InkCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(TranscriptionLanguage.onboardingChoices.enumerated()), id: \.element.id) { index, option in
+                        languageRow(option)
+                        if index < TranscriptionLanguage.onboardingChoices.count - 1 {
+                            InkDivider(leading: Ink.rowHPad)
+                        }
+                    }
+                }
+            }
+            recommendationCard
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func languageRow(_ option: TranscriptionLanguage.Choice) -> some View {
+        let selected = settings.transcriptionLanguage == option.code
+        return Button {
+            settings.applyLanguageRecommendation(option.code)
+        } label: {
+            HStack(alignment: .center, spacing: Ink.space3) {
+                Text(option.flag)
+                    .font(.system(size: 18))
+                    .frame(width: 28, alignment: .center)
+                VStack(alignment: .leading, spacing: Ink.titleDescGap) {
+                    Text(option.name)
+                        .font(Ink.rowTitleFont)
+                        .foregroundStyle(Ink.label)
+                    Text(option.code == TranscriptionLanguage.auto ? "auto-detect" : option.code)
+                        .font(Ink.mono(10))
+                        .foregroundStyle(Ink.secondary)
+                }
+                Spacer(minLength: Ink.space2)
+                if selected {
+                    InkCheck(done: true)
+                }
+            }
+            .padding(.horizontal, Ink.rowHPad)
+            .padding(.vertical, Ink.rowVPad)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .retroHover(tint: nil)
+    }
+
+    private var recommendationCard: some View {
+        let model = TranscriptionLanguage.recommendedChoice(for: settings.transcriptionLanguage)
+        let reason = TranscriptionLanguage.recommendationReason(for: settings.transcriptionLanguage)
+        return InkCard {
+            VStack(alignment: .leading, spacing: Ink.space3) {
+                HStack(spacing: Ink.space2) {
+                    Text("recommended")
+                        .font(Ink.mono(10))
+                        .foregroundStyle(Ink.secondary)
+                    if model.isDefaultOnThisMac, settings.transcriptionLanguage == TranscriptionLanguage.english {
+                        Text("default")
+                            .font(Ink.mono(10))
+                            .foregroundStyle(Ink.label)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                    .strokeBorder(Ink.label, lineWidth: Ink.stroke)
+                            )
+                    }
+                }
+                Text(model.title)
+                    .font(Ink.rowTitleFont)
+                    .foregroundStyle(Ink.label)
+                Text(reason)
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: Ink.space2) {
+                    ForEach(Array(model.languageFlagEmojis.enumerated()), id: \.offset) { _, emoji in
+                        Text(emoji).font(.system(size: 14))
+                    }
+                    if model.languageOverflowCount > 0 {
+                        Text("+\(model.languageOverflowCount)")
+                            .font(Ink.mono(10))
+                            .foregroundStyle(Ink.secondary)
+                    }
+                    Text("· \(model.megabytes) MB")
+                        .font(Ink.mono(10))
+                        .foregroundStyle(Ink.secondary)
+                    if let wer = model.openASRAvgWER {
+                        Text(String(format: "· WER %.2f", wer))
+                            .font(Ink.mono(10))
+                            .foregroundStyle(Ink.secondary)
+                    }
+                }
+                Text("Continue downloads this on the next step, or pick another model there.")
+                    .font(Ink.captionFont)
+                    .foregroundStyle(Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Ink.cardPad)
+        }
+    }
+
     private var modelCard: some View {
         VStack(alignment: .leading, spacing: Ink.space3) {
-            Text("The first download can take a minute on a slow network. Keep this window open.")
+            Text("The first download can take a minute on a slow network. Keep this window open. Same stats list as Models.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)

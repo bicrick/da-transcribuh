@@ -136,6 +136,7 @@ final class ClipboardHistoryTests: XCTestCase {
                 "Keybinds",
                 "Clipboard history",
                 "Appearance",
+                "Language",
                 "Model",
                 "Try a session",
                 "Ready",

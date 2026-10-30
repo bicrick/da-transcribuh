@@ -90,7 +90,7 @@ struct ModelPage: View {
     private var builtInSection: some View {
         SettingsSection(
             title: "Built-in models",
-            footer: "Fast and Balanced are WhisperKit (argmaxinc/whisperkit-coreml). Highest is NVIDIA Parakeet TDT 0.6B v2 via FluidAudio (English, Apple Silicon). Size is the download. Highest has no live captions — the final transcript still pastes on stop."
+            footer: "Pick any model below. Parakeet (FluidAudio) needs Apple Silicon and has no live captions — the final transcript still pastes on stop. WhisperKit models support live captions. Size is the download. Stats use Open ASR leaderboard numbers when published."
         ) {
             SpeechModelPicker(settings: settings, transfer: transfer)
         }

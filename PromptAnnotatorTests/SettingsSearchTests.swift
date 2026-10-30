@@ -41,11 +41,11 @@ final class SettingsSearchTests: XCTestCase {
 
     func testModelTitleMatches() {
         let hits = SettingsSearch.search(
-            query: "Balanced",
+            query: "Parakeet TDT 0.6B v2",
             sessions: [],
             modelTitles: SpeechModelChoice.all.map(\.title)
         )
-        XCTAssertTrue(hits.contains(where: { $0.kind == .model && $0.title == "Balanced" }))
+        XCTAssertTrue(hits.contains(where: { $0.kind == .model && $0.title == "Parakeet TDT 0.6B v2" }))
     }
 
     func testHistorySnippetHighlightsNeedle() {

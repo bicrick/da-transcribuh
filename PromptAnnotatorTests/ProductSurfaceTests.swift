@@ -24,6 +24,7 @@ final class ProductSurfaceTests: XCTestCase {
                 "Keybinds",
                 "Clipboard history",
                 "Appearance",
+                "Language",
                 "Model",
                 "Try a session",
                 "Ready",

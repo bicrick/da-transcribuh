@@ -67,7 +67,7 @@ enum WhisperSourceResolver {
         // Parakeet is routed by RoutingTranscriber; WhisperKit only sees Whisper backends.
         let variant = choice.backend == .whisperKit
             ? choice.variant
-            : SpeechModelChoice.recommended.variant
+            : SpeechModelChoice.whisperFallback.variant
         return .builtIn(variant: variant, repo: WhisperKitTranscriber.modelRepo)
     }
 

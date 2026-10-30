@@ -10,11 +10,11 @@ enum OnDeviceSpeechBackend: String, Codable, CaseIterable, Sendable {
     var title: String {
         switch self {
         case .whisperKit: return "WhisperKit"
-        case .fluidAudio: return "FluidAudio Parakeet"
+        case .fluidAudio: return "FluidAudio"
         }
     }
 
-    /// Live captions need a streaming/partial path. Parakeet v2 is batch-only here.
+    /// Live captions need a streaming/partial path. FluidAudio Parakeet is batch-only here.
     var supportsLiveCaptions: Bool {
         switch self {
         case .whisperKit: return true

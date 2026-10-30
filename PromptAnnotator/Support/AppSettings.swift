@@ -121,6 +121,7 @@ final class AppSettings: ObservableObject {
     @Published var returnOnShift: Bool
     @Published var capitalizeTranscript: Bool
     @Published var speechModel: String
+    @Published var transcriptionLanguage: String
     @Published var speechEngine: SpeechEngineKind
     @Published var customModelID: String?
     @Published var customModels: [CustomWhisperModel]
@@ -182,11 +183,12 @@ final class AppSettings: ObservableObject {
         let rawSpeechModel = defaults.string(forKey: Keys.speechModel)
         let resolvedSpeechModel = SpeechModelChoice.stored(rawSpeechModel).variant
         speechModel = resolvedSpeechModel
-        // Persist turbo → Parakeet (or Intel fallback) so the key matches the resolved choice.
+        // Persist resolved choice (e.g. Intel + Parakeet → Whisper fallback) so the key matches.
         // Use the local so we do not touch `self` before the remaining stored properties init.
         if rawSpeechModel != resolvedSpeechModel {
             defaults.set(resolvedSpeechModel, forKey: Keys.speechModel)
         }
+        transcriptionLanguage = TranscriptionLanguage.stored(defaults.string(forKey: Keys.transcriptionLanguage))
         speechEngine = SpeechEngineKind.stored(defaults.string(forKey: Keys.speechEngine))
         let loadedModels = CustomWhisperCatalog.load(defaults: defaults)
         customModels = loadedModels
@@ -489,6 +491,17 @@ final class AppSettings: ObservableObject {
         persist(Keys.capitalize, enabled)
     }
 
+    func setTranscriptionLanguage(_ code: String) {
+        transcriptionLanguage = TranscriptionLanguage.stored(code)
+        persist(Keys.transcriptionLanguage, transcriptionLanguage)
+    }
+
+    /// Persists the language and selects the recommended on-device model for it.
+    func applyLanguageRecommendation(_ code: String, appleSilicon: Bool = AppleSilicon.isCurrent) {
+        setTranscriptionLanguage(code)
+        setSpeechModel(TranscriptionLanguage.recommendedVariant(for: code, appleSilicon: appleSilicon))
+    }
+
     func setSpeechModel(_ variant: String) {
         speechModel = SpeechModelChoice.stored(variant).variant
         customModelID = nil
@@ -554,11 +567,12 @@ final class AppSettings: ObservableObject {
         SpeechModelStatus.liveCaptionsEnabled(defaults: defaults)
     }
 
-    /// Clears a broken custom selection and restores the built-in balanced model (no reload notify).
+    /// Clears a broken custom/Parakeet selection and restores Whisper small.en for an on-device retry.
+    /// Always a WhisperKit variant — not `recommended` (which may be Parakeet on Apple Silicon).
     func fallBackToDefaultWhisperModel() {
         customModelID = nil
         CustomWhisperCatalog.setSelectedCustomID(nil, defaults: defaults)
-        speechModel = SpeechModelChoice.recommended.variant
+        speechModel = SpeechModelChoice.whisperFallback.variant
         persist(Keys.speechModel, speechModel)
         customModels = CustomWhisperCatalog.load(defaults: defaults)
     }
@@ -645,6 +659,7 @@ final class AppSettings: ObservableObject {
         static let returnOnShift = "session.returnOnShift"
         static let capitalize = "session.capitalize"
         static let speechModel = SpeechModelChoice.defaultsKey
+        static let transcriptionLanguage = TranscriptionLanguage.defaultsKey
         static let speechEngine = SpeechEngineKind.defaultsKey
         static let openAIBaseURL = OpenAICompatibleTranscriber.baseURLKey
         static let openAIModel = OpenAICompatibleTranscriber.modelKey

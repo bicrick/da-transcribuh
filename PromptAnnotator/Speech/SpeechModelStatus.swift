@@ -20,7 +20,7 @@ enum SpeechModelStatus {
         case .whisperKit:
             return WhisperKitTranscriber.modelIsInstalled()
         case .fluidAudio:
-            return ParakeetTranscriber.modelIsInstalled()
+            return ParakeetTranscriber.modelIsInstalled(variant: choice.variant)
         }
     }
 

@@ -17,7 +17,7 @@ enum SpeechEngineKind: String, Codable, CaseIterable, Identifiable, Sendable {
     var detail: String {
         switch self {
         case .whisperKit:
-            return "WhisperKit, Parakeet (Highest), or your Core ML folders. Live captions for WhisperKit."
+            return "WhisperKit, FluidAudio Parakeet, or your Core ML folders. Live captions for WhisperKit."
         case .openAICompatible:
             return "Final transcript only via /v1/audio/transcriptions. Live captions stay off."
         }
