@@ -3,15 +3,26 @@ import XCTest
 @testable import PromptAnnotator
 
 final class HotkeyChordTests: XCTestCase {
-    func testDefaultIsOptionSpace() {
+    func testDefaultIsFn() {
         let chord = HotkeyChord.default
+        XCTAssertEqual(chord.keyCode, HotkeyChord.fnKeyCode)
+        XCTAssertEqual(chord.carbonModifiers, 0)
+        XCTAssertTrue(chord.isFnOnly)
+        XCTAssertTrue(chord.isSingleKey)
+        XCTAssertTrue(chord.isRegistrable)
+        XCTAssertFalse(chord.isCarbonRegistrable)
+        XCTAssertTrue(chord.canRegister)
+        XCTAssertEqual(chord.display, "fn")
+        XCTAssertEqual(chord.keycaps, ["fn"])
+        XCTAssertNil(chord.rejection)
+    }
+
+    func testOptionSpaceFallback() {
+        let chord = HotkeyChord.optionSpaceDefault
         XCTAssertEqual(chord.keyCode, UInt32(kVK_Space))
         XCTAssertEqual(chord.carbonModifiers, UInt32(optionKey))
-        XCTAssertTrue(chord.canRegister)
-        XCTAssertFalse(chord.takesOverSystemShortcut)
+        XCTAssertTrue(chord.isCarbonRegistrable)
         XCTAssertEqual(chord.display, "⌥Space")
-        XCTAssertEqual(chord.keycaps, ["⌥", "Space"])
-        XCTAssertNil(chord.rejection)
     }
 
     func testLegacyDefaultWasControlOptionSpace() {
@@ -26,10 +37,8 @@ final class HotkeyChordTests: XCTestCase {
         let option = HotkeyChord(keyCode: UInt32(kVK_Space), carbonModifiers: UInt32(optionKey))
         let command = HotkeyChord(keyCode: UInt32(kVK_Space), carbonModifiers: UInt32(cmdKey))
         let both = HotkeyChord(keyCode: UInt32(kVK_Space), carbonModifiers: UInt32(cmdKey | optionKey))
-        // ⌥Space is the default — allowed.
         XCTAssertFalse(option.takesOverSystemShortcut)
         XCTAssertTrue(option.canRegister)
-        // Spotlight / Finder search stay reserved.
         XCTAssertTrue(command.takesOverSystemShortcut)
         XCTAssertTrue(both.takesOverSystemShortcut)
         XCTAssertFalse(command.canRegister)
@@ -73,11 +82,11 @@ final class HotkeyChordTests: XCTestCase {
         let letter = HotkeyChord(keyCode: UInt32(kVK_ANSI_K), carbonModifiers: 0)
         XCTAssertFalse(letter.isFunctionKey)
         XCTAssertFalse(letter.canRegister)
-        XCTAssertEqual(letter.rejection, "Add at least one modifier, or use a function key.")
+        XCTAssertEqual(letter.rejection, "Add at least one modifier, use a function key, or pick fn.")
     }
 
     @MainActor
-    func testLegacyDefaultMigratesOnceToOptionSpace() {
+    func testLegacyDefaultMigratesOnceToFn() {
         let suiteName = "test.hotkey.migrate.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -87,15 +96,30 @@ final class HotkeyChordTests: XCTestCase {
 
         let settings = AppSettings(defaults: defaults)
         XCTAssertEqual(settings.chord, .default)
-        XCTAssertEqual(settings.chord.display, "⌥Space")
-        XCTAssertEqual(defaults.integer(forKey: "hotkey.keyCode"), Int(kVK_Space))
-        XCTAssertEqual(defaults.integer(forKey: "hotkey.modifiers"), Int(optionKey))
+        XCTAssertEqual(settings.chord.display, "fn")
+        XCTAssertEqual(defaults.integer(forKey: "hotkey.keyCode"), Int(HotkeyChord.fnKeyCode))
+        XCTAssertEqual(defaults.integer(forKey: "hotkey.modifiers"), 0)
         XCTAssertTrue(defaults.bool(forKey: "hotkey.migratedToOptionSpace"))
 
         // After migration, an explicit ⌃⌥Space choice is kept.
+        defaults.set(Int(kVK_Space), forKey: "hotkey.keyCode")
         defaults.set(Int(controlKey | optionKey), forKey: "hotkey.modifiers")
         let again = AppSettings(defaults: defaults)
         XCTAssertEqual(again.chord, .legacyDefault)
+    }
+
+    @MainActor
+    func testStoredOptionSpaceIsKept() {
+        let suiteName = "test.hotkey.optionSpace.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(Int(kVK_Space), forKey: "hotkey.keyCode")
+        defaults.set(Int(optionKey), forKey: "hotkey.modifiers")
+        defaults.set(true, forKey: "hotkey.migratedToOptionSpace")
+
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertEqual(settings.chord, .optionSpaceDefault)
     }
 
     @MainActor
@@ -114,5 +138,34 @@ final class HotkeyChordTests: XCTestCase {
         let settings = AppSettings(defaults: defaults)
         XCTAssertEqual(settings.chord, custom)
         XCTAssertTrue(defaults.bool(forKey: "hotkey.migratedToOptionSpace"))
+    }
+
+    @MainActor
+    func testFreshInstallDefaultsToHoldAndDoubleTap() {
+        let suiteName = "test.hotkey.behavior.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertEqual(settings.hotkeyBehavior, .holdAndDoubleTap)
+        XCTAssertTrue(settings.pushToTalk)
+    }
+
+    @MainActor
+    func testLegacyPushToTalkBoolMigrates() {
+        let suiteName = "test.hotkey.pttMigrate.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(true, forKey: "hotkey.pushToTalk")
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertEqual(settings.hotkeyBehavior, .holdOnly)
+
+        let suite2 = "test.hotkey.pttMigrate2.\(UUID().uuidString)"
+        let defaults2 = UserDefaults(suiteName: suite2)!
+        defer { defaults2.removePersistentDomain(forName: suite2) }
+        defaults2.set(false, forKey: "hotkey.pushToTalk")
+        let settings2 = AppSettings(defaults: defaults2)
+        XCTAssertEqual(settings2.hotkeyBehavior, .toggleOnly)
     }
 }

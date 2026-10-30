@@ -96,7 +96,9 @@ final class AppSettings: ObservableObject {
     @Published var clipboardCapturePaused: Bool = false
     @Published var clipboardClearOnQuit: Bool = false
     @Published var clipboardClearSystemClipboard: Bool = false
-    @Published var pushToTalk: Bool
+    @Published var hotkeyBehavior: HotkeyBehavior
+    /// True when hold-style activation is on (not toggle-only). Kept for menu/UI call sites.
+    var pushToTalk: Bool { hotkeyBehavior != .toggleOnly }
     /// Held alone during a session for the screenshot crosshair.
     @Published private(set) var screenshotKey: SessionModifier
     /// Held alone during a session to draw. `nil` is Off.
@@ -159,7 +161,7 @@ final class AppSettings: ObservableObject {
         }
         let limit = defaults.object(forKey: Keys.clipboardLimit) as? Int ?? 200
         clipboardHistoryLimit = min(500, max(20, limit))
-        pushToTalk = defaults.bool(forKey: Keys.pushToTalk)
+        hotkeyBehavior = Self.loadHotkeyBehavior(defaults: defaults)
         islandStyle = IslandStyle.stored(defaults.string(forKey: Keys.island) ?? "")
         soundEnabled = defaults.object(forKey: Keys.sound) as? Bool ?? true
         let storedVolume = defaults.object(forKey: Keys.volume) as? Double
@@ -220,8 +222,10 @@ final class AppSettings: ObservableObject {
         setAppearance(appearance.next)
     }
 
-    /// Load Start/Stop chord. One-shot migration: users still on the old default
-    /// ⌃⌥Space (never customized) move to ⌥Space; custom chords are left alone.
+    /// Load Start/Stop chord.
+    /// - No saved chord → fn (Wispr-style default).
+    /// - Saved chords (including ⌥Space) are kept.
+    /// - One-shot: never-customized ⌃⌥Space migrates to the current default (fn).
     private static func loadChord(defaults: UserDefaults) -> HotkeyChord {
         let keyCode = defaults.object(forKey: Keys.chordKey) as? Int
         let modifiers = defaults.object(forKey: Keys.chordMods) as? Int
@@ -239,6 +243,26 @@ final class AppSettings: ObservableObject {
             }
         }
         return stored ?? .default
+    }
+
+    /// Prefer explicit `hotkey.behavior`. Else migrate legacy `hotkey.pushToTalk` bool.
+    /// Brand-new installs (no saved chord) get hold + double-tap. Existing chord users
+    /// without a PTT preference keep classic toggle so ⌥Space stays tap-to-toggle.
+    private static func loadHotkeyBehavior(defaults: UserDefaults) -> HotkeyBehavior {
+        if let raw = defaults.string(forKey: Keys.hotkeyBehavior),
+           let behavior = HotkeyBehavior(rawValue: raw) {
+            return behavior
+        }
+        if defaults.object(forKey: Keys.pushToTalk) != nil {
+            let legacy = defaults.bool(forKey: Keys.pushToTalk)
+            let migrated: HotkeyBehavior = legacy ? .holdOnly : .toggleOnly
+            defaults.set(migrated.rawValue, forKey: Keys.hotkeyBehavior)
+            return migrated
+        }
+        let hasSavedChord = defaults.object(forKey: Keys.chordKey) != nil
+        let behavior: HotkeyBehavior = hasSavedChord ? .toggleOnly : .holdAndDoubleTap
+        defaults.set(behavior.rawValue, forKey: Keys.hotkeyBehavior)
+        return behavior
     }
 
     private static func chord(key: String, mods: String, defaults: UserDefaults) -> HotkeyChord? {
@@ -365,7 +389,7 @@ final class AppSettings: ObservableObject {
         guard chord.canRegister(reserving: sessionKeys) else { return false }
         guard chord != cancelChord else { return false }
         guard chord != clipboardChord else { return false }
-        guard HotkeyCenter.shared.apply(chord) else { return false }
+        guard HotkeyCenter.shared.apply(chord, behavior: hotkeyBehavior) else { return false }
         self.chord = chord
         defaults.set(Int(chord.keyCode), forKey: Keys.chordKey)
         defaults.set(Int(chord.carbonModifiers), forKey: Keys.chordMods)
@@ -414,8 +438,15 @@ final class AppSettings: ObservableObject {
     }
 
     func setPushToTalk(_ enabled: Bool) {
-        pushToTalk = enabled
-        persist(Keys.pushToTalk, enabled)
+        setHotkeyBehavior(enabled ? .holdOnly : .toggleOnly)
+    }
+
+    func setHotkeyBehavior(_ behavior: HotkeyBehavior) {
+        hotkeyBehavior = behavior
+        persist(Keys.hotkeyBehavior, behavior.rawValue)
+        // Mirror bool for older diagnostics / readers.
+        persist(Keys.pushToTalk, behavior != .toggleOnly)
+        HotkeyCenter.shared.applyBehavior(behavior)
     }
 
     func setSoundTheme(_ theme: SoundTheme) {
@@ -637,6 +668,7 @@ final class AppSettings: ObservableObject {
         static let clipboardChordMods = "clipboard.hotkey.modifiers"
         static let clipboardLimit = "clipboard.historyLimit"
         static let pushToTalk = "hotkey.pushToTalk"
+        static let hotkeyBehavior = "hotkey.behavior"
         static let screenshotKey = "session.screenshotKey"
         static let annotateKey = "session.annotateKey"
         static let island = "island.style"

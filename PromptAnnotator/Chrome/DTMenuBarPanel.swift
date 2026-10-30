@@ -154,10 +154,14 @@ struct DTMenuBarPanel: View {
 
     private var shortcutHint: String {
         let chord = settings.chord.display
-        if settings.pushToTalk {
+        switch settings.hotkeyBehavior {
+        case .holdAndDoubleTap:
+            return "Hold \(chord) · double-tap hands-free"
+        case .holdOnly:
             return "Hold \(chord) to talk"
+        case .toggleOnly:
+            return "\(chord) starts and stops"
         }
-        return "\(chord) starts and stops"
     }
 
     private var hairline: some View {

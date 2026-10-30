@@ -73,9 +73,7 @@ struct ConfigurationPage: View {
             VStack(alignment: .leading, spacing: 0) {
                 InkSettingRow(
                     title: "Start and stop",
-                    detail: settings.pushToTalk
-                        ? "Hold \(settings.chord.display) to talk. Release to stop."
-                        : "\(settings.chord.display) starts a session. Press it again to stop."
+                    detail: "\(settings.chord.display) — \(settings.hotkeyBehavior.title.lowercased())."
                 ) {
                     InkShortcutRecorder(
                         keys: settings.chord.keycaps,
@@ -102,14 +100,19 @@ struct ConfigurationPage: View {
                     }
                 }
                 InkDivider(leading: 0)
-                InkToggleRow(
-                    title: "Push to talk",
-                    detail: "Hold the recording shortcut. The menu bar command stays a tap.",
-                    isOn: Binding(
-                        get: { settings.pushToTalk },
-                        set: { settings.setPushToTalk($0) }
+                InkSettingRow(
+                    title: "Activation",
+                    detail: settings.hotkeyBehavior.detail
+                ) {
+                    InkMenuPicker(
+                        title: "Activation",
+                        selection: Binding(
+                            get: { settings.hotkeyBehavior },
+                            set: { settings.setHotkeyBehavior($0) }
+                        ),
+                        options: HotkeyBehavior.allCases.map { ($0, $0.title) }
                     )
-                )
+                }
                 InkDivider(leading: 0)
                 InkSettingRow(
                     title: "Screenshot key",
@@ -146,7 +149,7 @@ struct ConfigurationPage: View {
                         .padding(.horizontal, Ink.rowHPad)
                         .padding(.bottom, Ink.space2)
                 }
-                Text("Click the keycaps, press a new combo (needs a modifier, or a function key). It re-registers live — no relaunch. Session keys stay free: hold one alone to grab the screen or draw. Command-Space and Option-Command-Space stay with the system. Escape while capturing Cancel clears it.")
+                Text("Click the keycaps, press a new combo (modifier, function key, or use fn below). Bare fn needs Keyboard → Press 🌐 key to → Do Nothing so emoji/dictation does not steal it. Session keys stay free. ⌘Space / ⌥⌘Space stay with the system. Escape while capturing Cancel clears it.")
                     .font(Ink.captionFont)
                     .foregroundStyle(Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -154,9 +157,15 @@ struct ConfigurationPage: View {
                     .padding(.bottom, Ink.space3)
                 HStack {
                     Spacer()
-                    Button("Reset to ⌥Space") {
+                    Button("Use fn") {
                         capture = nil
-                        message = settings.setChord(.default) ? nil : "macOS would not register the default shortcut."
+                        settings.setHotkeyBehavior(.holdAndDoubleTap)
+                        message = settings.setChord(.default) ? nil : "Could not enable the fn shortcut."
+                    }
+                    .buttonStyle(InkSecondaryButtonStyle())
+                    Button("Use ⌥Space") {
+                        capture = nil
+                        message = settings.setChord(.optionSpaceDefault) ? nil : "macOS would not register that shortcut."
                     }
                     .buttonStyle(InkSecondaryButtonStyle())
                 }
