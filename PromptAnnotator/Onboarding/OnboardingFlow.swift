@@ -38,9 +38,9 @@ enum OnboardingStep: Int, CaseIterable {
         case .welcome:
             return "Talk, and capture the screen when you want the picture with the words."
         case .permissions:
-            return "Microphone, Screen Recording, and Accessibility. Flip them, then Reopen so da transcribuh picks them up."
+            return "Microphone, Screen Recording, Accessibility, and Input Monitoring (for fn). Flip them, then Reopen so da transcribuh picks them up."
         case .shortcut:
-            return "Recording defaults to ⌥Space; clipboard history to ⇧⌘C. Both are rebindable. ⌘Space / ⌥⌘Space stay with the system."
+            return "Recording defaults to fn (hold to talk, double-tap for hands-free). Prefer ⌥Space? Rebind below. Clipboard defaults to ⇧⌘C. ⌘Space / ⌥⌘Space stay with the system."
         case .clipboard:
             return "Maccy-style history of text, images, and files. Default shortcut ⇧⌘C. Tune capture and paste on the Clipboard settings tab."
         case .appearance:
@@ -340,6 +340,15 @@ struct OnboardingFlow: View {
                             ? nil
                             : "da transcribuh must appear in the list. Turn On prompts for that, then Reopen."
                     )
+                    InkDivider(leading: 0)
+                    permissionRow(
+                        title: "Input Monitoring",
+                        detail: "Helps the fn / Globe shortcut hear key events reliably (Wispr asks for this too). Soft — Accessibility still covers most holds.",
+                        on: permissions.status.inputMonitoring,
+                        recovery: permissions.status.inputMonitoring
+                            ? nil
+                            : "Turn On requests it. Enable da transcribuh under Privacy & Security → Input Monitoring, then Reopen."
+                    )
                 }
             }
             Text("After you change a switch in System Settings, Reopen so da transcribuh picks it up.")
@@ -350,6 +359,7 @@ struct OnboardingFlow: View {
                 Button("Turn On") {
                     Task {
                         _ = await Permissions.requestMicrophone()
+                        _ = Permissions.requestInputMonitoring()
                         Permissions.revealSettings(for: Permissions.current())
                         permissions.refresh()
                     }
@@ -363,7 +373,7 @@ struct OnboardingFlow: View {
             if permissions.status.isReady {
                 HStack(spacing: Ink.space2) {
                     InkCheck(done: true)
-                    Text("All three are on. Continue.")
+                    Text("Microphone, Screen Recording, and Accessibility are on. Continue.")
                         .font(Ink.buttonSmallFont)
                         .foregroundStyle(Ink.label)
                 }
@@ -442,9 +452,15 @@ struct OnboardingFlow: View {
                         }
                         .buttonStyle(InkSecondaryButtonStyle())
                         .disabled(listening || listeningClipboard)
+                        Button("Use fn") {
+                            listening = false
+                            settings.setHotkeyBehavior(.holdAndDoubleTap)
+                            shortcutNote = settings.setChord(.default) ? nil : "Could not enable the fn shortcut."
+                        }
+                        .buttonStyle(InkSecondaryButtonStyle())
                         Button("Use ⌥Space") {
                             listening = false
-                            shortcutNote = settings.setChord(.default) ? nil : "macOS would not register that shortcut."
+                            shortcutNote = settings.setChord(.optionSpaceDefault) ? nil : "macOS would not register that shortcut."
                         }
                         .buttonStyle(InkSecondaryButtonStyle())
                     }
@@ -452,7 +468,7 @@ struct OnboardingFlow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(Ink.cardPad)
             }
-            Text("Hold the chord instead of tapping if you turn on push-to-talk later in General.")
+            Text("fn defaults to hold-to-talk with double-tap hands-free (Wispr-style). Set Keyboard → Press 🌐 key to → Do Nothing so emoji/dictation does not steal fn. Change activation anytime in General.")
                 .font(Ink.captionFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)

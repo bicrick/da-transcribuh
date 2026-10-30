@@ -5,13 +5,23 @@ import Foundation
 /// The session toggle. It cannot use a session key (Shift grabs the screen and Control
 /// draws by default), because those are held on their own during a session.
 /// Command-Space and Option-Command-Space stay with Spotlight / Finder search.
-/// Option-Space is the default Start/Stop chord (Carbon consumes it so it won’t type NBSP).
+/// Default is the Globe/fn key alone (Wispr Flow–style), monitored via flagsChanged —
+/// Carbon cannot register bare fn. ⌥Space remains available as a combo fallback.
 struct HotkeyChord: Equatable, Codable {
     var keyCode: UInt32
     var carbonModifiers: UInt32
 
-    /// Default Start/Stop: Option-Space.
+    /// Hardware key code for Globe/fn (`kVK_Function` / 0x3F).
+    static let fnKeyCode: UInt32 = 0x3F
+
+    /// Default Start/Stop: Globe/fn alone.
     static let `default` = HotkeyChord(
+        keyCode: fnKeyCode,
+        carbonModifiers: 0
+    )
+
+    /// Previous default (⌥Space). Kept for migration and the "Use ⌥Space" button.
+    static let optionSpaceDefault = HotkeyChord(
         keyCode: UInt32(kVK_Space),
         carbonModifiers: UInt32(optionKey)
     )
@@ -57,9 +67,25 @@ struct HotkeyChord: Equatable, Codable {
         normalizedModifiers & modifier.carbonMask != 0
     }
 
-    /// Valid for Carbon at all: a modifier or a function key, and not a system chord.
+    /// Bare Globe/fn — not Carbon-registrable; watched via flagsChanged.
+    var isFnOnly: Bool {
+        keyCode == Self.fnKeyCode && normalizedModifiers == 0
+    }
+
+    /// Single physical key with no ⌘⌥⌃⇧: fn, or a bare F-key. Uses hold/tap semantics.
+    var isSingleKey: Bool {
+        if isFnOnly { return true }
+        return normalizedModifiers == 0 && isFunctionKey
+    }
+
+    /// Carbon `RegisterEventHotKey` can own this chord (not bare fn).
+    var isCarbonRegistrable: Bool {
+        !isFnOnly && (normalizedModifiers != 0 || isFunctionKey) && !takesOverSystemShortcut
+    }
+
+    /// Valid as a recording shortcut: Carbon-registrable, or bare fn.
     var isRegistrable: Bool {
-        (normalizedModifiers != 0 || isFunctionKey) && !takesOverSystemShortcut
+        isFnOnly || isCarbonRegistrable
     }
 
     /// Recording chord with the default screenshot key reserved.
@@ -86,8 +112,8 @@ struct HotkeyChord: Equatable, Codable {
     }
 
     func rejection(reserving keys: SessionKeys.Bindings?) -> String? {
-        if normalizedModifiers == 0 && !isFunctionKey {
-            return "Add at least one modifier, or use a function key."
+        if normalizedModifiers == 0 && !isFunctionKey && !isFnOnly {
+            return "Add at least one modifier, use a function key, or pick fn."
         }
         if let keys {
             if includes(keys.screenshot) {
@@ -113,6 +139,7 @@ struct HotkeyChord: Equatable, Codable {
     )
 
     var display: String {
+        if isFnOnly { return "fn" }
         var symbols = ""
         let mods = normalizedModifiers
         if mods & UInt32(controlKey) != 0 { symbols += "⌃" }
@@ -124,6 +151,7 @@ struct HotkeyChord: Equatable, Codable {
 
     /// Separate keycaps, modifiers first, then the key. Option-Space is ⌥, Space.
     var keycaps: [String] {
+        if isFnOnly { return ["fn"] }
         var caps: [String] = []
         let mods = normalizedModifiers
         if mods & UInt32(controlKey) != 0 { caps.append("⌃") }
@@ -136,6 +164,7 @@ struct HotkeyChord: Equatable, Codable {
 
     var keyTitle: String {
         switch keyCode {
+        case Self.fnKeyCode: return "fn"
         case UInt32(kVK_Space): return "Space"
         case UInt32(kVK_Return): return "Return"
         case UInt32(kVK_ANSI_KeypadEnter): return "Enter"
@@ -207,16 +236,24 @@ enum RecordingChordCapture {
         case saved(success: Bool)
     }
 
-    /// Esc cancels; Delete / Forward Delete restores ⌥Space; otherwise validate + `setChord`.
+    /// Esc cancels; Delete / Forward Delete restores the default (fn); otherwise validate + `setChord`.
     @MainActor
     static func applyToggleEvent(_ event: NSEvent, settings: AppSettings) -> Outcome {
-        let bare = event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let bare = flags.subtracting(.function).isEmpty
         if bare, event.keyCode == 53 { // Esc
             return .cancelled
         }
         if bare, event.keyCode == 51 || event.keyCode == 117 { // Delete / Fwd Del
+            settings.setHotkeyBehavior(.holdAndDoubleTap)
             let ok = settings.setChord(.default)
             return .restoredDefault(success: ok)
+        }
+        // Bare fn / Globe cannot be captured as a normal keyDown; Settings offers "Use fn".
+        if event.keyCode == UInt16(HotkeyChord.fnKeyCode), flags.subtracting(.function).isEmpty {
+            settings.setHotkeyBehavior(.holdAndDoubleTap)
+            let ok = settings.setChord(.default)
+            return .saved(success: ok)
         }
         let chord = HotkeyChord(event: event)
         if let rejection = chord.rejection(reserving: settings.sessionKeys) {

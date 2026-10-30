@@ -94,6 +94,8 @@ final class SessionController: ObservableObject {
     private var clockSpan: CGFloat = 0
     /// Push-to-talk key-up arrived while `begin()` was still awaiting permissions / setup.
     private var pushToTalkReleasedWhileStarting = false
+    /// When true with `pushToTalkReleasedWhileStarting`, begin() cancels instead of finish().
+    private var activationWantsCancel = false
     /// Onboarding practice skips paste-on-stop so the welcome window is not disrupted.
     private var skipNextPaste = false
     /// Injectable for tests; production uses the live Accessibility probe.
@@ -218,31 +220,53 @@ final class SessionController: ObservableObject {
         }
     }
 
+    /// Receives start / stop / cancel from `HotkeyCenter`'s activation machine.
+    func handleActivation(_ action: HotkeyActivationMachine.Action) {
+        switch action {
+        case .startRecording:
+            if phase == .recording { return }
+            guard !isBusy else { return }
+            pushToTalkReleasedWhileStarting = false
+            activationWantsCancel = false
+            StopTrace.noteTrigger(uptime: HotkeyCenter.shared.lastPressUptime)
+            Task { await begin() }
+        case .stopRecording:
+            StopTrace.noteTrigger(uptime: HotkeyCenter.shared.lastPressUptime)
+            if phase == .recording {
+                Task { await finish() }
+            } else {
+                // Release during begin — finish once recording actually starts.
+                pushToTalkReleasedWhileStarting = true
+                activationWantsCancel = false
+            }
+        case .cancelRecording:
+            StopTrace.noteTrigger(uptime: HotkeyCenter.shared.lastPressUptime)
+            if phase == .recording {
+                cancel()
+            } else {
+                // Brief tap / interrupt before begin finished — drop without pasting.
+                pushToTalkReleasedWhileStarting = true
+                activationWantsCancel = true
+            }
+        case .armDoubleTapTimer, .cancelDoubleTapTimer:
+            break
+        }
+    }
+
+    /// Menu bar / Home Start still toggle without going through the hold machine.
     func handleHotkey() {
         if phase == .recording {
             StopTrace.noteTrigger(uptime: HotkeyCenter.shared.lastPressUptime)
         }
-        if AppSettings.shared.pushToTalk {
-            if phase == .recording {
-                PushToTalk.shared.disarm()
-                Task { await finish() }
-            } else if !isBusy {
-                pushToTalkReleasedWhileStarting = false
-                PushToTalk.shared.arm(keyCode: UInt16(AppSettings.shared.chord.keyCode))
-                Task { await begin() }
-            }
-        } else {
-            Task { await performToggle() }
-        }
+        Task { await performToggle() }
     }
 
     func releasePushToTalk() {
+        // Legacy path from PushToTalk monitors; hold modes now go through handleActivation.
         guard AppSettings.shared.pushToTalk else { return }
         if phase == .recording {
             Task { await finish() }
         } else {
-            // Key-up before or during begin (including the gap after arm before isStarting).
-            // Only reached when PushToTalk was armed — menu/Home Start never arms.
             pushToTalkReleasedWhileStarting = true
         }
     }
@@ -255,6 +279,7 @@ final class SessionController: ObservableObject {
         skipNextPaste = true
         // Practice does not arm PTT — clear any stale release latch so begin is not auto-stopped.
         pushToTalkReleasedWhileStarting = false
+        activationWantsCancel = false
         await begin()
         if phase == .recording { return true }
         skipNextPaste = false
@@ -265,6 +290,7 @@ final class SessionController: ObservableObject {
         guard phase == .recording else { return }
         PushToTalk.shared.disarm()
         pushToTalkReleasedWhileStarting = false
+        activationWantsCancel = false
         skipNextPaste = false
         keepTranscribing = false
         speechTask?.cancel()
@@ -533,6 +559,7 @@ final class SessionController: ObservableObject {
         guard phase == .recording || phase == .finishing else { return }
         PushToTalk.shared.disarm()
         pushToTalkReleasedWhileStarting = false
+        activationWantsCancel = false
         skipNextPaste = false
         keepTranscribing = false
         speechTask?.cancel()
@@ -562,17 +589,10 @@ final class SessionController: ObservableObject {
         return .passThrough
     }
 
-    /// Modifiers of the push-to-talk chord while it is held, so ⌥Space plus Shift still
-    /// counts as Shift alone.
+    /// Modifiers of the recording chord while it is held, so ⌥Space plus Shift still
+    /// counts as Shift alone (fn contributes SecondaryFn).
     func heldChordFlags() -> CGEventFlags {
-        guard PushToTalk.shared.isArmed else { return [] }
-        let mods = AppSettings.shared.chord.normalizedModifiers
-        var flags: CGEventFlags = []
-        for key in SessionModifier.allCases where mods & key.carbonMask != 0 {
-            flags.insert(key.eventFlag)
-        }
-        if mods & UInt32(cmdKey) != 0 { flags.insert(.maskCommand) }
-        return flags
+        HotkeyCenter.shared.heldChordFlags()
     }
 
     func sessionHoldChanged(to hold: SessionKeys.Hold) {
@@ -836,6 +856,7 @@ final class SessionController: ObservableObject {
         } else {
             // Menu/Home Start never arms PTT — drop any stale release latch from an earlier chord.
             pushToTalkReleasedWhileStarting = false
+            activationWantsCancel = false
             await begin()
         }
     }
@@ -852,6 +873,7 @@ final class SessionController: ObservableObject {
         guard access.isReady else {
             PushToTalk.shared.disarm()
             pushToTalkReleasedWhileStarting = false
+            activationWantsCancel = false
             skipNextPaste = false
             offerPermissions(access)
             return
@@ -859,9 +881,10 @@ final class SessionController: ObservableObject {
         guard monitor.install() else {
             PushToTalk.shared.disarm()
             pushToTalkReleasedWhileStarting = false
+            activationWantsCancel = false
             skipNextPaste = false
             if !AXIsProcessTrusted() {
-                offerPermissions(Permissions.Status(accessibility: false, microphone: true, screen: true))
+                offerPermissions(Permissions.Status(accessibility: false, microphone: true, screen: true, inputMonitoring: true))
             } else {
                 lastError = "Couldn't watch the pointer."
                 presentError("Couldn't watch the pointer", "Accessibility is on, but the event tap did not install. Quit and reopen da transcribuh.")
@@ -921,17 +944,23 @@ final class SessionController: ObservableObject {
             AppSounds.sessionStarted()
             log.info("Session started at \(folder.path, privacy: .public)")
 
-            // Push-to-talk release during permission wait would otherwise leave the session running.
-            // Only the latch — never `!isArmed`, which would auto-stop menu/Home Start (they never arm).
-            let stopForPushToTalk = preferences.pushToTalk && pushToTalkReleasedWhileStarting
+            // Hold/tap release during permission wait would otherwise leave the session running.
+            // Only the latch — menu/Home Start never sets it.
+            let releasedEarly = preferences.pushToTalk && pushToTalkReleasedWhileStarting
+            let wantsCancel = activationWantsCancel
             pushToTalkReleasedWhileStarting = false
-            if stopForPushToTalk {
-                PushToTalk.shared.disarm()
-                Task { await self.finish() }
+            activationWantsCancel = false
+            if releasedEarly {
+                if wantsCancel {
+                    self.cancel()
+                } else {
+                    Task { await self.finish() }
+                }
             }
         } catch {
             PushToTalk.shared.disarm()
             pushToTalkReleasedWhileStarting = false
+            activationWantsCancel = false
             skipNextPaste = false
             monitor.stop()
             audio.stop()
@@ -955,6 +984,7 @@ final class SessionController: ObservableObject {
         StopTrace.note("audio", String(format: "%.1f", Double(audio.sampleCount()) / 16_000))
         PushToTalk.shared.disarm()
         pushToTalkReleasedWhileStarting = false
+        activationWantsCancel = false
         let heardSpeech = audio.heardSpeech()
         AppSounds.sessionStopped(heardSpeech: heardSpeech)
         setPhase(.finishing)

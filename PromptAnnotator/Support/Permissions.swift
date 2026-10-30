@@ -8,7 +8,10 @@ enum Permissions {
         var accessibility: Bool
         var microphone: Bool
         var screen: Bool
+        /// Listen-event access (Input Monitoring). Needed for some fn/global monitors.
+        var inputMonitoring: Bool
 
+        /// Core session still requires AX + mic + screen. Input Monitoring is soft for now.
         var isReady: Bool { accessibility && microphone && screen }
 
         var summary: String? {
@@ -25,8 +28,15 @@ enum Permissions {
         Status(
             accessibility: AXIsProcessTrusted(),
             microphone: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
-            screen: CGPreflightScreenCaptureAccess()
+            screen: CGPreflightScreenCaptureAccess(),
+            inputMonitoring: CGPreflightListenEventAccess()
         )
+    }
+
+    @discardableResult
+    static func requestInputMonitoring() -> Bool {
+        if CGPreflightListenEventAccess() { return true }
+        return CGRequestListenEventAccess()
     }
 
     static func requestMicrophone() async -> Bool {

@@ -263,7 +263,7 @@ struct InkKeycapRow: View {
 /// Home Start-row chord editor — same `ShortcutCapture` + `AppSettings.setChord` as General.
 /// Muted “click to rebind” hint sits left of the keycaps (does not shift Start).
 /// Hover: label border + tint + pointing hand. Click to capture; Esc cancels;
-/// Delete restores ⌥Space. Conflicts show as a brief red caption under the caps.
+/// Delete restores fn. Conflicts show as a brief red caption under the caps.
 struct HomeChordEditor: View {
     @ObservedObject var settings: AppSettings
     @State private var listening = false
@@ -288,7 +288,7 @@ struct HomeChordEditor: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .help(listening ? "Press a shortcut — Esc cancels, Delete restores ⌥Space" : "Edit recording shortcut")
+                .help(listening ? "Press a shortcut — Esc cancels, Delete restores fn" : "Edit recording shortcut")
                 .accessibilityLabel(listening ? "Listening for shortcut" : "Recording shortcut \(settings.chord.display)")
                 .accessibilityHint("Click to change the Start and stop shortcut")
             }

@@ -66,11 +66,13 @@ final class SessionKeySettingsTests: XCTestCase {
         XCTAssertNotNil(settings.cancelChord, "a cancel chord without session keys survives")
     }
 
-    func testCancelChordWithControlLeavesDrawingOff() {
+    func testCancelChordWithControlMovesAnnotateToOption() {
         storeCancel(HotkeyChord(keyCode: UInt32(kVK_ANSI_X), carbonModifiers: UInt32(controlKey | cmdKey)))
         let settings = AppSettings(defaults: defaults)
         XCTAssertEqual(settings.chord, .default)
-        XCTAssertNil(settings.annotateKey, "⌥Space and ⌃⌘X use both")
+        // fn uses no modifiers; cancel uses Control → annotate lands on Option.
+        XCTAssertEqual(settings.annotateKey, .option)
+        XCTAssertEqual(settings.screenshotKey, .shift)
     }
 
     func testStoredChoicesReload() {
@@ -82,11 +84,24 @@ final class SessionKeySettingsTests: XCTestCase {
     }
 
     func testStoredClashWithTheShortcutIsRepaired() {
+        // ⌥Space occupies Option; a stored Option screenshot must move to Shift.
+        storeChord(.optionSpaceDefault)
         defaults.set("option", forKey: "session.screenshotKey")
         defaults.set("control", forKey: "session.annotateKey")
         let settings = AppSettings(defaults: defaults)
-        XCTAssertEqual(settings.chord, .default, "⌥Space stays")
+        XCTAssertEqual(settings.chord, .optionSpaceDefault, "saved ⌥Space is kept")
         XCTAssertEqual(settings.sessionKeys, .standard)
+    }
+
+    func testStoredKeysCompatibleWithFnAreKept() {
+        defaults.set("option", forKey: "session.screenshotKey")
+        defaults.set("control", forKey: "session.annotateKey")
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertEqual(settings.chord, .default, "fn stays")
+        XCTAssertEqual(
+            settings.sessionKeys,
+            SessionKeys.Bindings(screenshot: .option, annotate: .control)
+        )
     }
 
     func testGarbageIsIgnored() {
@@ -115,7 +130,12 @@ final class SessionKeySettingsTests: XCTestCase {
     }
 
     func testPickersRejectTheShortcutsModifiers() {
+        // Bind ⌥Space so Option is reserved by the recording chord.
+        defaults.set(Int(kVK_Space), forKey: "hotkey.keyCode")
+        defaults.set(Int(optionKey), forKey: "hotkey.modifiers")
+        defaults.set(true, forKey: "hotkey.migratedToOptionSpace")
         let settings = AppSettings(defaults: defaults)
+        XCTAssertEqual(settings.chord, .optionSpaceDefault)
         XCTAssertEqual(
             settings.setAnnotateKey(.option),
             "Start and stop uses ⌥Space, so Option stays free for it."
