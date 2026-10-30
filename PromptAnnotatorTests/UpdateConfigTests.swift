@@ -1,7 +1,7 @@
 import XCTest
 @testable import PromptAnnotator
 
-/// Sparkle settings baked into Info.plist. Beta ships with automatic checks off.
+/// Sparkle settings baked into Info.plist. Automatic checks on; never silent-installs.
 final class UpdateConfigTests: XCTestCase {
     func testFeedPointsAtTheWebsiteAppcast() {
         XCTAssertEqual(
@@ -16,8 +16,8 @@ final class UpdateConfigTests: XCTestCase {
         XCTAssertEqual(Data(base64Encoded: key)?.count, 32)
     }
 
-    func testAutomaticChecksStayOffAndTheFeedMustBeSigned() {
-        XCTAssertFalse(UpdateController.Config.automaticChecksEnabled)
+    func testAutomaticChecksAreOnAndTheFeedMustBeSigned() {
+        XCTAssertTrue(UpdateController.Config.automaticChecksEnabled)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "SUAutomaticallyUpdate") as? Bool, false)
         XCTAssertTrue(UpdateController.Config.requiresSignedFeed)
     }

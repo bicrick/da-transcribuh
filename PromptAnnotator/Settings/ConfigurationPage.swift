@@ -488,7 +488,7 @@ struct ConfigurationPage: View {
     private var updatesDetail: String {
         let automatic = updates.automaticallyChecksForUpdates
             ? "Checks automatically."
-            : "Automatic checks are off during the beta."
+            : "Automatic checks are off."
         return "This build is \(AppVersion.label). \(automatic)"
     }
 

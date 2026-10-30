@@ -52,7 +52,7 @@
 	<key>SUPublicEDKey</key>
 	<string>G6SPYolzL6cJ7xbOSHKEttfAfRfUKrVPUfdwCXSjvus=</string>
 	<key>SUEnableAutomaticChecks</key>
-	<false/>
+	<true/>
 	<key>SUAutomaticallyUpdate</key>
 	<false/>
 	<key>SURequireSignedFeed</key>

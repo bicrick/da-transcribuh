@@ -3,8 +3,9 @@
 #
 #   scripts/release.sh <version> [--skip-notarize] [--publish]
 #
-# Env: PRERELEASE=0 publishes a full release instead of a prerelease. The Sparkle feed is
-# served by the website (appcast.xml + download/da-transcribuh-<version>.dmg); see docs/releasing.md.
+# Env: PRERELEASE defaults to 0 (full release). Set PRERELEASE=1 for a GitHub prerelease.
+# The Sparkle feed is served by the website (appcast.xml + download/da-transcribuh-<version>.dmg);
+# see docs/releasing.md.
 #
 # See docs/releasing.md for one-time setup.
 set -euo pipefail
@@ -51,7 +52,7 @@ DMG="$OUT/$APP_NAME $VERSION.dmg"          # "da transcribuh 0.9.1.dmg"
 DMG_ALIAS="da-transcribuh.dmg"              # URL-safe copy for GitHub (see docs/releasing.md)
 DMG_BG="$ROOT/Config/dmg/background.tiff"   # 600x400 + 1200x800, from Config/dmg/render-background.swift
 ENTITLEMENTS="$ROOT/Config/Release.entitlements"
-PRERELEASE="${PRERELEASE:-1}"
+PRERELEASE="${PRERELEASE:-0}"
 # Sparkle comes in through SwiftPM. Clone packages into build/ so its tools sit at a known path.
 SPM_DIR="$ROOT/build/spm"
 SPARKLE_BIN="${SPARKLE_BIN:-$SPM_DIR/artifacts/sparkle/Sparkle/bin}"
@@ -282,7 +283,7 @@ if (( PUBLISH == 1 )); then
   cp "$DMG" "$OUT/$DMG_ALIAS"
   PRE_FLAG=(); (( PRERELEASE == 1 )) && PRE_FLAG=(--prerelease)
   gh release create "v$VERSION" -R "$REPO" \
-    --title "da transcribuh $VERSION beta" --generate-notes ${PRE_FLAG[@]+"${PRE_FLAG[@]}"} --target "$(git rev-parse HEAD)" \
+    --title "da transcribuh $VERSION" --generate-notes ${PRE_FLAG[@]+"${PRE_FLAG[@]}"} --target "$(git rev-parse HEAD)" \
     "$DMG" "$OUT/$DMG_ALIAS" "$OUT/appcast.xml"
 fi
 

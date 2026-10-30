@@ -66,7 +66,7 @@ func render(scale: CGFloat) -> CGImage {
 
     ctx.setShouldAntialias(true)
     text("drag me into Applications", size: 22, color: black, centerX: W / 2, baseline: 60, in: ctx)
-    text("da transcribuh  beta", size: 12, color: grey, centerX: W / 2, baseline: 350, in: ctx)
+    text("da transcribuh", size: 12, color: grey, centerX: W / 2, baseline: 350, in: ctx)
     return ctx.makeImage()!
 }
 
