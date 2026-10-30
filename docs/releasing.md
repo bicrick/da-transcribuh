@@ -56,11 +56,12 @@ only ever see the copy in `/Applications`.
 
 - bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.pbxproj` in the release PR. the script
   builds the version you pass (it warns if that differs from the project) with the project's build number
-  (override with `BUILD_NUMBER=...`). the app shows them as `<version> beta (<build>)` (`AppVersion.channel`).
-- `--publish` creates a prerelease and uploads two copies of the same DMG. GitHub replaces spaces in asset
-  names with dots, so `da transcribuh <version>.dmg` appears as `da.transcribuh.<version>.dmg`.
-  the URL-safe alias `da-transcribuh.dmg` keeps the README's `releases/latest/download/da-transcribuh.dmg`
-  link stable. it is the only reason the alias exists.
+  (override with `BUILD_NUMBER=...`). the app shows them as `<version> (<build>)` (`AppVersion.label`).
+- `--publish` creates a full GitHub release by default (`PRERELEASE=0`) and uploads two copies of the same
+  DMG. GitHub replaces spaces in asset names with dots, so `da transcribuh <version>.dmg` appears as
+  `da.transcribuh.<version>.dmg`. the URL-safe alias `da-transcribuh.dmg` keeps the README's
+  `releases/latest/download/da-transcribuh.dmg` link stable. it is the only reason the alias exists.
+  set `PRERELEASE=1` only if you intentionally want a GitHub prerelease.
 
 ## the DMG window
 
@@ -119,19 +120,19 @@ the app embeds Sparkle 2.10.0 (SwiftPM, exact version). `UpdateController` owns 
 `SPUStandardUpdaterController`. it never starts under unit tests. "Check for Updates…" sits in the
 menu bar menu and on General → Updates.
 
-**what ships now (beta, private repo):**
+**what ships now (1.0+, public repo):**
 
 | Info.plist key | value | why |
 |---|---|---|
 | `SUFeedURL` | `https://da-transcribuh-site.vercel.app/appcast.xml` | public, served by the website repo. keep this URL even after a custom domain is added |
 | `SUPublicEDKey` | public EdDSA key | verifies every update and the feed |
-| `SUEnableAutomaticChecks` | `false` | no background checks, and no first-launch permission prompt |
+| `SUEnableAutomaticChecks` | `true` | Sparkle checks the feed in the background |
 | `SUAutomaticallyUpdate` | `false` | never installs without asking |
 | `SURequireSignedFeed` | `true` | rejects an appcast that is not signed by our key |
 | `SUVerifyUpdateBeforeExtraction` | `true` | checks the DMG signature before unpacking it |
 
-the feed and the DMGs live on the public website (`bicrick/da-transcribuh-site`), so updates work while
-this repo stays private. 0.9.4 and older builds still point at the old GitHub feed and never see updates.
+the feed and the DMGs live on the public website (`bicrick/da-transcribuh-site`). 0.9.4 and older builds
+still point at the old GitHub feed and never see updates.
 
 **the appcast.** `scripts/release.sh` runs `scripts/make-appcast.sh` after the DMG is notarized and stapled.
 it calls Sparkle's `generate_appcast` on a folder holding just `da-transcribuh-<version>.dmg`, with enclosure URL
@@ -149,19 +150,14 @@ click **Always Allow** while you are at the Mac. the release preflight also reso
 `build/spm` on the first run, which fetches from github.com through git's `osxkeychain` helper. that
 can raise a GitHub keychain prompt too.
 
-**flip at public launch** (one PR, then cut the release):
+**public launch checklist** (done as of 1.0.1):
 
-1. make the repo public (or host `appcast.xml` and the DMG somewhere public, and point `SUFeedURL` there).
-2. publish full releases, not prereleases. `releases/latest` skips prereleases, so the feed and the README
-   download link only resolve for a full release: `PRERELEASE=0 scripts/release.sh <version> --publish`.
-   make that the default in `release.sh` once betas stop.
-3. in `Config/Info.plist` set `SUEnableAutomaticChecks` to `true`. optionally add
-   `SUScheduledCheckInterval` (seconds, default 86400 = daily).
-4. optional: `SUAutomaticallyUpdate` `true` for silent background installs (users can still opt out).
-5. change the General → Updates detail text (`updatesDetail` in `ConfigurationPage.swift`) and the
-   `UpdateConfigTests` expectations to match.
-6. updates only reach installs that already embed Sparkle (the first release after this lands, and later).
-   0.9.2 and older need one manual download.
+1. repo is public; feed + DMGs stay on `da-transcribuh-site`.
+2. `release.sh` defaults to full releases (`PRERELEASE=0`). set `PRERELEASE=1` only for intentional prereleases.
+3. `SUEnableAutomaticChecks` is `true`. optional: add `SUScheduledCheckInterval` (seconds, default 86400).
+4. optional later: `SUAutomaticallyUpdate` `true` for silent background installs (users can still opt out).
+5. General → Updates detail (`updatesDetail` in `ConfigurationPage.swift`) and `UpdateConfigTests` match.
+6. updates only reach installs that already embed Sparkle. 0.9.2 and older need one manual download.
 
 **test an update end to end** (before launch, once the repo is public or with a local feed): install
 version N, publish N+1 with `--publish`, then "Check for Updates…" in N should offer N+1, download,

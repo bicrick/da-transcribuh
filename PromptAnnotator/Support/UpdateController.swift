@@ -4,9 +4,8 @@ import Sparkle
 
 /// Sparkle 2 updater. One instance for the app.
 ///
-/// Info.plist turns automatic checks off (`SUEnableAutomaticChecks` = NO) while the repo is
-/// private, so nothing touches the network until someone picks "Check for Updates…".
-/// docs/releasing.md lists what to flip at public launch.
+/// Info.plist turns automatic checks on (`SUEnableAutomaticChecks` = YES). Silent installs stay
+/// off (`SUAutomaticallyUpdate` = NO). docs/releasing.md covers the Sparkle feed.
 @MainActor
 final class UpdateController: ObservableObject {
     static let shared = UpdateController()

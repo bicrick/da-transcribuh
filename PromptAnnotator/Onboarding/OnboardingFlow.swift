@@ -273,7 +273,7 @@ struct OnboardingFlow: View {
                         .foregroundStyle(Ink.secondary)
                 }
             }
-            Text("This beta is free and open source.")
+            Text("Free and open source.")
                 .font(Ink.bodyFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -3,11 +3,10 @@ import XCTest
 @testable import PromptAnnotator
 
 final class ProductSurfaceTests: XCTestCase {
-    func testBetaLabelCarriesTheMarketingVersionAndBuild() {
-        XCTAssertEqual(AppVersion.channel, "beta")
-        XCTAssertEqual(AppVersion.marketing, "0.9.7")
-        XCTAssertEqual(AppVersion.build, "9")
-        XCTAssertEqual(AppVersion.label, "0.9.7 beta (9)")
+    func testVersionLabelCarriesTheMarketingVersionAndBuild() {
+        XCTAssertEqual(AppVersion.marketing, "1.0.1")
+        XCTAssertEqual(AppVersion.build, "10")
+        XCTAssertEqual(AppVersion.label, "1.0.1 (10)")
         XCTAssertEqual(ReleaseCheck.currentVersion(), AppVersion.marketing)
     }
 
