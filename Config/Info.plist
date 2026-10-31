@@ -7,7 +7,7 @@
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleDisplayName</key>
-	<string>da transcribuh</string>
+	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>da transcribuh</string>
+	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -29,11 +29,11 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>da transcribuh records the microphone during a session so it can type what you say next to each screenshot.</string>
+	<string>$(PRODUCT_NAME) records the microphone during a session so it can type what you say next to each screenshot.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>da transcribuh captures the display when you release shift so it can save a still with your marks baked in.</string>
+	<string>$(PRODUCT_NAME) captures the display when you release shift so it can save a still with your marks baked in.</string>
 	<!-- Bundled OFL fonts live in PromptAnnotator/Fonts/ → Resources/Fonts/.
 	     InkFontRegistrar also CTFontManager-registers every .otf at launch. -->
 	<key>ATSApplicationFontsPath</key>

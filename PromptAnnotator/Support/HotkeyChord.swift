@@ -245,13 +245,11 @@ enum RecordingChordCapture {
             return .cancelled
         }
         if bare, event.keyCode == 51 || event.keyCode == 117 { // Delete / Fwd Del
-            settings.setHotkeyBehavior(.holdAndDoubleTap)
-            let ok = settings.setChord(.default)
+            let ok = settings.setChord(.default) // coerces to holdAndDoubleTap
             return .restoredDefault(success: ok)
         }
-        // Bare fn / Globe cannot be captured as a normal keyDown; Settings offers "Use fn".
+        // Bare fn / Globe arrives as flagsChanged (ShortcutCapture) or rare keyDown.
         if event.keyCode == UInt16(HotkeyChord.fnKeyCode), flags.subtracting(.function).isEmpty {
-            settings.setHotkeyBehavior(.holdAndDoubleTap)
             let ok = settings.setChord(.default)
             return .saved(success: ok)
         }
@@ -259,6 +257,7 @@ enum RecordingChordCapture {
         if let rejection = chord.rejection(reserving: settings.sessionKeys) {
             return .rejected(rejection)
         }
+        // setChord picks toggleOnly for modifier combos, hold for bare F-keys.
         let ok = settings.setChord(chord)
         return .saved(success: ok)
     }

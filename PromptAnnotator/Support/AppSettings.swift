@@ -389,7 +389,19 @@ final class AppSettings: ObservableObject {
         guard chord.canRegister(reserving: sessionKeys) else { return false }
         guard chord != cancelChord else { return false }
         guard chord != clipboardChord else { return false }
-        guard HotkeyCenter.shared.apply(chord, behavior: hotkeyBehavior) else { return false }
+        // Combos (⌥Space, etc.) toggle on keyDown. Bare fn / F-keys use hold+tap.
+        let resolved: HotkeyBehavior
+        if chord.isSingleKey {
+            resolved = (hotkeyBehavior == .holdOnly) ? .holdOnly : .holdAndDoubleTap
+        } else {
+            resolved = .toggleOnly
+        }
+        if hotkeyBehavior != resolved {
+            hotkeyBehavior = resolved
+            persist(Keys.hotkeyBehavior, resolved.rawValue)
+            persist(Keys.pushToTalk, resolved != .toggleOnly)
+        }
+        guard HotkeyCenter.shared.apply(chord, behavior: resolved) else { return false }
         self.chord = chord
         defaults.set(Int(chord.keyCode), forKey: Keys.chordKey)
         defaults.set(Int(chord.carbonModifiers), forKey: Keys.chordMods)
@@ -442,11 +454,13 @@ final class AppSettings: ObservableObject {
     }
 
     func setHotkeyBehavior(_ behavior: HotkeyBehavior) {
-        hotkeyBehavior = behavior
-        persist(Keys.hotkeyBehavior, behavior.rawValue)
+        // Modifier combos cannot use hold/tap — Carbon has no reliable chord keyUp.
+        let resolved = chord.isSingleKey ? behavior : .toggleOnly
+        hotkeyBehavior = resolved
+        persist(Keys.hotkeyBehavior, resolved.rawValue)
         // Mirror bool for older diagnostics / readers.
-        persist(Keys.pushToTalk, behavior != .toggleOnly)
-        HotkeyCenter.shared.applyBehavior(behavior)
+        persist(Keys.pushToTalk, resolved != .toggleOnly)
+        HotkeyCenter.shared.applyBehavior(resolved)
     }
 
     func setSoundTheme(_ theme: SoundTheme) {

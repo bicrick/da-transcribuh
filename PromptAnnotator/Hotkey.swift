@@ -98,6 +98,12 @@ final class HotkeyCenter {
         return true
     }
 
+    /// Modifier combos (⌥Space, etc.) always toggle on keyDown.
+    /// Hold / double-tap only applies to bare single keys (fn, F-keys).
+    private var effectiveBehavior: HotkeyBehavior {
+        chord.isSingleKey ? behavior : .toggleOnly
+    }
+
     private func applyRegistration(_ chord: HotkeyChord) -> Bool {
         tearDownChordMonitors()
         machine = HotkeyActivationMachine()
@@ -147,7 +153,9 @@ final class HotkeyCenter {
         )
         guard status == noErr else { return false }
         self.chord = chord
-        if behavior != .toggleOnly {
+        // Hold keyUp/interrupt only for bare single keys. Combos toggle on Carbon
+        // keyDown; Space keyUp for ⌥Space made stop require simultaneous presses.
+        if chord.isSingleKey, behavior != .toggleOnly {
             installKeyMonitorsForHold()
         }
         return true
@@ -196,11 +204,12 @@ final class HotkeyCenter {
     }
 
     private func edge(_ edge: HotkeyActivationMachine.Edge) {
+        let mode = effectiveBehavior
         switch edge {
         case .down(let at):
             lastPressUptime = at
             // Toggle does not keep a physical hold; hold modes do.
-            if behavior != .toggleOnly {
+            if mode != .toggleOnly {
                 isHolding = true
             }
         case .up, .interrupted:
@@ -208,7 +217,7 @@ final class HotkeyCenter {
         case .doubleTapTimedOut:
             break
         }
-        let actions = machine.handle(edge, behavior: behavior)
+        let actions = machine.handle(edge, behavior: mode)
         dispatch(actions)
     }
 
