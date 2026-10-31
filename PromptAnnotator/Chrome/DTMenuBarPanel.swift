@@ -156,7 +156,7 @@ struct DTMenuBarPanel: View {
         let chord = settings.chord.display
         switch settings.hotkeyBehavior {
         case .holdAndDoubleTap:
-            return "Hold \(chord) · double-tap hands-free"
+            return "Tap \(chord) to toggle · hold to talk"
         case .holdOnly:
             return "Hold \(chord) to talk"
         case .toggleOnly:

@@ -143,10 +143,9 @@ private struct DTTrafficLight: View {
                 Circle()
                     .strokeBorder(Ink.label, lineWidth: Ink.stroke)
                 if showGlyph {
-                    Text(kind.glyph)
-                        .font(.system(size: 8, weight: .bold))
+                    // Geometric glyphs — Text baselines sit high in a 12pt circle.
+                    DTTrafficLightGlyph(kind: kind)
                         .foregroundStyle(Ink.label)
-                        .offset(y: kind == .close ? -0.5 : 0)
                 }
             }
             .frame(width: diameter, height: diameter)
@@ -168,6 +167,45 @@ private struct DTTrafficLight: View {
         return SettingsPresenter.shared.attachedWindow
             ?? OnboardingPresenter.shared.attachedWindow
             ?? NSApp.keyWindow
+    }
+}
+
+/// Path-drawn × / − / + centered in the traffic-light circle (no font baseline drift).
+private struct DTTrafficLightGlyph: View {
+    let kind: DTWindowButtonKind
+
+    var body: some View {
+        Canvas { context, size in
+            let inset = size.width * 0.28
+            let rect = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
+            var path = Path()
+            switch kind {
+            case .close:
+                path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+                path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+                path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+                path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            case .miniaturize:
+                let y = rect.midY
+                path.move(to: CGPoint(x: rect.minX, y: y))
+                path.addLine(to: CGPoint(x: rect.maxX, y: y))
+            case .zoom:
+                let cx = rect.midX
+                let cy = rect.midY
+                path.move(to: CGPoint(x: rect.minX, y: cy))
+                path.addLine(to: CGPoint(x: rect.maxX, y: cy))
+                path.move(to: CGPoint(x: cx, y: rect.minY))
+                path.addLine(to: CGPoint(x: cx, y: rect.maxY))
+            }
+            context.stroke(
+                path,
+                with: .foreground,
+                style: StrokeStyle(lineWidth: 1.25, lineCap: .square, lineJoin: .miter)
+            )
+        }
+        .frame(width: 12, height: 12)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

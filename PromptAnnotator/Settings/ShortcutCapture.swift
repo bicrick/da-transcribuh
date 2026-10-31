@@ -35,9 +35,25 @@ struct ShortcutCapture: NSViewRepresentable {
         private func sync() {
             if capture, monitor == nil {
                 window?.makeFirstResponder(self)
+                // keyDown for normal chords; flagsChanged for bare fn/Globe (no keyDown).
                 // Local monitor only — removed in sync(false) and deinit; weak self avoids a cycle.
-                monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                let mask: NSEvent.EventTypeMask = [.keyDown, .flagsChanged]
+                monitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
                     guard let self, self.capture else { return event }
+                    if event.type == .flagsChanged {
+                        // Only bare fn/Globe. Other modifiers wait for a keyDown chord
+                        // (hold ⌥, then Space) so we do not assign Option alone.
+                        guard event.keyCode == UInt16(HotkeyChord.fnKeyCode),
+                              event.modifierFlags.contains(.function) else {
+                            return event
+                        }
+                        let others = event.modifierFlags
+                            .intersection(.deviceIndependentFlagsMask)
+                            .subtracting(.function)
+                        guard others.isEmpty else { return event }
+                        self.onKey?(event)
+                        return nil
+                    }
                     self.onKey?(event)
                     return nil
                 }

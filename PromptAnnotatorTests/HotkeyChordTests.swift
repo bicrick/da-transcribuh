@@ -168,4 +168,38 @@ final class HotkeyChordTests: XCTestCase {
         let settings2 = AppSettings(defaults: defaults2)
         XCTAssertEqual(settings2.hotkeyBehavior, .toggleOnly)
     }
+
+    @MainActor
+    func testOptionSpaceForcesToggleOnly() {
+        let suiteName = "test.hotkey.optSpaceToggle.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertEqual(settings.hotkeyBehavior, .holdAndDoubleTap)
+        XCTAssertTrue(settings.setChord(.optionSpaceDefault))
+        XCTAssertEqual(settings.chord, .optionSpaceDefault)
+        XCTAssertEqual(settings.hotkeyBehavior, .toggleOnly)
+        XCTAssertFalse(settings.pushToTalk)
+    }
+
+    @MainActor
+    func testFnChordForcesHoldAndDoubleTap() {
+        let suiteName = "test.hotkey.fnHold.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(Int(kVK_Space), forKey: "hotkey.keyCode")
+        defaults.set(Int(optionKey), forKey: "hotkey.modifiers")
+        defaults.set(HotkeyBehavior.toggleOnly.rawValue, forKey: "hotkey.behavior")
+        defaults.set(true, forKey: "hotkey.migratedToOptionSpace")
+
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertEqual(settings.chord, .optionSpaceDefault)
+        XCTAssertEqual(settings.hotkeyBehavior, .toggleOnly)
+        XCTAssertTrue(settings.setChord(.default))
+        XCTAssertEqual(settings.chord, .default)
+        XCTAssertEqual(settings.hotkeyBehavior, .holdAndDoubleTap)
+    }
+
 }

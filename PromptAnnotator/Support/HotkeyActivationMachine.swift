@@ -1,11 +1,9 @@
 import Foundation
 
 /// How the Start/Stop shortcut behaves.
-/// Wispr Flow model (docs.wisprflow.ai): hold to talk, double-tap within ~0.5s for
-/// hands-free, a lone brief tap waits then cancels without pasting.
 enum HotkeyBehavior: String, CaseIterable, Codable, Equatable, Hashable {
-    /// Hold ≥ briefThreshold → push-to-talk; release stops. Double-tap within
-    /// doubleTapWindow → hands-free. A single brief tap times out and cancels.
+    /// Tap to toggle hands-free; hold ≥ `holdThreshold` for push-to-talk.
+    /// Raw value kept as `holdAndDoubleTap` so existing UserDefaults keep working.
     case holdAndDoubleTap
     /// Hold to talk only. Brief release cancels without pasting. No hands-free latch.
     case holdOnly
@@ -14,7 +12,7 @@ enum HotkeyBehavior: String, CaseIterable, Codable, Equatable, Hashable {
 
     var title: String {
         switch self {
-        case .holdAndDoubleTap: return "Hold to talk + double-tap hands-free"
+        case .holdAndDoubleTap: return "Tap to toggle, hold to talk"
         case .holdOnly: return "Hold to talk"
         case .toggleOnly: return "Toggle only"
         }
@@ -23,7 +21,7 @@ enum HotkeyBehavior: String, CaseIterable, Codable, Equatable, Hashable {
     var detail: String {
         switch self {
         case .holdAndDoubleTap:
-            return "Hold to dictate. Double-tap within half a second for hands-free. A quick single tap cancels."
+            return "Quick tap starts or stops hands-free. Hold to talk, release to stop."
         case .holdOnly:
             return "Hold to dictate, release to stop. Short taps cancel so accidental presses stay quiet."
         case .toggleOnly:
@@ -32,33 +30,31 @@ enum HotkeyBehavior: String, CaseIterable, Codable, Equatable, Hashable {
     }
 }
 
-/// Pure press/hold/tap/double-tap state machine for single-key (and hold-mode) hotkeys.
-/// Timing matches Wispr Flow (~0.5s brief / double-tap window).
+/// Pure press / hold / tap state machine for single-key (and hold-mode) hotkeys.
+/// Tap vs hold uses Superwhisper-style timing (~300ms).
 struct HotkeyActivationMachine: Equatable {
-    /// Hold shorter than this is a "tap" (Wispr: under half a second).
-    static let briefThreshold: TimeInterval = 0.5
-    /// Second tap must land within this window to become hands-free.
-    static let doubleTapWindow: TimeInterval = 0.5
+    /// Hold at or past this duration is push-to-talk; shorter is a tap.
+    static let holdThreshold: TimeInterval = 0.3
 
     enum Phase: Equatable {
         case idle
-        /// Key is down; recording may already have started.
+        /// Key down; not yet decided tap vs hold. No recording yet.
+        case pending(downAt: TimeInterval)
+        /// Push-to-talk: threshold crossed, recording while held.
         case holding(downAt: TimeInterval)
-        /// Brief release; waiting to see if a second tap arrives.
-        case awaitingDoubleTap(releasedAt: TimeInterval)
         /// Hands-free recording (not holding).
         case handsFree
-        /// Key down while hands-free (about to stop on release, or cancel if too quick).
+        /// Key down while hands-free — stop on release (tap or hold).
         case handsFreeStopping(downAt: TimeInterval)
     }
 
     enum Edge: Equatable {
         case down(at: TimeInterval)
         case up(at: TimeInterval)
-        /// Another key arrived while the hotkey was held (fn+arrow, etc.).
+        /// Another key arrived while the hotkey was held (fn+arrow, emoji picker, etc.).
         case interrupted
-        /// Double-tap wait expired without a second press.
-        case doubleTapTimedOut
+        /// `holdThreshold` elapsed while still pending.
+        case holdThresholdReached
     }
 
     enum Action: Equatable {
@@ -66,8 +62,8 @@ struct HotkeyActivationMachine: Equatable {
         case stopRecording
         /// Discard in-progress take; do not paste.
         case cancelRecording
-        case armDoubleTapTimer(deadline: TimeInterval)
-        case cancelDoubleTapTimer
+        case armHoldTimer(deadline: TimeInterval)
+        case cancelHoldTimer
     }
 
     private(set) var phase: Phase = .idle
@@ -79,7 +75,7 @@ struct HotkeyActivationMachine: Equatable {
         case .holdOnly:
             return handleHoldOnly(edge)
         case .holdAndDoubleTap:
-            return handleHoldAndDoubleTap(edge)
+            return handleTapToggleHoldTalk(edge)
         }
     }
 
@@ -88,16 +84,15 @@ struct HotkeyActivationMachine: Equatable {
     private mutating func handleToggle(_ edge: Edge) -> [Action] {
         switch edge {
         case .down:
-            // Toggle fires on press.
             switch phase {
             case .idle:
-                phase = .handsFree // "on" without holding
+                phase = .handsFree
                 return [.startRecording]
-            case .handsFree, .handsFreeStopping, .holding, .awaitingDoubleTap:
+            case .handsFree, .handsFreeStopping, .holding, .pending:
                 phase = .idle
-                return [.cancelDoubleTapTimer, .stopRecording]
+                return [.cancelHoldTimer, .stopRecording]
             }
-        case .up, .interrupted, .doubleTapTimedOut:
+        case .up, .interrupted, .holdThresholdReached:
             return []
         }
     }
@@ -111,14 +106,14 @@ struct HotkeyActivationMachine: Equatable {
             case .idle:
                 phase = .holding(downAt: at)
                 return [.startRecording]
-            case .holding, .awaitingDoubleTap, .handsFree, .handsFreeStopping:
+            case .holding, .pending, .handsFree, .handsFreeStopping:
                 return []
             }
         case .up(let at):
             guard case .holding(let downAt) = phase else { return [] }
             let duration = at - downAt
             phase = .idle
-            if duration < Self.briefThreshold {
+            if duration < Self.holdThreshold {
                 return [.cancelRecording]
             }
             return [.stopRecording]
@@ -126,68 +121,62 @@ struct HotkeyActivationMachine: Equatable {
             guard case .holding = phase else { return [] }
             phase = .idle
             return [.cancelRecording]
-        case .doubleTapTimedOut:
+        case .holdThresholdReached:
             return []
         }
     }
 
-    // MARK: - Hold + double-tap (Wispr)
+    // MARK: - Tap toggle + hold PTT (Superwhisper-style)
 
-    private mutating func handleHoldAndDoubleTap(_ edge: Edge) -> [Action] {
+    private mutating func handleTapToggleHoldTalk(_ edge: Edge) -> [Action] {
         switch edge {
         case .down(let at):
             switch phase {
             case .idle:
-                phase = .holding(downAt: at)
-                return [.startRecording]
-            case .awaitingDoubleTap:
-                // Second tap → hands-free. Keep the recording that already started.
-                phase = .handsFree
-                return [.cancelDoubleTapTimer]
+                phase = .pending(downAt: at)
+                return [.armHoldTimer(deadline: at + Self.holdThreshold)]
             case .handsFree:
                 phase = .handsFreeStopping(downAt: at)
                 return []
-            case .holding, .handsFreeStopping:
+            case .pending, .holding, .handsFreeStopping:
                 return []
             }
-        case .up(let at):
+        case .up:
             switch phase {
-            case .holding(let downAt):
-                let duration = at - downAt
-                if duration < Self.briefThreshold {
-                    // Brief tap: wait for a possible second press before cancelling.
-                    phase = .awaitingDoubleTap(releasedAt: at)
-                    return [.armDoubleTapTimer(deadline: at + Self.doubleTapWindow)]
-                }
+            case .pending:
+                // Quick tap → toggle hands-free on.
+                phase = .handsFree
+                return [.cancelHoldTimer, .startRecording]
+            case .holding:
                 phase = .idle
                 return [.stopRecording]
-            case .handsFreeStopping(let downAt):
-                let duration = at - downAt
-                phase = .idle
-                // Wispr: pressing hands-free again within half a second of starting cancels.
-                if duration < Self.briefThreshold {
-                    return [.cancelRecording]
-                }
-                return [.stopRecording]
-            default:
-                return []
-            }
-        case .interrupted:
-            switch phase {
-            case .holding, .awaitingDoubleTap:
-                phase = .idle
-                return [.cancelDoubleTapTimer, .cancelRecording]
             case .handsFreeStopping:
-                // Interrupted while stopping — just go idle; leave recording to cancel.
+                // Tap or hold while hands-free both stop on release.
                 phase = .idle
-                return [.cancelRecording]
+                return [.stopRecording]
             case .idle, .handsFree:
                 return []
             }
-        case .doubleTapTimedOut:
-            guard case .awaitingDoubleTap = phase else { return [] }
-            phase = .idle
-            return [.cancelRecording]
+        case .holdThresholdReached:
+            guard case .pending(let downAt) = phase else { return [] }
+            // Crossed threshold while still held → push-to-talk.
+            phase = .holding(downAt: downAt)
+            return [.startRecording]
+        case .interrupted:
+            switch phase {
+            case .pending:
+                // Undecided tap: do not toggle.
+                phase = .idle
+                return [.cancelHoldTimer]
+            case .holding:
+                phase = .idle
+                return [.cancelRecording]
+            case .handsFreeStopping:
+                phase = .idle
+                return [.stopRecording]
+            case .idle, .handsFree:
+                return []
+            }
         }
     }
 }

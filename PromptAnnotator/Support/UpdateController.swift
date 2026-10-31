@@ -21,6 +21,13 @@ final class UpdateController: ObservableObject {
             controller = nil
             return
         }
+        // Debug builds use com.bicrick.PromptAnnotator.dev so TCC and Sparkle
+        // stay clear of the Developer ID install. Never pull production updates
+        // into a local signed binary.
+        if Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true {
+            controller = nil
+            return
+        }
         let controller = SPUStandardUpdaterController(
             startingUpdater: true,
             updaterDelegate: nil,

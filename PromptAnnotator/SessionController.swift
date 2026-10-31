@@ -248,7 +248,7 @@ final class SessionController: ObservableObject {
                 pushToTalkReleasedWhileStarting = true
                 activationWantsCancel = true
             }
-        case .armDoubleTapTimer, .cancelDoubleTapTimer:
+        case .armHoldTimer, .cancelHoldTimer:
             break
         }
     }

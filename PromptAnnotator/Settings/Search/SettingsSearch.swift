@@ -82,7 +82,7 @@ enum SettingsSearch {
         hit("clip.storage", .clipboard, "Clipboard storage", "Save files, images, text"),
         hit("clip.ignore", .clipboard, "Clipboard ignore", "Ignored apps and concealed types"),
         hit("clip.advanced", .clipboard, "Clipboard advanced", "Pause capture, clear on quit"),
-        hit("gen.ptt", .configuration, "Activation", "Hold to talk, double-tap hands-free, or toggle"),
+        hit("gen.ptt", .configuration, "Activation", "Tap to toggle, hold to talk, or toggle only"),
         hit("gen.fn", .configuration, "fn key", "Globe/fn default recording shortcut"),
         hit("gen.shotkey", .configuration, "Screenshot key", "Hold for the crosshair (Shift)"),
         hit("gen.drawkey", .configuration, "Annotate key", "Hold to draw (Control)"),

@@ -40,7 +40,7 @@ enum OnboardingStep: Int, CaseIterable {
         case .permissions:
             return "Microphone, Screen Recording, Accessibility, and Input Monitoring (for fn). Flip them, then Reopen so da transcribuh picks them up."
         case .shortcut:
-            return "Recording defaults to fn (hold to talk, double-tap for hands-free). Prefer ⌥Space? Rebind below. Clipboard defaults to ⇧⌘C. ⌘Space / ⌥⌘Space stay with the system."
+            return "Recording defaults to fn (tap to toggle, hold to talk). Prefer ⌥Space? Rebind below. Clipboard defaults to ⇧⌘C. ⌘Space / ⌥⌘Space stay with the system."
         case .clipboard:
             return "Maccy-style history of text, images, and files. Default shortcut ⇧⌘C. Tune capture and paste on the Clipboard settings tab."
         case .appearance:
@@ -468,7 +468,7 @@ struct OnboardingFlow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(Ink.cardPad)
             }
-            Text("fn defaults to hold-to-talk with double-tap hands-free (Wispr-style). Set Keyboard → Press 🌐 key to → Do Nothing so emoji/dictation does not steal fn. Change activation anytime in General.")
+            Text("fn defaults to tap-to-toggle / hold-to-talk. Set Keyboard → Press 🌐 key to → Do Nothing so emoji/dictation does not steal fn. Change activation anytime in General.")
                 .font(Ink.captionFont)
                 .foregroundStyle(Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
