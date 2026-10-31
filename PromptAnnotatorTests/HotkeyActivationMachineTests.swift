@@ -2,78 +2,141 @@ import XCTest
 @testable import PromptAnnotator
 
 final class HotkeyActivationMachineTests: XCTestCase {
-    func testHoldAndDoubleTapLongHoldStops() {
+
+    // MARK: - Tap toggle + hold PTT
+
+    func testTapStartsHandsFree() {
         var m = HotkeyActivationMachine()
         XCTAssertEqual(
             m.handle(.down(at: 1.0), behavior: .holdAndDoubleTap),
+            [.armHoldTimer(deadline: 1.0 + HotkeyActivationMachine.holdThreshold)]
+        )
+        // Quick release before threshold → hands-free on
+        XCTAssertEqual(
+            m.handle(.up(at: 1.1), behavior: .holdAndDoubleTap),
+            [.cancelHoldTimer, .startRecording]
+        )
+        XCTAssertEqual(m.phase, .handsFree)
+    }
+
+    func testHoldStartsPushToTalkAndReleaseStops() {
+        var m = HotkeyActivationMachine()
+        _ = m.handle(.down(at: 1.0), behavior: .holdAndDoubleTap)
+        XCTAssertEqual(
+            m.handle(.holdThresholdReached, behavior: .holdAndDoubleTap),
             [.startRecording]
         )
+        XCTAssertEqual(m.phase, .holding(downAt: 1.0))
         XCTAssertEqual(
-            m.handle(.up(at: 1.6), behavior: .holdAndDoubleTap),
+            m.handle(.up(at: 1.8), behavior: .holdAndDoubleTap),
             [.stopRecording]
         )
+        XCTAssertEqual(m.phase, .idle)
     }
 
-    func testHoldAndDoubleTapBriefTapArmsTimerThenCancels() {
+    func testTapWhileHandsFreeStops() {
         var m = HotkeyActivationMachine()
         _ = m.handle(.down(at: 1.0), behavior: .holdAndDoubleTap)
-        let up = m.handle(.up(at: 1.2), behavior: .holdAndDoubleTap)
-        XCTAssertEqual(up, [.armDoubleTapTimer(deadline: 1.7)])
+        _ = m.handle(.up(at: 1.1), behavior: .holdAndDoubleTap)
+        // Second tap down → stopping
+        XCTAssertEqual(m.handle(.down(at: 2.0), behavior: .holdAndDoubleTap), [])
+        XCTAssertEqual(m.phase, .handsFreeStopping(downAt: 2.0))
         XCTAssertEqual(
-            m.handle(.doubleTapTimedOut, behavior: .holdAndDoubleTap),
-            [.cancelRecording]
-        )
-    }
-
-    func testHoldAndDoubleTapSecondTapHandsFree() {
-        var m = HotkeyActivationMachine()
-        _ = m.handle(.down(at: 1.0), behavior: .holdAndDoubleTap)
-        _ = m.handle(.up(at: 1.2), behavior: .holdAndDoubleTap)
-        XCTAssertEqual(
-            m.handle(.down(at: 1.4), behavior: .holdAndDoubleTap),
-            [.cancelDoubleTapTimer]
-        )
-        // Stop hands-free with a press+release
-        XCTAssertEqual(
-            m.handle(.up(at: 1.5), behavior: .holdAndDoubleTap),
-            []
-        )
-        // Still hands-free until stopping press
-        _ = m.handle(.down(at: 3.0), behavior: .holdAndDoubleTap)
-        XCTAssertEqual(
-            m.handle(.up(at: 3.6), behavior: .holdAndDoubleTap),
+            m.handle(.up(at: 2.1), behavior: .holdAndDoubleTap),
             [.stopRecording]
         )
+        XCTAssertEqual(m.phase, .idle)
     }
 
-    func testHoldAndDoubleTapInterruptCancels() {
+    func testHoldWhileHandsFreeAlsoStopsOnRelease() {
+        var m = HotkeyActivationMachine()
+        _ = m.handle(.down(at: 1.0), behavior: .holdAndDoubleTap)
+        _ = m.handle(.up(at: 1.1), behavior: .holdAndDoubleTap)
+        _ = m.handle(.down(at: 2.0), behavior: .holdAndDoubleTap)
+        // Long hold then release still stops
+        XCTAssertEqual(
+            m.handle(.up(at: 2.8), behavior: .holdAndDoubleTap),
+            [.stopRecording]
+        )
+        XCTAssertEqual(m.phase, .idle)
+    }
+
+    func testInterruptDuringPendingDoesNotToggle() {
         var m = HotkeyActivationMachine()
         _ = m.handle(.down(at: 1.0), behavior: .holdAndDoubleTap)
         XCTAssertEqual(
             m.handle(.interrupted, behavior: .holdAndDoubleTap),
-            [.cancelDoubleTapTimer, .cancelRecording]
+            [.cancelHoldTimer]
+        )
+        XCTAssertEqual(m.phase, .idle)
+    }
+
+    func testInterruptDuringHoldCancels() {
+        var m = HotkeyActivationMachine()
+        _ = m.handle(.down(at: 1.0), behavior: .holdAndDoubleTap)
+        _ = m.handle(.holdThresholdReached, behavior: .holdAndDoubleTap)
+        XCTAssertEqual(
+            m.handle(.interrupted, behavior: .holdAndDoubleTap),
+            [.cancelRecording]
+        )
+        XCTAssertEqual(m.phase, .idle)
+    }
+
+    func testInterruptDuringHandsFreeStoppingStops() {
+        var m = HotkeyActivationMachine()
+        _ = m.handle(.down(at: 1.0), behavior: .holdAndDoubleTap)
+        _ = m.handle(.up(at: 1.1), behavior: .holdAndDoubleTap)
+        _ = m.handle(.down(at: 2.0), behavior: .holdAndDoubleTap)
+        XCTAssertEqual(
+            m.handle(.interrupted, behavior: .holdAndDoubleTap),
+            [.stopRecording]
+        )
+        XCTAssertEqual(m.phase, .idle)
+    }
+
+    // MARK: - Hold only
+
+    func testHoldOnlyLongHoldStops() {
+        var m = HotkeyActivationMachine()
+        XCTAssertEqual(
+            m.handle(.down(at: 1.0), behavior: .holdOnly),
+            [.startRecording]
+        )
+        XCTAssertEqual(
+            m.handle(.up(at: 1.6), behavior: .holdOnly),
+            [.stopRecording]
         )
     }
 
-    func testHoldOnlyBriefCancels() {
+    func testHoldOnlyBriefTapCancels() {
         var m = HotkeyActivationMachine()
         _ = m.handle(.down(at: 1.0), behavior: .holdOnly)
         XCTAssertEqual(
-            m.handle(.up(at: 1.2), behavior: .holdOnly),
+            m.handle(.up(at: 1.1), behavior: .holdOnly),
             [.cancelRecording]
         )
     }
 
-    func testToggleOnlyIgnoresUp() {
+    func testHoldOnlyInterruptCancels() {
+        var m = HotkeyActivationMachine()
+        _ = m.handle(.down(at: 1.0), behavior: .holdOnly)
+        XCTAssertEqual(
+            m.handle(.interrupted, behavior: .holdOnly),
+            [.cancelRecording]
+        )
+    }
+
+    // MARK: - Toggle
+
+    func testToggleFlips() {
         var m = HotkeyActivationMachine()
         XCTAssertEqual(
             m.handle(.down(at: 1.0), behavior: .toggleOnly),
             [.startRecording]
         )
-        XCTAssertEqual(m.handle(.up(at: 1.1), behavior: .toggleOnly), [])
         XCTAssertEqual(
             m.handle(.down(at: 2.0), behavior: .toggleOnly),
-            [.cancelDoubleTapTimer, .stopRecording]
+            [.cancelHoldTimer, .stopRecording]
         )
     }
 }

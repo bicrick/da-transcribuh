@@ -246,7 +246,7 @@ final class AppSettings: ObservableObject {
     }
 
     /// Prefer explicit `hotkey.behavior`. Else migrate legacy `hotkey.pushToTalk` bool.
-    /// Brand-new installs (no saved chord) get hold + double-tap. Existing chord users
+    /// Brand-new installs (no saved chord) get tap-toggle / hold-PTT. Existing chord users
     /// without a PTT preference keep classic toggle so ⌥Space stays tap-to-toggle.
     private static func loadHotkeyBehavior(defaults: UserDefaults) -> HotkeyBehavior {
         if let raw = defaults.string(forKey: Keys.hotkeyBehavior),

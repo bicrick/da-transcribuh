@@ -4,8 +4,8 @@ import CoreGraphics
 import Foundation
 
 /// Global Start/Stop hotkey.
-/// Carbon `RegisterEventHotKey` for registrable chords; `FnKeyMonitor` for bare fn
-/// (Wispr Flow–style). Hold / double-tap / toggle driven by `HotkeyActivationMachine`.
+/// Carbon `RegisterEventHotKey` for registrable chords; `FnKeyMonitor` for bare fn.
+/// Tap-toggle / hold-PTT / toggle driven by `HotkeyActivationMachine`.
 final class HotkeyCenter {
     static let shared = HotkeyCenter()
 
@@ -27,7 +27,7 @@ final class HotkeyCenter {
     private var chord = HotkeyChord.default
     private var behavior: HotkeyBehavior = .holdAndDoubleTap
     private var machine = HotkeyActivationMachine()
-    private var doubleTapWork: DispatchWorkItem?
+    private var holdTimerWork: DispatchWorkItem?
     private var fnMonitor: FnKeyMonitor?
     private var keyUpGlobal: Any?
     private var keyUpLocal: Any?
@@ -66,7 +66,7 @@ final class HotkeyCenter {
     func applyBehavior(_ behavior: HotkeyBehavior) {
         self.behavior = behavior
         machine = HotkeyActivationMachine()
-        clearDoubleTapTimer()
+        clearHoldTimer()
         isHolding = false
         // Re-bind monitors for the same chord under the new behavior.
         if installed {
@@ -99,7 +99,7 @@ final class HotkeyCenter {
     }
 
     /// Modifier combos (⌥Space, etc.) always toggle on keyDown.
-    /// Hold / double-tap only applies to bare single keys (fn, F-keys).
+    /// Tap-toggle / hold-PTT only applies to bare single keys (fn, F-keys).
     private var effectiveBehavior: HotkeyBehavior {
         chord.isSingleKey ? behavior : .toggleOnly
     }
@@ -107,7 +107,7 @@ final class HotkeyCenter {
     private func applyRegistration(_ chord: HotkeyChord) -> Bool {
         tearDownChordMonitors()
         machine = HotkeyActivationMachine()
-        clearDoubleTapTimer()
+        clearHoldTimer()
         isHolding = false
 
         if chord.isFnOnly {
@@ -214,7 +214,7 @@ final class HotkeyCenter {
             }
         case .up, .interrupted:
             isHolding = false
-        case .doubleTapTimedOut:
+        case .holdThresholdReached:
             break
         }
         let actions = machine.handle(edge, behavior: mode)
@@ -224,16 +224,16 @@ final class HotkeyCenter {
     private func dispatch(_ actions: [HotkeyActivationMachine.Action]) {
         for action in actions {
             switch action {
-            case .armDoubleTapTimer(let deadline):
-                clearDoubleTapTimer()
+            case .armHoldTimer(let deadline):
+                clearHoldTimer()
                 let delay = max(0, deadline - ProcessInfo.processInfo.systemUptime)
                 let work = DispatchWorkItem { [weak self] in
-                    self?.edge(.doubleTapTimedOut)
+                    self?.edge(.holdThresholdReached)
                 }
-                doubleTapWork = work
+                holdTimerWork = work
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
-            case .cancelDoubleTapTimer:
-                clearDoubleTapTimer()
+            case .cancelHoldTimer:
+                clearHoldTimer()
             case .startRecording, .stopRecording, .cancelRecording:
                 if let onActivation {
                     onActivation(action)
@@ -245,9 +245,9 @@ final class HotkeyCenter {
         }
     }
 
-    private func clearDoubleTapTimer() {
-        doubleTapWork?.cancel()
-        doubleTapWork = nil
+    private func clearHoldTimer() {
+        holdTimerWork?.cancel()
+        holdTimerWork = nil
     }
 
     private func installHandlerIfNeeded() {
@@ -300,7 +300,7 @@ final class HotkeyCenter {
 
     func remove() {
         tearDownChordMonitors()
-        clearDoubleTapTimer()
+        clearHoldTimer()
         machine = HotkeyActivationMachine()
         isHolding = false
         installed = false
