@@ -877,7 +877,9 @@ final class PermissionModel: ObservableObject {
     @Published private(set) var status = Permissions.current()
 
     func refresh() {
-        status = Permissions.current()
+        let next = Permissions.current()
+        // Publish only on a real change so polling and activation refreshes stay free.
+        if next != status { status = next }
     }
 }
 
