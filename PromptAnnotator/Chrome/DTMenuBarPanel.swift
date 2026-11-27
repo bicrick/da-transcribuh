@@ -2,16 +2,25 @@ import AppKit
 import SwiftUI
 
 /// B/W menu-bar panel matching the menubar-menu mockup.
-/// Used inside `MenuBarExtra` with `.menuBarExtraStyle(.window)`.
+/// Hosted inside `DTMenuBarController`'s borderless square `ChromePanel`.
 struct DTMenuBarPanel: View {
     @ObservedObject var session: SessionController
     @ObservedObject var settings: AppSettings
     @ObservedObject var stayAwake: StayAwakeController
+    var onDismiss: (() -> Void)? = nil
     @ObservedObject private var updates = UpdateController.shared
     @Environment(\.dismiss) private var dismiss
 
     private let panelWidth: CGFloat = 260
     private var shadow: CGFloat { Ink.bevelOffset }
+
+    private func closePanel() {
+        if let onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
+        }
+    }
 
     var body: some View {
         let _ = PerfSuite.count("menuPanel")
@@ -53,7 +62,7 @@ struct DTMenuBarPanel: View {
             if settings.clipboardHistoryEnabled {
                 row("Clipboard history (\(settings.clipboardChord.display))") {
                     ClipboardHistoryController.shared.togglePanel()
-                    dismiss()
+                    closePanel()
                 }
             }
             // Always listed so a disabled clipboard can still be found and turned on.
@@ -93,11 +102,6 @@ struct DTMenuBarPanel: View {
         .padding(.bottom, shadow)
         .onAppear {
             stayAwake.refreshSystemState()
-        }
-        .background {
-            HostWindowAccessor { window in
-                polishMenuBarWindow(window)
-            }
         }
     }
 
@@ -263,21 +267,8 @@ struct DTMenuBarPanel: View {
             guard !disabled else { return }
             action()
             if dismissOnTap {
-                dismiss()
+                closePanel()
             }
-        }
-    }
-
-    private func polishMenuBarWindow(_ window: NSWindow) {
-        window.backgroundColor = .clear
-        window.isOpaque = false
-        window.hasShadow = false
-        window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = true
-        if let content = window.contentView {
-            content.wantsLayer = true
-            content.layer?.cornerRadius = 0
-            content.layer?.masksToBounds = false
         }
     }
 }

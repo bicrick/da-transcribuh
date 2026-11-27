@@ -401,6 +401,15 @@ final class StayAwakeTests: XCTestCase {
 
     // MARK: - Menu Bar Status Icon Rendering
 
+    func testMenuBarPanelIsBorderlessSquareWithNoSystemGlass() {
+        let panel = DTMenuBarController.makePanel()
+        XCTAssertTrue(panel.styleMask.contains(.borderless))
+        XCTAssertEqual(panel.cornerRadius, 0)
+        XCTAssertFalse(panel.isOpaque)
+        XCTAssertFalse(panel.hasShadow)
+        XCTAssertEqual(panel.level, .popUpMenu)
+    }
+
     func testMenuBarStatusIconRendersColoredBadgeForActiveStates() throws {
         XCTAssertNil(MenuBarStatusIcon.image(for: .inactive))
 
