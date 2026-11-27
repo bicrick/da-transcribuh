@@ -34,7 +34,7 @@ enum VerifyNavHarness {
                         let w = SettingsPresenter.shared.attachedWindow
                         log("settings visible=\(w?.isVisible ?? false) panelVisible=\(panel?.isVisible ?? false)")
                         snap(w, "\(dir)/nav-1-after-cmd-comma.png", log)
-                        let host = NSHostingView(rootView: DTMenuBarPanel(session: SessionController.shared, settings: AppSettings.shared))
+                        let host = NSHostingView(rootView: DTMenuBarPanel(session: SessionController.shared, settings: AppSettings.shared, stayAwake: StayAwakeController.shared))
                         host.frame = NSRect(origin: .zero, size: host.fittingSize)
                         let offscreen = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
                         offscreen.contentView = host

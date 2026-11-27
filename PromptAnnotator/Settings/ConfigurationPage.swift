@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ConfigurationPage: View {
     @ObservedObject var settings: AppSettings
+    @ObservedObject private var stayAwake = StayAwakeController.shared
     @State private var capture: CaptureTarget?
     @State private var message: String?
     @ObservedObject private var updates = UpdateController.shared
@@ -42,6 +43,12 @@ struct ConfigurationPage: View {
             SettingsSection(title: "Application") {
                 applicationCard
             }
+            SettingsSection(
+                title: "Stay awake",
+                footer: "Closed-lid mode uses pmset disablesleep so the Mac stays running without an external display. Stay plugged in for long jobs and avoid leaving a running MacBook in a bag."
+            ) {
+                stayAwakeCard
+            }
             SettingsSection(title: "Advanced") {
                 advancedCard
             }
@@ -66,6 +73,9 @@ struct ConfigurationPage: View {
         )) { event in
             apply(event)
         })
+        .onAppear {
+            stayAwake.refreshSystemState()
+        }
     }
 
     private var shortcutCard: some View {
@@ -311,6 +321,92 @@ struct ConfigurationPage: View {
                 }
                 .padding(.horizontal, Ink.rowHPad)
                 .padding(.bottom, Ink.rowVPad)
+            }
+        }
+    }
+
+    private var stayAwakeCard: some View {
+        InkCard {
+            VStack(alignment: .leading, spacing: 0) {
+                InkSettingRow(
+                    title: "Stay awake mode",
+                    detail: settings.stayAwakeDefaultMode.detail
+                ) {
+                    InkMenuPicker(
+                        title: "Stay awake mode",
+                        selection: Binding(
+                            get: { settings.stayAwakeDefaultMode },
+                            set: { settings.setStayAwakeDefaultMode($0) }
+                        ),
+                        options: StayAwakeMode.activeModes.map { ($0, $0.title) }
+                    )
+                }
+                InkDivider(leading: 0)
+                InkSettingRow(
+                    title: "Default duration",
+                    detail: "How long each Stay Awake session runs from the menu bar."
+                ) {
+                    InkMenuPicker(
+                        title: "Default duration",
+                        selection: Binding(
+                            get: { settings.stayAwakeDefaultDuration },
+                            set: { settings.setStayAwakeDefaultDuration($0) }
+                        ),
+                        options: StayAwakeDuration.allCases.map { ($0, $0.title) }
+                    )
+                }
+                InkDivider(leading: 0)
+                InkSettingRow(
+                    title: "Battery safety cutoff",
+                    detail: "Restores normal sleep automatically when unplugged and battery reaches this level."
+                ) {
+                    InkMenuPicker(
+                        title: "Battery safety cutoff",
+                        selection: Binding(
+                            get: { settings.stayAwakeBatteryCutoff },
+                            set: { settings.setStayAwakeBatteryCutoff($0) }
+                        ),
+                        options: StayAwakeBatteryCutoff.presets.map { ($0, StayAwakeBatteryCutoff.title(for: $0)) }
+                    )
+                }
+                InkDivider(leading: 0)
+                InkToggleRow(
+                    title: "Restore normal sleep on quit",
+                    detail: "Turns pmset disablesleep back off when quitting da transcribuh.",
+                    isOn: Binding(
+                        get: { settings.stayAwakeRestoreOnQuit },
+                        set: { settings.setStayAwakeRestoreOnQuit($0) }
+                    )
+                )
+                InkDivider(leading: 0)
+                InkSettingRow(
+                    title: "Closed-lid helper",
+                    detail: stayAwake.helperInstalled
+                        ? "Installed at \(StayAwakeSudoersRule.path). Toggling closed-lid mode needs no password."
+                        : "Installs a one-line sudoers rule limited strictly to pmset disablesleep 0/1."
+                ) {
+                    if stayAwake.helperInstalled {
+                        Button("Remove") {
+                            stayAwake.removeHelper()
+                        }
+                        .buttonStyle(InkSecondaryButtonStyle())
+                        .disabled(stayAwake.isBusy)
+                    } else {
+                        Button("Install…") {
+                            stayAwake.installHelper()
+                        }
+                        .buttonStyle(InkSecondaryButtonStyle())
+                        .disabled(stayAwake.isBusy)
+                    }
+                }
+                if let note = stayAwake.statusMessage, !note.isEmpty {
+                    Text(note)
+                        .font(Ink.captionFont)
+                        .foregroundStyle(stayAwake.statusIsError ? Ink.error : Ink.secondary)
+                        .padding(.horizontal, Ink.rowHPad)
+                        .padding(.bottom, Ink.space2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }

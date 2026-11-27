@@ -6,6 +6,7 @@ import SwiftUI
 struct DTMenuBarPanel: View {
     @ObservedObject var session: SessionController
     @ObservedObject var settings: AppSettings
+    @ObservedObject var stayAwake: StayAwakeController
     @ObservedObject private var updates = UpdateController.shared
     @Environment(\.dismiss) private var dismiss
 
@@ -40,9 +41,13 @@ struct DTMenuBarPanel: View {
 
             hairline
 
-            row(settings.appearance.menuLabel) {
+            row(settings.appearance.menuLabel, dismissOnTap: false) {
                 settings.cycleAppearance()
             }
+
+            hairline
+
+            stayAwakeBlock
 
             hairline
             if settings.clipboardHistoryEnabled {
@@ -86,6 +91,9 @@ struct DTMenuBarPanel: View {
         }
         .padding(.trailing, shadow)
         .padding(.bottom, shadow)
+        .onAppear {
+            stayAwake.refreshSystemState()
+        }
         .background {
             HostWindowAccessor { window in
                 polishMenuBarWindow(window)
@@ -164,6 +172,75 @@ struct DTMenuBarPanel: View {
         }
     }
 
+    private var stayAwakeBlock: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            row(
+                stayAwake.menuToggleTitle,
+                disabled: stayAwake.isBusy,
+                dismissOnTap: false,
+                indicatorColor: stayAwakeIndicatorColor
+            ) {
+                stayAwake.togglePrimary()
+            }
+
+            if stayAwake.mode.isActive {
+                HStack(spacing: Ink.space1) {
+                    ForEach(StayAwakeMode.activeModes) { candidate in
+                        DTMenuChip(
+                            label: candidate.shortLabel,
+                            selected: stayAwake.mode == candidate,
+                            disabled: stayAwake.isBusy
+                        ) {
+                            stayAwake.selectMode(candidate)
+                        }
+                    }
+                }
+                .padding(.horizontal, Ink.space3)
+                .padding(.bottom, Ink.space1)
+
+                HStack(spacing: Ink.space1) {
+                    ForEach(StayAwakeDuration.allCases) { candidate in
+                        DTMenuChip(
+                            label: candidate.shortLabel,
+                            selected: stayAwake.duration == candidate,
+                            disabled: stayAwake.isBusy
+                        ) {
+                            stayAwake.setDuration(candidate)
+                        }
+                    }
+                }
+                .padding(.horizontal, Ink.space3)
+                .padding(.bottom, Ink.space2)
+            }
+
+            Text(stayAwake.menuStatusLine)
+                .font(Ink.menuBarMetaFont)
+                .foregroundStyle(Ink.secondary)
+                .padding(.horizontal, Ink.space3)
+                .padding(.bottom, Ink.space2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let note = stayAwake.statusMessage, !note.isEmpty {
+                Text(note)
+                    .font(Ink.menuBarMetaFont)
+                    .foregroundStyle(stayAwake.statusIsError ? Ink.error : Ink.secondary)
+                    .padding(.horizontal, Ink.space3)
+                    .padding(.bottom, Ink.space2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var stayAwakeIndicatorColor: Color? {
+        switch stayAwake.indicatorState {
+        case .inactive: return nil
+        case .lidClosed: return Ink.tabStrokeOrange
+        case .lidOpen: return Ink.tabStrokeGreen
+        }
+    }
+
     private var hairline: some View {
         Rectangle()
             .fill(Ink.label)
@@ -174,13 +251,18 @@ struct DTMenuBarPanel: View {
     private func row(
         _ title: String,
         disabled: Bool = false,
+        dismissOnTap: Bool = true,
+        indicatorColor: Color? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        DTMenuRow(title: title, disabled: disabled) {
+        DTMenuRow(
+            title: title,
+            disabled: disabled,
+            indicatorColor: indicatorColor
+        ) {
             guard !disabled else { return }
             action()
-            // Theme cycle stays open so the user can click again; other actions dismiss.
-            if !title.hasPrefix("theme:") {
+            if dismissOnTap {
                 dismiss()
             }
         }
@@ -205,18 +287,32 @@ struct DTMenuBarPanel: View {
 private struct DTMenuRow: View {
     var title: String
     var disabled: Bool
+    var indicatorColor: Color? = nil
     var action: () -> Void
 
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
-            InkGlyphString(text: title, size: 13, color: rowForeground)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Ink.space3)
-                .padding(.vertical, Ink.space2)
-                .contentShape(Rectangle())
-                .background(rowBackground)
+            HStack(spacing: Ink.space2) {
+                InkGlyphString(text: title, size: 13, color: rowForeground)
+                Spacer(minLength: 0)
+                if let indicatorColor {
+                    Rectangle()
+                        .fill(indicatorColor)
+                        .frame(width: 8, height: 8)
+                        .overlay(
+                            Rectangle()
+                                .strokeBorder(rowForeground, lineWidth: 1)
+                        )
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Ink.space3)
+            .padding(.vertical, Ink.space2)
+            .contentShape(Rectangle())
+            .background(rowBackground)
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -239,5 +335,51 @@ private struct DTMenuRow: View {
     private var rowBackground: Color {
         if disabled { return .clear }
         return hovering ? Ink.primaryFill : .clear
+    }
+}
+
+private struct DTMenuChip: View {
+    var label: String
+    var selected: Bool
+    var disabled: Bool
+    var action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(Ink.menuBarMetaFont)
+                .foregroundStyle(foreground)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+                .background(background)
+                .overlay(
+                    Rectangle()
+                        .strokeBorder(disabled ? Ink.tertiary : Ink.label, lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .onHover { over in
+            withAnimation(.easeOut(duration: Ink.hoverDuration)) {
+                hovering = over && !disabled
+            }
+        }
+        .accessibilityLabel(label)
+    }
+
+    private var foreground: Color {
+        if disabled { return Ink.tertiary }
+        if selected { return Ink.onPrimary }
+        return Ink.label
+    }
+
+    private var background: Color {
+        if selected { return Ink.primaryFill }
+        if hovering { return Ink.rowHover }
+        return .clear
     }
 }

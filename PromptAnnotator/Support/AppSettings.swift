@@ -129,6 +129,10 @@ final class AppSettings: ObservableObject {
     @Published var customModels: [CustomWhisperModel]
     @Published var openAIBaseURL: String
     @Published var openAIModel: String
+    @Published var stayAwakeDefaultMode: StayAwakeMode
+    @Published var stayAwakeDefaultDuration: StayAwakeDuration
+    @Published var stayAwakeBatteryCutoff: Int
+    @Published var stayAwakeRestoreOnQuit: Bool
     @Published var loginItemNote: String?
 
     var onChromeChange: (() -> Void)?
@@ -202,6 +206,14 @@ final class AppSettings: ObservableObject {
         }
         openAIBaseURL = OpenAICompatibleTranscriber.storedBaseURL(defaults: defaults)
         openAIModel = OpenAICompatibleTranscriber.storedModel(defaults: defaults)
+        stayAwakeDefaultMode = StayAwakeMode.storedDefault(defaults.string(forKey: Keys.stayAwakeDefaultMode))
+        stayAwakeDefaultDuration = StayAwakeDuration.stored(defaults.string(forKey: Keys.stayAwakeDefaultDuration))
+        if let rawCutoff = defaults.object(forKey: Keys.stayAwakeBatteryCutoff) as? Int {
+            stayAwakeBatteryCutoff = StayAwakeBatteryCutoff.sanitize(rawCutoff)
+        } else {
+            stayAwakeBatteryCutoff = StayAwakeBatteryCutoff.defaultPercent
+        }
+        stayAwakeRestoreOnQuit = defaults.object(forKey: Keys.stayAwakeRestoreOnQuit) as? Bool ?? true
         loginItemNote = nil
         loadClipboardPreferences()
         isLoading = false
@@ -655,6 +667,33 @@ final class AppSettings: ObservableObject {
         persist(Keys.color, color.name)
     }
 
+    func setStayAwakeDefaultMode(_ mode: StayAwakeMode) {
+        let resolved: StayAwakeMode = (mode == .off) ? .lidClosed : mode
+        guard stayAwakeDefaultMode != resolved else { return }
+        stayAwakeDefaultMode = resolved
+        persist(Keys.stayAwakeDefaultMode, resolved.rawValue)
+    }
+
+    func setStayAwakeDefaultDuration(_ duration: StayAwakeDuration) {
+        guard stayAwakeDefaultDuration != duration else { return }
+        stayAwakeDefaultDuration = duration
+        persist(Keys.stayAwakeDefaultDuration, duration.rawValue)
+    }
+
+    func setStayAwakeBatteryCutoff(_ percent: Int) {
+        let sanitized = StayAwakeBatteryCutoff.sanitize(percent)
+        guard stayAwakeBatteryCutoff != sanitized else { return }
+        stayAwakeBatteryCutoff = sanitized
+        guard !isLoading else { return }
+        defaults.set(sanitized, forKey: Keys.stayAwakeBatteryCutoff)
+    }
+
+    func setStayAwakeRestoreOnQuit(_ enabled: Bool) {
+        guard stayAwakeRestoreOnQuit != enabled else { return }
+        stayAwakeRestoreOnQuit = enabled
+        persist(Keys.stayAwakeRestoreOnQuit, enabled)
+    }
+
     func persist(_ key: String, _ value: String) {
         guard !isLoading else { return }
         defaults.set(value, forKey: key)
@@ -709,5 +748,9 @@ final class AppSettings: ObservableObject {
         static let speechEngine = SpeechEngineKind.defaultsKey
         static let openAIBaseURL = OpenAICompatibleTranscriber.baseURLKey
         static let openAIModel = OpenAICompatibleTranscriber.modelKey
+        static let stayAwakeDefaultMode = "stayAwake.defaultMode"
+        static let stayAwakeDefaultDuration = "stayAwake.defaultDuration"
+        static let stayAwakeBatteryCutoff = "stayAwake.batteryCutoff"
+        static let stayAwakeRestoreOnQuit = "stayAwake.restoreOnQuit"
     }
 }

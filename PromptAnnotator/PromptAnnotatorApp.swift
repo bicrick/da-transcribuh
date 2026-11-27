@@ -11,21 +11,42 @@ enum Runtime {
 struct PromptAnnotatorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var session = SessionController.shared
+    @StateObject private var stayAwake = StayAwakeController.shared
+
+    private var menuAccessibilityLabel: String {
+        switch stayAwake.indicatorState {
+        case .inactive:
+            return session.menuAccessibilityLabel
+        case .lidClosed:
+            return "\(session.menuAccessibilityLabel) — Stay awake (lid closed)"
+        case .lidOpen:
+            return "\(session.menuAccessibilityLabel) — Stay awake (lid open)"
+        }
+    }
 
     var body: some Scene {
         MenuBarExtra {
-            DTMenuBarPanel(session: session, settings: AppSettings.shared)
+            DTMenuBarPanel(
+                session: session,
+                settings: AppSettings.shared,
+                stayAwake: stayAwake
+            )
                 .focusEffectDisabled()
         } label: {
-            // Template dt glyph (assets).
+            // Template dt glyph when idle; colored + badged dt when Stay Awake is active.
             Label {
-                Text(session.menuAccessibilityLabel)
+                Text(menuAccessibilityLabel)
             } icon: {
-                Image("MenuBarIcon")
-                    .renderingMode(.template)
+                if let activeIcon = MenuBarStatusIcon.image(for: stayAwake.indicatorState) {
+                    Image(nsImage: activeIcon)
+                        .renderingMode(.original)
+                } else {
+                    Image("MenuBarIcon")
+                        .renderingMode(.template)
+                }
             }
             .labelStyle(.iconOnly)
-            .accessibilityLabel(session.menuAccessibilityLabel)
+            .accessibilityLabel(menuAccessibilityLabel)
         }
         .menuBarExtraStyle(.window)
     }
@@ -64,7 +85,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         PasteFollowUp.shared.install()
         // Sparkle. Automatic checks are off in Info.plist; this only wires up the manual check.
-        MainActor.assumeIsolated { UpdateController.shared.start() }
+        MainActor.assumeIsolated {
+            UpdateController.shared.start()
+            StayAwakeController.shared.refreshSystemState()
+        }
         ClipboardHistoryController.shared.install()
         // Drop empty (no text, no images) sessions left from older builds — once.
         SessionEmptyTake.runOneTimeCleanupIfNeeded()
@@ -104,6 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ClipboardHistoryController.shared.remove()
         }
         MainActor.assumeIsolated {
+            StayAwakeController.shared.shutdown()
             SessionController.shared.abandonIfRecording()
         }
     }
